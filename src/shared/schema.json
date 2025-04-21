@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Plugin Configuration",
+  "type": "object",
+  "required": ["name", "version", "fx_version"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the plugin"
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the plugin (e.g., 1.0.0)"
+    },
+    "fx_version": {
+      "type": "string",
+      "description": "FXv2 resource version (e.g., cerulean, bodacious)",
+      "enum": ["cerulean", "bodacious", "adamant"]
+    },
+    "games": {
+      "type": "array",
+      "description": "Supported games",
+      "items": {
+        "type": "string",
+        "enum": ["gta5", "rdr3"]
+      }
+    },
+    "author": {
+      "type": "string",
+      "description": "Author of the plugin"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the plugin"
+    },
+    "client_scripts": {
+      "type": "array",
+      "description": "Client-side scripts to load",
+      "items": {
+        "type": "string"
+      }
+    },
+    "server_scripts": {
+      "type": "array",
+      "description": "Server-side scripts to load",
+      "items": {
+        "type": "string"
+      }
+    },
+    "shared_scripts": {
+      "type": "array",
+      "description": "Scripts to load on both client and server",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exports": {
+      "type": "array",
+      "description": "Global functions exported by client script",
+      "items": {
+        "type": "string"
+      }
+    },
+    "server_exports": {
+      "type": "array",
+      "description": "Global functions exported by server script",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ui_page": {
+      "type": "string",
+      "description": "Sets the NUI page"
+    },
+    "level_meta": {
+      "type": "object",
+      "description": "Level meta configurations",
+      "properties": {
+        "before": {
+          "type": "string",
+          "description": "Loads level meta before the primary level meta"
+        },
+        "after": {
+          "type": "string",
+          "description": "Loads level meta after the primary level meta"
+        },
+        "replace": {
+          "type": "string",
+          "description": "Replaces the level meta"
+        }
+      }
+    },
+    "data_files": {
+      "type": "array",
+      "description": "Data files for the game's extra content system",
+      "items": {
+        "type": "object",
+        "required": ["type", "path"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of data file (e.g., AUDIO_WAVEPACK)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to the data file"
+          }
+        }
+      }
+    },
+    "is_map": {
+      "type": "boolean",
+      "description": "Marks the resource as a GTA map",
+      "default": false
+    },
+    "server_only": {
+      "type": "boolean",
+      "description": "Marks the resource as server-only",
+      "default": false
+    },
+    "loadscreen": {
+      "type": "object",
+      "description": "Loading screen configuration",
+      "properties": {
+        "page": {
+          "type": "string",
+          "description": "Sets the HTML file as the game loading screen"
+        },
+        "manual_shutdown": {
+          "type": "boolean",
+          "description": "Enables manual shutdown of the loadscreen",
+          "default": false
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "description": "Files to include in the resource packfile",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Required resources",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": ["resource"],
+            "properties": {
+              "resource": {
+                "type": "string",
+                "description": "Resource name"
+              },
+              "server": {
+                "type": "string",
+                "description": "Server constraints"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "lua54": {
+      "type": "boolean",
+      "description": "Enables Lua 5.4",
+      "default": false
+    },
+    "provide": {
+      "type": "string",
+      "description": "Marks this resource as a replacement for another resource"
+    },
+    "experimental": {
+      "type": "object",
+      "description": "Experimental features",
+      "properties": {
+        "use_fxv2_oal": {
+          "type": "boolean",
+          "description": "Enables One Argument List for Lua",
+          "default": false
+        },
+        "clr_disable_task_scheduler": {
+          "type": "boolean",
+          "description": "Disables C# task scheduler on the server",
+          "default": false
+        }
+      }
+    },
+    "convars": {
+      "type": "object",
+      "description": "Configuration variables",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Category of the convar group"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "type", "default"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the convar"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the convar",
+                  "enum": ["CV_STRING", "CV_INT", "CV_FLOAT", "CV_BOOL"]
+                },
+                "default": {
+                  "description": "Default value of the convar"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "custom_data": {
+      "type": "object",
+      "description": "Custom metadata",
+      "additionalProperties": true
+    }
+  }
+}

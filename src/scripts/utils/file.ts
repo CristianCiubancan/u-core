@@ -1,14 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface File {
+export interface File {
   name: string;
   pathFromPluginDir: string;
   isPluginJsonFile: boolean;
   fullPath: string;
 }
 
-interface Plugin {
+export interface Plugin {
   name: string;
   pathFromPluginsDir: string;
   hasHtml: boolean;
@@ -165,6 +165,3 @@ export function parseFilePathsIntoFiles(pluginDirPath: string): File[] {
 
   return result;
 }
-
-// Export interfaces for use in other files
-export type { Plugin, File };
