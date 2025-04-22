@@ -1,8 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import {
+  getPluginScripts,
   getPluginsPaths,
-  getFilePaths,
   parseFilePathsIntoFiles,
   parsePluginPathsIntoPlugins,
 } from './utils/file';
@@ -11,13 +11,8 @@ import { generateManifest } from './utils/manifest';
 const pluginsDir = path.join(__dirname, '../plugins');
 const rootDir = path.join(__dirname, '../../');
 
-// Get all files in the plugins directory
-const allPluginFiles = getFilePaths(pluginsDir);
-console.log('Found the following plugin files:', allPluginFiles);
-
 // Get plugin directories
 const { pluginPaths } = getPluginsPaths(pluginsDir);
-console.log('Found the following plugin directories:', pluginPaths);
 
 // Pass the plugins directory to ensure correct relative path calculation
 const plugins = parsePluginPathsIntoPlugins(pluginPaths);
@@ -25,18 +20,71 @@ const plugins = parsePluginPathsIntoPlugins(pluginPaths);
 // Process files for each plugin
 for (const plugin of plugins) {
   if (!plugin.fullPath) {
-    console.log(`Skipping plugin ${plugin.name} as it has no fullPath`);
     continue;
   }
 
   // Get the files for this plugin
   const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
-  console.log(`Found ${pluginFiles.length} files for plugin ${plugin.name}`);
 
   // Add all files to the plugin
   plugin.files.push(...pluginFiles);
 
-  // Generate manifest file for this plugin
+  // Read plugin.json
+  const jsonPath = path.join(plugin.fullPath, 'plugin.json');
+  const pluginJsonContent = fs.readFileSync(jsonPath, 'utf8');
+  const parsedPluginJsonFileData = JSON.parse(pluginJsonContent);
+
+  console.log(`Plugin files:`, JSON.stringify(plugin.files, null, 2));
+
+  console.log(
+    `Generating manifest for ${JSON.stringify(
+      parsedPluginJsonFileData,
+      null,
+      2
+    )}`
+  );
+
+  // Get all script files for this plugin
+  const scriptFiles = getPluginScripts(
+    plugin.fullPath,
+    parsedPluginJsonFileData
+  );
+
+  // Create updated plugin configuration with detected file patterns
+  const updatedPluginJson = { ...parsedPluginJsonFileData };
+
+  // Update the plugin JSON with actual patterns that match files (if you want to save these changes)
+  if (scriptFiles.client.length > 0) {
+    // Create patterns based on actual file extensions
+    const extensions = new Set(
+      scriptFiles.client.map((file) => path.extname(file))
+    );
+    updatedPluginJson.client_scripts = Array.from(extensions)
+      .filter((ext) => ext !== '')
+      .map((ext) => `client/*${ext}`);
+  }
+
+  if (scriptFiles.server.length > 0) {
+    // Create patterns based on actual file extensions
+    const extensions = new Set(
+      scriptFiles.server.map((file) => path.extname(file))
+    );
+    updatedPluginJson.server_scripts = Array.from(extensions)
+      .filter((ext) => ext !== '')
+      .map((ext) => `server/*${ext}`);
+  }
+
+  if (scriptFiles.shared.length > 0) {
+    // Create patterns based on actual file extensions
+    const extensions = new Set(
+      scriptFiles.shared.map((file) => path.extname(file))
+    );
+    updatedPluginJson.shared_scripts = Array.from(extensions)
+      .filter((ext) => ext !== '')
+      .map((ext) => `shared/*${ext}`);
+  }
+
+  // Generate manifest file for this plugin using the updated patterns
   const manifestPath = path.join(
     rootDir,
     'dist',
@@ -44,19 +92,5 @@ for (const plugin of plugins) {
     'fxmanifest.lua'
   );
 
-  const parsedPluginJsonFileData = JSON.parse(
-    fs.readFileSync(path.join(plugin.fullPath, 'plugin.json'), 'utf8')
-  );
-
-  generateManifest(parsedPluginJsonFileData, manifestPath);
-  console.log(
-    `Generated manifest for plugin ${plugin.name} at ${manifestPath}`
-  );
+  generateManifest(updatedPluginJson, manifestPath);
 }
-
-console.log('Found the following plugins:', JSON.stringify(plugins, null, 2));
-
-// Optional: Export to a summary file
-// const summaryPath = path.join(__dirname, '../plugins-summary.json');
-// fs.writeFileSync(summaryPath, JSON.stringify(plugins, null, 2));
-// console.log(`Saved plugins summary to ${summaryPath}`);
