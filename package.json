@@ -4,19 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "pnpm tsx src/scripts/build.ts"
+    "build": "pnpm tsx src/scripts/build.ts",
+    "dev": "pnpm tsx src/scripts/build.ts --watch"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.8.0",
-  "devDependencies": {
-    "@types/node": "^22.14.1",
-    "tsx": "^4.19.3"
-  },
   "dependencies": {
-    "esbuild": "^0.25.2",
-    "glob": "^11.0.1"
+    "glob-promise": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/node": "^20.4.5",
+    "esbuild": "^0.18.11",
+    "tsx": "^3.12.7",
+    "typescript": "^5.1.6"
   }
 }

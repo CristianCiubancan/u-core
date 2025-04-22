@@ -205,18 +205,31 @@ export function getPluginScripts(
     if (!patterns || !Array.isArray(patterns)) return;
 
     patterns.forEach((pattern) => {
-      // Convert pattern to use forward slashes for consistency
-      const normalizedPattern = pattern.replace(/\\/g, '/');
+      try {
+        // Make sure the pattern is properly formed for glob
+        // If pattern doesn't contain a *, assume it's a direct file reference
+        const normalizedPattern = pattern.replace(/\\/g, '/');
 
-      // Resolve the glob pattern relative to the plugin directory
-      const matches = glob.sync(normalizedPattern, {
-        cwd: pluginPath,
-        absolute: false,
-        nodir: true,
-      });
+        // Resolve the glob pattern relative to the plugin directory
+        const matches = glob.sync(normalizedPattern, {
+          cwd: pluginPath,
+          absolute: false,
+          nodir: true,
+        });
 
-      // Add all matches to the result array for this type
-      result[type].push(...matches);
+        // If we have matches, convert them to use consistent path separators
+        const normalizedMatches = matches.map((match) =>
+          match.replace(/\//g, path.sep)
+        );
+
+        // Add all matches to the result array for this type
+        result[type].push(...normalizedMatches);
+      } catch (error) {
+        console.warn(
+          `Error processing pattern "${pattern}" for ${type} scripts:`,
+          error
+        );
+      }
     });
   };
 
