@@ -307,9 +307,9 @@ export function generateManifest(
     console.error(`Error writing manifest to ${outputPath}:`, error);
   }
 }
-
 /**
  * Prepare updated plugin JSON for manifest generation
+ * Replaces all .ts extensions with .js in all script references
  */
 export function preparePluginManifestData(
   pluginJsonData: any,
@@ -320,24 +320,64 @@ export function preparePluginManifestData(
     'Preparing plugin manifest data...',
     JSON.stringify(pluginJsonData, null, 2)
   );
+
+  // Helper function to replace .ts with .js in file paths
+  const replaceExtension = (files: string[]): string[] => {
+    return files.map((file) => file.replace(/\.ts$/, '.js'));
+  };
+
+  // Replace extensions in generated files
+  const processedGeneratedFiles = {
+    client: replaceExtension(generatedFiles.client),
+    server: replaceExtension(generatedFiles.server),
+    shared: replaceExtension(generatedFiles.shared),
+  };
+
+  // Replace extensions in script files
+  const processedScriptFiles = {
+    client: replaceExtension(scriptFiles.client),
+    server: replaceExtension(scriptFiles.server),
+    shared: replaceExtension(scriptFiles.shared),
+  };
+
+  // Replace extensions in original plugin data if needed
+  const originalClientScripts = Array.isArray(pluginJsonData.client_scripts)
+    ? replaceExtension(pluginJsonData.client_scripts)
+    : pluginJsonData.client_scripts;
+
+  const originalServerScripts = Array.isArray(pluginJsonData.server_scripts)
+    ? replaceExtension(pluginJsonData.server_scripts)
+    : pluginJsonData.server_scripts;
+
+  const originalSharedScripts = Array.isArray(pluginJsonData.shared_scripts)
+    ? replaceExtension(pluginJsonData.shared_scripts)
+    : pluginJsonData.shared_scripts;
+
+  // Process the 'files' array if it exists
+  const processedFiles = Array.isArray(pluginJsonData.files)
+    ? replaceExtension(pluginJsonData.files)
+    : pluginJsonData.files;
+
   return {
     ...pluginJsonData,
-    // Store the resolved patterns for reference
-    _resolvedClientScripts: scriptFiles.client,
-    _resolvedServerScripts: scriptFiles.server,
-    _resolvedSharedScripts: scriptFiles.shared,
+    // Store the resolved patterns for reference with .ts replaced by .js
+    _resolvedClientScripts: processedScriptFiles.client,
+    _resolvedServerScripts: processedScriptFiles.server,
+    _resolvedSharedScripts: processedScriptFiles.shared,
     // Use generated files if available, otherwise use original patterns
     client_scripts:
-      generatedFiles.client.length > 0
-        ? generatedFiles.client
-        : pluginJsonData.client_scripts,
+      processedGeneratedFiles.client.length > 0
+        ? processedGeneratedFiles.client
+        : originalClientScripts,
     server_scripts:
-      generatedFiles.server.length > 0
-        ? generatedFiles.server
-        : pluginJsonData.server_scripts,
+      processedGeneratedFiles.server.length > 0
+        ? processedGeneratedFiles.server
+        : originalServerScripts,
     shared_scripts:
-      generatedFiles.shared.length > 0
-        ? generatedFiles.shared
-        : pluginJsonData.shared_scripts,
+      processedGeneratedFiles.shared.length > 0
+        ? processedGeneratedFiles.shared
+        : originalSharedScripts,
+    // Update files array with .ts replaced by .js
+    files: processedFiles,
   };
 }
