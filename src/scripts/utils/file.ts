@@ -307,9 +307,16 @@ export function getPluginOutputInfo(plugin: any, distDir: string) {
     normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
 
   // Calculate relative path consistently
-  const pluginRelativePath = pathContainsPluginsPrefix
-    ? path.relative(pluginsPathNormalized, normalizedPluginPath)
-    : normalizedPluginPath;
+  let pluginRelativePath = normalizedPluginPath;
+  if (pathContainsPluginsPrefix) {
+    pluginRelativePath = path.relative(
+      pluginsPathNormalized,
+      normalizedPluginPath
+    );
+  } else if (plugin.name === 'core') {
+    // Special case for the core plugin
+    pluginRelativePath = 'core';
+  }
 
   // Final output directory
   const outputDir = path.join(distDir, pluginRelativePath);
@@ -345,7 +352,20 @@ export async function processFile(file: any, outputDir: string) {
   }
 
   const fileExt = path.extname(file.name).toLowerCase();
-  const outputPath = path.join(outputDir, file.pathFromPluginDir);
+  // Calculate the output path relative to the output directory, removing the 'src/core' part for core plugin files
+  let relativeFilePath = file.pathFromPluginDir;
+  // Check if the file path starts with 'src/core/' (case-insensitive and platform-independent)
+  if (
+    relativeFilePath
+      .toLowerCase()
+      .startsWith(path.join('src', 'core').toLowerCase() + path.sep)
+  ) {
+    relativeFilePath = path.relative(
+      path.join('src', 'core'),
+      relativeFilePath
+    );
+  }
+  const outputPath = path.join(outputDir, relativeFilePath);
   const outputPathWithCorrectExt = outputPath.replace(/\.(ts|tsx)$/, '.js');
 
   // Ensure output directory exists
