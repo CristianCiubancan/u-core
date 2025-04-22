@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'glob';
+import * as fsPromises from 'fs/promises';
+import { bundleJavaScript, bundleTypeScript, copyLuaFile } from './bundler';
 
 export interface File {
   name: string;
@@ -249,4 +251,171 @@ export function getPluginScripts(
   }
 
   return result;
+}
+
+/**
+ * Read and parse plugin JSON file
+ */
+export function readPluginJson(jsonPath: string) {
+  try {
+    const pluginJsonContent = fs.readFileSync(jsonPath, 'utf8');
+    return JSON.parse(pluginJsonContent);
+  } catch (err) {
+    console.error(`Error reading plugin.json at ${jsonPath}:`, err);
+    throw err;
+  }
+}
+
+/**
+ * Helper function to determine which category a file belongs to
+ * Cross-platform compatible
+ */
+function getFileCategory(
+  filePath: string
+): 'client' | 'server' | 'shared' | null {
+  // Normalize the path to ensure consistent separators
+  const normalizedPath = path.normalize(filePath);
+
+  // Create normalized category prefixes with proper separators
+  const clientPrefix = path.normalize('client' + path.sep);
+  const serverPrefix = path.normalize('server' + path.sep);
+  const sharedPrefix = path.normalize('shared' + path.sep);
+
+  // Check if the path starts with any of the category prefixes
+  if (normalizedPath.startsWith(clientPrefix)) {
+    return 'client';
+  } else if (normalizedPath.startsWith(serverPrefix)) {
+    return 'server';
+  } else if (normalizedPath.startsWith(sharedPrefix)) {
+    return 'shared';
+  }
+
+  return null;
+}
+
+/**
+ * Calculate output paths and directories for a plugin
+ */
+export function getPluginOutputInfo(
+  plugin: any,
+  pluginsDir: string,
+  distDir: string
+) {
+  const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
+  const pluginsPathNormalized = path.normalize('plugins');
+  const pathContainsPluginsPrefix =
+    normalizedPluginPath.startsWith(pluginsPathNormalized) ||
+    normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
+
+  // Calculate relative path consistently
+  const pluginRelativePath = pathContainsPluginsPrefix
+    ? path.relative(pluginsPathNormalized, normalizedPluginPath)
+    : normalizedPluginPath;
+
+  // Final output directory
+  const outputDir = path.join(distDir, pluginRelativePath);
+
+  return {
+    pluginRelativePath,
+    outputDir,
+    manifestPath: path.join(distDir, pluginRelativePath, 'fxmanifest.lua'),
+  };
+}
+
+/**
+ * Ensure directory exists
+ */
+export async function ensureDirectoryExists(dirPath: string): Promise<void> {
+  try {
+    await fsPromises.mkdir(dirPath, { recursive: true });
+    console.log(`Created/verified directory: ${dirPath}`);
+  } catch (err) {
+    console.error(`Error creating directory ${dirPath}:`, err);
+    throw err;
+  }
+}
+
+/**
+ * Process a single file based on its type
+ */
+export async function processFile(file: any, outputDir: string) {
+  // Skip plugin.json as it's handled separately
+  if (file.isPluginJsonFile) {
+    return null;
+  }
+
+  const fileExt = path.extname(file.name).toLowerCase();
+  const outputPath = path.join(outputDir, file.pathFromPluginDir);
+  const outputPathWithCorrectExt = outputPath.replace(/\.(ts|tsx)$/, '.js');
+
+  // Ensure output directory exists
+  await ensureDirectoryExists(path.dirname(outputPath));
+
+  try {
+    switch (fileExt) {
+      case '.ts':
+        // Skip .d.ts files
+        if (file.name.endsWith('.d.ts')) {
+          return null;
+        }
+        // For TSX files (React components)
+        if (file.name.endsWith('.tsx')) {
+          await bundleTypeScript(
+            file.fullPath,
+            outputPath.replace('.tsx', '.js'),
+            true
+          );
+        } else {
+          await bundleTypeScript(
+            file.fullPath,
+            outputPath.replace('.ts', '.js')
+          );
+        }
+        break;
+      case '.js':
+        await bundleJavaScript(file.fullPath, outputPath);
+        break;
+      case '.lua':
+        await copyLuaFile(file.fullPath, outputPath);
+        break;
+      default:
+        // Copy other files directly
+        await fsPromises.copyFile(file.fullPath, outputPath);
+        break;
+    }
+
+    return {
+      sourcePath: file.pathFromPluginDir,
+      outputPath: path.relative(outputDir, outputPathWithCorrectExt),
+      category: getFileCategory(file.pathFromPluginDir),
+    };
+  } catch (err) {
+    console.error(`Error processing file ${file.fullPath}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Organize processed files by category
+ */
+export function categorizeGeneratedFiles(processedFiles: any[]) {
+  const generatedFiles: {
+    client: string[];
+    server: string[];
+    shared: string[];
+  } = {
+    client: [],
+    server: [],
+    shared: [],
+  };
+
+  processedFiles
+    .filter((file) => file && file.category)
+    .forEach((file) => {
+      generatedFiles[file.category as keyof typeof generatedFiles].push(
+        file.outputPath
+      );
+    });
+
+  return generatedFiles;
 }

@@ -1,296 +1,114 @@
 import * as path from 'path';
-import * as fs from 'fs';
-import * as fsPromises from 'fs/promises';
+
 import {
+  categorizeGeneratedFiles,
+  ensureDirectoryExists,
+  getPluginOutputInfo,
   getPluginScripts,
   getPluginsPaths,
   parseFilePathsIntoFiles,
   parsePluginPathsIntoPlugins,
+  processFile,
+  readPluginJson,
 } from './utils/file';
-import { generateManifest } from './utils/manifest';
-import {
-  bundleTypeScript,
-  bundleJavaScript,
-  copyLuaFile,
-  verifyOutputDir,
-} from './utils/bundler';
+import { generateManifest, preparePluginManifestData } from './utils/manifest';
+import { verifyOutputDir } from './utils/bundler';
 
 /**
- * Helper function to determine which category a file belongs to
- * Updated to be cross-platform compatible
+ * Build a single plugin
  */
-function getFileCategory(
-  filePath: string
-): 'client' | 'server' | 'shared' | null {
-  // Normalize the path to ensure consistent separators
-  const normalizedPath = path.normalize(filePath);
-
-  // Create normalized category prefixes with proper separators
-  const clientPrefix = path.normalize('client' + path.sep);
-  const serverPrefix = path.normalize('server' + path.sep);
-  const sharedPrefix = path.normalize('shared' + path.sep);
-
-  // Check if the path starts with any of the category prefixes
-  if (normalizedPath.startsWith(clientPrefix)) {
-    return 'client';
-  } else if (normalizedPath.startsWith(serverPrefix)) {
-    return 'server';
-  } else if (normalizedPath.startsWith(sharedPrefix)) {
-    return 'shared';
+async function buildPlugin(plugin: any, distDir: string) {
+  if (!plugin.fullPath) {
+    console.log(`Skipping plugin with no path: ${plugin.name || 'unknown'}`);
+    return;
   }
 
-  return null;
-}
-
-/**
- * Build plugin files by processing each file according to its type
- */
-async function buildPluginFiles(plugin, scriptFiles, distDir) {
-  // Use path.normalize to ensure consistent path separators
-  const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
-  const pluginsDir = path.normalize('plugins');
-  const pathContainsPluginsPrefix =
-    normalizedPluginPath.startsWith(pluginsDir) ||
-    normalizedPluginPath.startsWith(pluginsDir + path.sep);
-
-  // Create the pluginRelativePath correctly regardless of path separator
-  let pluginRelativePath;
-  if (pathContainsPluginsPrefix) {
-    pluginRelativePath = path.relative(pluginsDir, normalizedPluginPath);
-  } else {
-    pluginRelativePath = normalizedPluginPath;
-  }
-
-  // Create final output directory by joining distDir with pluginRelativePath
-  const outputDir = path.join(distDir, pluginRelativePath);
+  // Get plugin output info
+  const pluginsDir = path.join(__dirname, '../plugins');
+  const { outputDir, manifestPath } = getPluginOutputInfo(
+    plugin,
+    pluginsDir,
+    distDir
+  );
 
   console.log(`\nBuilding plugin files to: ${outputDir}`);
 
   // Ensure output directory exists
-  try {
-    await fsPromises.mkdir(outputDir, { recursive: true });
-    console.log(`Created/verified output directory: ${outputDir}`);
-  } catch (err) {
-    console.error(`Error creating output directory ${outputDir}:`, err);
-    throw err;
-  }
+  await ensureDirectoryExists(outputDir);
 
-  // Track what files we're actually creating in the output directory
-  const generatedFiles: {
-    client: string[];
-    server: string[];
-    shared: string[];
-  } = {
-    client: [],
-    server: [],
-    shared: [],
-  };
+  // Read plugin.json
+  const jsonPath = path.join(plugin.fullPath, 'plugin.json');
+  const pluginJsonData = readPluginJson(jsonPath);
 
-  // Process all files in the plugin
-  for (const file of plugin.files) {
-    // Skip plugin.json as it's already processed for manifest generation
-    if (file.isPluginJsonFile) {
-      continue;
-    }
+  // Get the files for this plugin
+  const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
+  plugin.files.push(...pluginFiles);
 
-    const fileExt = path.extname(file.name).toLowerCase();
-    const outputPath = path.join(outputDir, file.pathFromPluginDir);
-    const outputPathWithCorrectExt = outputPath.replace(/\.(ts|tsx)$/, '.js');
+  console.log(`Plugin files:`, JSON.stringify(plugin.files, null, 2));
 
-    // Determine which script category this file belongs to (client, server, shared)
-    const category = getFileCategory(file.pathFromPluginDir);
+  // Get script files based on patterns in plugin.json
+  const scriptFiles = getPluginScripts(pluginJsonData, plugin.fullPath);
+  console.log(`Detected script files:`, JSON.stringify(scriptFiles, null, 2));
 
-    // If this is a valid category, track the file
-    if (category) {
-      // We'll track the output path (with correct extension) instead of the source path
-      const relativePath = path.relative(outputDir, outputPathWithCorrectExt);
-      // Use type assertion to tell TypeScript that category is a valid key
-      generatedFiles[category as keyof typeof generatedFiles].push(
-        relativePath
-      );
-    }
+  // Process all files
+  const processPromises = plugin.files.map((file) =>
+    processFile(file, outputDir)
+  );
+  const processedFiles = await Promise.all(processPromises);
 
-    // Ensure output directory for this file exists
-    try {
-      await fsPromises.mkdir(path.dirname(outputPath), { recursive: true });
-      console.log(
-        `Created/verified directory for: ${path.dirname(outputPath)}`
-      );
-    } catch (err) {
-      console.error(`Error creating directory for ${outputPath}:`, err);
-      throw err;
-    }
+  // Categorize generated files
+  const generatedFiles = categorizeGeneratedFiles(processedFiles);
 
-    try {
-      switch (fileExt) {
-        case '.ts':
-          // Skip .d.ts files
-          if (file.name.endsWith('.d.ts')) {
-            continue;
-          }
+  // Prepare manifest data
+  const updatedPluginJson = preparePluginManifestData(
+    pluginJsonData,
+    generatedFiles,
+    scriptFiles
+  );
 
-          // For TSX files (React components), use a different approach if needed
-          if (file.name.endsWith('.tsx')) {
-            await bundleTypeScript(
-              file.fullPath,
-              outputPath.replace('.tsx', '.js'),
-              true
-            );
-          } else {
-            await bundleTypeScript(
-              file.fullPath,
-              outputPath.replace('.ts', '.js')
-            );
-          }
-          break;
-        case '.js':
-          await bundleJavaScript(file.fullPath, outputPath);
-          break;
-        case '.lua':
-          await copyLuaFile(file.fullPath, outputPath);
-          break;
-        default:
-          // Copy other files directly (e.g., .json, .html, etc.)
-          await fsPromises.copyFile(file.fullPath, outputPath);
-          break;
-      }
-    } catch (err) {
-      console.error(`Error processing file ${file.fullPath}:`, err);
-    }
-  }
+  console.log(
+    `Final manifest configuration:`,
+    JSON.stringify(updatedPluginJson, null, 2)
+  );
 
-  console.log(`Successfully built plugin: ${plugin.pathFromPluginsDir}`);
+  // Generate the manifest with the updated file paths
+  generateManifest(updatedPluginJson, manifestPath);
 
   // Verify the output directory content
   await verifyOutputDir(outputDir);
 
-  // Return the list of generated files for the manifest
+  console.log(`Successfully built plugin: ${plugin.pathFromPluginsDir}`);
+
   return generatedFiles;
 }
 
-// Update the main function to use the generated files in the manifest
+/**
+ * Main build function
+ */
 async function main() {
   const pluginsDir = path.join(__dirname, '../plugins');
   const rootDir = path.join(__dirname, '../../');
   const distDir = path.join(rootDir, 'dist/plugins');
 
   // Ensure dist directory exists
-  if (!fs.existsSync(distDir)) {
-    fs.mkdirSync(distDir, { recursive: true });
-  }
+  await ensureDirectoryExists(distDir);
 
   // Get plugin directories
   const { pluginPaths } = getPluginsPaths(pluginsDir);
 
-  // Pass the plugins directory to ensure correct relative path calculation
+  // Parse plugin paths into plugin objects
   const plugins = parsePluginPathsIntoPlugins(pluginPaths);
 
-  // Process files for each plugin
+  // Process each plugin
   for (const plugin of plugins) {
-    if (!plugin.fullPath) {
-      continue;
-    }
-
-    // Get the files for this plugin
-    const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
-
-    // Add all files to the plugin
-    plugin.files.push(...pluginFiles);
-
-    // Read plugin.json
-    const jsonPath = path.join(plugin.fullPath, 'plugin.json');
-    const pluginJsonContent = fs.readFileSync(jsonPath, 'utf8');
-    const parsedPluginJsonFileData = JSON.parse(pluginJsonContent);
-
-    console.log(`Plugin files:`, JSON.stringify(plugin.files, null, 2));
-
-    // Get script files based on patterns in plugin.json
-    const scriptFiles = getPluginScripts(
-      parsedPluginJsonFileData,
-      plugin.fullPath
-    );
-
-    // Log the detected script files (optional but helpful for debugging)
-    console.log(`Detected script files:`, JSON.stringify(scriptFiles, null, 2));
-
-    console.log(
-      `Generating manifest for ${JSON.stringify(
-        parsedPluginJsonFileData,
-        null,
-        2
-      )}`
-    );
-
-    // Create initial updated plugin configuration with detected file patterns
-    let updatedPluginJson = {
-      ...parsedPluginJsonFileData,
-      // Store the resolved patterns for reference
-      _resolvedClientScripts: scriptFiles.client,
-      _resolvedServerScripts: scriptFiles.server,
-      _resolvedSharedScripts: scriptFiles.shared,
-    };
-
-    console.log(
-      `Updated plugin config:`,
-      JSON.stringify(updatedPluginJson, null, 2)
-    );
-
-    // Apply the same path normalization logic as in buildPluginFiles
-    const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
-    const pluginsPathNormalized = path.normalize('plugins');
-    const pathContainsPluginsPrefix =
-      normalizedPluginPath.startsWith(pluginsPathNormalized) ||
-      normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
-
-    // Create the pluginRelativePath correctly regardless of path separator
-    let manifestRelativePath;
-    if (pathContainsPluginsPrefix) {
-      manifestRelativePath = path.relative(
-        pluginsPathNormalized,
-        normalizedPluginPath
-      );
-    } else {
-      manifestRelativePath = normalizedPluginPath;
-    }
-
-    // Create correct manifest path
-    const manifestPath = path.join(
-      rootDir,
-      'dist',
-      'plugins',
-      manifestRelativePath,
-      'fxmanifest.lua'
-    );
-
-    // Build the plugin files and get back what was actually generated
-    const generatedFiles = await buildPluginFiles(plugin, scriptFiles, distDir);
-
-    // Now update the plugin config with the correct output files (instead of source files)
-    // Replace the patterns with the actual generated files for the manifest
-    updatedPluginJson = {
-      ...updatedPluginJson,
-      client_scripts:
-        generatedFiles.client.length > 0
-          ? generatedFiles.client
-          : parsedPluginJsonFileData.client_scripts,
-      server_scripts:
-        generatedFiles.server.length > 0
-          ? generatedFiles.server
-          : parsedPluginJsonFileData.server_scripts,
-      shared_scripts:
-        generatedFiles.shared.length > 0
-          ? generatedFiles.shared
-          : parsedPluginJsonFileData.shared_scripts,
-    };
-
-    console.log(
-      `Final manifest configuration:`,
-      JSON.stringify(updatedPluginJson, null, 2)
-    );
-
-    // Generate the manifest with the updated file paths
-    generateManifest(updatedPluginJson, manifestPath);
+    await buildPlugin(plugin, distDir);
   }
+
+  console.log('Build completed successfully!');
 }
 
-main();
+// Run the build process
+main().catch((error) => {
+  console.error('Build failed:', error);
+  process.exit(1);
+});

@@ -306,3 +306,33 @@ export function generateManifest(
     console.error(`Error writing manifest to ${outputPath}:`, error);
   }
 }
+
+/**
+ * Prepare updated plugin JSON for manifest generation
+ */
+export function preparePluginManifestData(
+  pluginJsonData: any,
+  generatedFiles: any,
+  scriptFiles: any
+) {
+  return {
+    ...pluginJsonData,
+    // Store the resolved patterns for reference
+    _resolvedClientScripts: scriptFiles.client,
+    _resolvedServerScripts: scriptFiles.server,
+    _resolvedSharedScripts: scriptFiles.shared,
+    // Use generated files if available, otherwise use original patterns
+    client_scripts:
+      generatedFiles.client.length > 0
+        ? generatedFiles.client
+        : pluginJsonData.client_scripts,
+    server_scripts:
+      generatedFiles.server.length > 0
+        ? generatedFiles.server
+        : pluginJsonData.server_scripts,
+    shared_scripts:
+      generatedFiles.shared.length > 0
+        ? generatedFiles.shared
+        : pluginJsonData.shared_scripts,
+  };
+}
