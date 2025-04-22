@@ -83,19 +83,24 @@ async function buildPlugin(plugin: any, distDir: string) {
 async function main() {
   const pluginsDir = path.join(__dirname, '../plugins');
   const rootDir = path.join(__dirname, '../../');
-  const distDir = path.join(rootDir, 'dist/plugins');
+  const distDir = path.join(rootDir, 'dist');
+
+  const coreDir = path.join(__dirname, '../core');
 
   // Ensure dist directory exists
   await ensureDirectoryExists(distDir);
+  await ensureDirectoryExists(coreDir);
 
   // Get plugin directories
   const { pluginPaths } = getPluginsPaths(pluginsDir);
+  const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
 
   // Parse plugin paths into plugin objects
   const plugins = parsePluginPathsIntoPlugins(pluginPaths);
-
+  const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
+  console.log('CACAT: ', [...plugins, ...corePlugins]);
   // Process each plugin
-  for (const plugin of plugins) {
+  for (const plugin of [...plugins, ...corePlugins]) {
     await buildPlugin(plugin, distDir);
   }
 
