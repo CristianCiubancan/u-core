@@ -2,6 +2,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * Normalizes file paths to use forward slashes regardless of OS
+ * @param value The path or array of paths to normalize
+ */
+function normalizePaths(value: any): any {
+  if (typeof value === 'string') {
+    return value.replace(/\\/g, '/');
+  } else if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (typeof item === 'string') {
+        return item.replace(/\\/g, '/');
+      }
+      return item;
+    });
+  }
+  return value;
+}
+
+/**
  * Generates an fxmanifest.lua file from plugin configuration
  * @param pluginJson Parsed plugin.json data or path to plugin.json file
  * @param outputPath Path where the manifest should be written
@@ -33,6 +51,16 @@ export function generateManifest(
       throw new Error('No valid plugin configuration data provided');
     }
 
+    // Normalize paths in script arrays and other fields that might contain file paths
+    config = {
+      ...config,
+      client_scripts: normalizePaths(config.client_scripts),
+      server_scripts: normalizePaths(config.server_scripts),
+      shared_scripts: normalizePaths(config.shared_scripts),
+      files: normalizePaths(config.files),
+      ui_page: normalizePaths(config.ui_page),
+    };
+
     // Map of JSON schema properties to fxmanifest.lua format
     const schemaToManifestMap: Record<
       string,
@@ -49,7 +77,9 @@ export function generateManifest(
       'client_scripts': (value) => {
         let result = `client_scripts {\n`;
         value.forEach((script: string) => {
-          result += `    '${script}',\n`;
+          // Ensure forward slashes
+          const normalizedScript = script.replace(/\\/g, '/');
+          result += `    '${normalizedScript}',\n`;
         });
         result += `}`;
         return result;
@@ -57,7 +87,9 @@ export function generateManifest(
       'server_scripts': (value) => {
         let result = `server_scripts {\n`;
         value.forEach((script: string) => {
-          result += `    '${script}',\n`;
+          // Ensure forward slashes
+          const normalizedScript = script.replace(/\\/g, '/');
+          result += `    '${normalizedScript}',\n`;
         });
         result += `}`;
         return result;
@@ -65,7 +97,9 @@ export function generateManifest(
       'shared_scripts': (value) => {
         let result = `shared_scripts {\n`;
         value.forEach((script: string) => {
-          result += `    '${script}',\n`;
+          // Ensure forward slashes
+          const normalizedScript = script.replace(/\\/g, '/');
+          result += `    '${normalizedScript}',\n`;
         });
         result += `}`;
         return result;
@@ -88,13 +122,15 @@ export function generateManifest(
       },
 
       // UI
-      'ui_page': (value) => `ui_page '${value}'`,
+      'ui_page': (value) => `ui_page '${value.replace(/\\/g, '/')}'`,
 
       // Files
       'files': (value) => {
         let result = '';
         value.forEach((file: string) => {
-          result += `file '${file}'\n`;
+          // Ensure forward slashes
+          const normalizedFile = file.replace(/\\/g, '/');
+          result += `file '${normalizedFile}'\n`;
         });
         return result.trim();
       },
@@ -150,7 +186,9 @@ export function generateManifest(
       config.data_files.length > 0
     ) {
       config.data_files.forEach((item: { type: string; path: string }) => {
-        content += `data_file '${item.type}' '${item.path}'\n`;
+        // Normalize path
+        const normalizedPath = item.path.replace(/\\/g, '/');
+        content += `data_file '${item.type}' '${normalizedPath}'\n`;
       });
       content += '\n';
     }
@@ -158,7 +196,9 @@ export function generateManifest(
     // Loadscreen
     if (config.loadscreen) {
       if (config.loadscreen.page) {
-        content += `loadscreen '${config.loadscreen.page}'\n`;
+        // Normalize path
+        const normalizedPage = config.loadscreen.page.replace(/\\/g, '/');
+        content += `loadscreen '${normalizedPage}'\n`;
       }
       if (config.loadscreen.manual_shutdown) {
         content += `loadscreen_manual_shutdown 'yes'\n`;
