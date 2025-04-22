@@ -6,6 +6,5 @@
   "description": "Example 3",
   "main": "index.js",
   "client_scripts": ["client/*.ts"],
-  "server_scripts": ["server/*.ts"],
-  "shared_scripts": ["shared/*.ts"]
+  "server_scripts": ["server/*.ts"]
 }
