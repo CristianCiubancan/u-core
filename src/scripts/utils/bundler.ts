@@ -17,11 +17,40 @@ export async function bundleTypeScript(
       ? { '.tsx': 'tsx', '.ts': 'ts', '.js': 'js' }
       : { '.ts': 'ts', '.js': 'js' };
 
+    // Determine if this is a server-side script by checking the path
+    const isServerScript =
+      inputFile.includes('/server/') || inputFile.includes('\\server\\');
+
+    // Configure platform and external modules based on script type
+    const platform = isServerScript ? 'node' : 'browser';
+
+    // For server scripts, mark Node.js modules as external
+    const external = isServerScript
+      ? [
+          'http',
+          'url',
+          'fs',
+          'path',
+          'dotenv',
+          'dotenv/config',
+          'crypto',
+          'os',
+          'stream',
+          'buffer',
+          'events',
+          'net',
+          'querystring',
+          'util',
+          'zlib',
+          // Add any other Node.js built-ins you're using
+        ]
+      : undefined;
+
     const result = await esbuild.build({
       entryPoints: [inputFile],
       bundle: true,
       outfile: outputFile,
-      platform: 'browser',
+      platform: platform, // Use appropriate platform based on script type
       format: 'esm',
       target: 'es2017',
       minify: false,
@@ -29,6 +58,10 @@ export async function bundleTypeScript(
       loader: loader,
       // If this is a React component, you might need to add specific settings
       jsx: isReact ? 'transform' : undefined,
+      // Mark Node.js built-ins as external for server scripts
+      external: external,
+      // Log level for better debugging
+      logLevel: 'info',
     });
 
     if (result.errors.length > 0) {

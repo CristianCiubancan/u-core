@@ -18,7 +18,7 @@
     "@citizenfx/client": "2.0.14427-1",
     "@citizenfx/server": "2.0.14427-1",
     "@types/glob": "^8.1.0",
-    "@types/node": "^20.4.5",
+    "@types/node": "^20.17.30",
     "esbuild": "^0.18.11",
     "tsx": "^3.12.7",
     "typescript": "^5.1.6"
