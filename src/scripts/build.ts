@@ -14,24 +14,54 @@ import {
   copyLuaFile,
   verifyOutputDir,
 } from './utils/bundler';
+
+/**
+ * Helper function to determine which category a file belongs to
+ * Updated to be cross-platform compatible
+ */
+function getFileCategory(
+  filePath: string
+): 'client' | 'server' | 'shared' | null {
+  // Normalize the path to ensure consistent separators
+  const normalizedPath = path.normalize(filePath);
+
+  // Create normalized category prefixes with proper separators
+  const clientPrefix = path.normalize('client' + path.sep);
+  const serverPrefix = path.normalize('server' + path.sep);
+  const sharedPrefix = path.normalize('shared' + path.sep);
+
+  // Check if the path starts with any of the category prefixes
+  if (normalizedPath.startsWith(clientPrefix)) {
+    return 'client';
+  } else if (normalizedPath.startsWith(serverPrefix)) {
+    return 'server';
+  } else if (normalizedPath.startsWith(sharedPrefix)) {
+    return 'shared';
+  }
+
+  return null;
+}
+
 /**
  * Build plugin files by processing each file according to its type
  */
 async function buildPluginFiles(plugin, scriptFiles, distDir) {
-  // Determine if path already contains 'plugins' prefix
+  // Use path.normalize to ensure consistent path separators
+  const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
+  const pluginsDir = path.normalize('plugins');
   const pathContainsPluginsPrefix =
-    plugin.pathFromPluginsDir.startsWith('plugins');
+    normalizedPluginPath.startsWith(pluginsDir) ||
+    normalizedPluginPath.startsWith(pluginsDir + path.sep);
 
-  // Create the output directory path, avoiding double 'plugins' in the path
-  const relativePath = pathContainsPluginsPrefix
-    ? plugin.pathFromPluginsDir
-    : path.join('plugins', plugin.pathFromPluginsDir);
+  // Create the pluginRelativePath correctly regardless of path separator
+  let pluginRelativePath;
+  if (pathContainsPluginsPrefix) {
+    pluginRelativePath = path.relative(pluginsDir, normalizedPluginPath);
+  } else {
+    pluginRelativePath = normalizedPluginPath;
+  }
 
-  // Use the path without the root distDir (which already includes 'plugins')
-  const pluginRelativePath = pathContainsPluginsPrefix
-    ? plugin.pathFromPluginsDir.substring('plugins/'.length)
-    : plugin.pathFromPluginsDir;
-
+  // Create final output directory by joining distDir with pluginRelativePath
   const outputDir = path.join(distDir, pluginRelativePath);
 
   console.log(`\nBuilding plugin files to: ${outputDir}`);
@@ -138,22 +168,6 @@ async function buildPluginFiles(plugin, scriptFiles, distDir) {
   return generatedFiles;
 }
 
-/**
- * Helper function to determine which category a file belongs to
- */
-function getFileCategory(
-  filePath: string
-): 'client' | 'server' | 'shared' | null {
-  if (filePath.startsWith('client/')) {
-    return 'client';
-  } else if (filePath.startsWith('server/')) {
-    return 'server';
-  } else if (filePath.startsWith('shared/')) {
-    return 'shared';
-  }
-  return null;
-}
-
 // Update the main function to use the generated files in the manifest
 async function main() {
   const pluginsDir = path.join(__dirname, '../plugins');
@@ -221,11 +235,30 @@ async function main() {
       JSON.stringify(updatedPluginJson, null, 2)
     );
 
-    // Build plugin files and get the list of generated files
+    // Apply the same path normalization logic as in buildPluginFiles
+    const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
+    const pluginsPathNormalized = path.normalize('plugins');
+    const pathContainsPluginsPrefix =
+      normalizedPluginPath.startsWith(pluginsPathNormalized) ||
+      normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
+
+    // Create the pluginRelativePath correctly regardless of path separator
+    let manifestRelativePath;
+    if (pathContainsPluginsPrefix) {
+      manifestRelativePath = path.relative(
+        pluginsPathNormalized,
+        normalizedPluginPath
+      );
+    } else {
+      manifestRelativePath = normalizedPluginPath;
+    }
+
+    // Create correct manifest path
     const manifestPath = path.join(
       rootDir,
       'dist',
-      plugin.pathFromPluginsDir,
+      'plugins',
+      manifestRelativePath,
       'fxmanifest.lua'
     );
 
