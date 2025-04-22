@@ -272,7 +272,7 @@ export function readPluginJson(jsonPath: string) {
  */
 function getFileCategory(
   filePath: string
-): 'client' | 'server' | 'shared' | null {
+): 'client' | 'server' | 'shared' | 'translations' | null {
   // Normalize the path to ensure consistent separators
   const normalizedPath = path.normalize(filePath);
 
@@ -280,6 +280,7 @@ function getFileCategory(
   const clientPrefix = path.normalize('client' + path.sep);
   const serverPrefix = path.normalize('server' + path.sep);
   const sharedPrefix = path.normalize('shared' + path.sep);
+  const translationsPrefix = path.normalize('translations' + path.sep);
 
   // Check if the path starts with any of the category prefixes
   if (normalizedPath.startsWith(clientPrefix)) {
@@ -288,6 +289,8 @@ function getFileCategory(
     return 'server';
   } else if (normalizedPath.startsWith(sharedPrefix)) {
     return 'shared';
+  } else if (normalizedPath.startsWith(translationsPrefix)) {
+    return 'translations';
   }
 
   return null;
@@ -296,11 +299,7 @@ function getFileCategory(
 /**
  * Calculate output paths and directories for a plugin
  */
-export function getPluginOutputInfo(
-  plugin: any,
-  pluginsDir: string,
-  distDir: string
-) {
+export function getPluginOutputInfo(plugin: any, distDir: string) {
   const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
   const pluginsPathNormalized = path.normalize('plugins');
   const pathContainsPluginsPrefix =
@@ -339,6 +338,7 @@ export async function ensureDirectoryExists(dirPath: string): Promise<void> {
  * Process a single file based on its type
  */
 export async function processFile(file: any, outputDir: string) {
+  console.log('Processing file:', JSON.stringify(file, null, 2));
   // Skip plugin.json as it's handled separately
   if (file.isPluginJsonFile) {
     return null;
@@ -403,10 +403,12 @@ export function categorizeGeneratedFiles(processedFiles: any[]) {
     client: string[];
     server: string[];
     shared: string[];
+    translations: string[];
   } = {
     client: [],
     server: [],
     shared: [],
+    translations: [],
   };
 
   processedFiles

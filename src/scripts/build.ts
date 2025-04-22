@@ -24,12 +24,7 @@ async function buildPlugin(plugin: any, distDir: string) {
   }
 
   // Get plugin output info
-  const pluginsDir = path.join(__dirname, '../plugins');
-  const { outputDir, manifestPath } = getPluginOutputInfo(
-    plugin,
-    pluginsDir,
-    distDir
-  );
+  const { outputDir, manifestPath } = getPluginOutputInfo(plugin, distDir);
 
   console.log(`\nBuilding plugin files to: ${outputDir}`);
 

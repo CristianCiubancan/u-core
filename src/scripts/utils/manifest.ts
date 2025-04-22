@@ -126,13 +126,14 @@ export function generateManifest(
 
       // Files
       'files': (value) => {
-        let result = '';
+        let result = `files {\n`;
         value.forEach((file: string) => {
           // Ensure forward slashes
           const normalizedFile = file.replace(/\\/g, '/');
-          result += `file '${normalizedFile}'\n`;
+          result += `    '${normalizedFile}',\n`;
         });
-        return result.trim();
+        result += `}`;
+        return result;
       },
 
       // Flags
@@ -315,6 +316,10 @@ export function preparePluginManifestData(
   generatedFiles: any,
   scriptFiles: any
 ) {
+  console.log(
+    'Preparing plugin manifest data...',
+    JSON.stringify(pluginJsonData, null, 2)
+  );
   return {
     ...pluginJsonData,
     // Store the resolved patterns for reference
