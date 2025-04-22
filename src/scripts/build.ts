@@ -1,6 +1,23 @@
 import * as path from 'path';
+import * as fsPromises from 'fs/promises';
 
 import {
+  categorizeGeneratedFiles,
+  ensureDirectoryExists,
+  getPluginOutputInfo,
+  getPluginScripts,
+  getPluginsPaths,
+  parseFilePathsIntoFiles,
+  parsePluginPathsIntoPlugins,
+  processFile,
+  readPluginJson,
+} from './utils/file';
+import { generateManifest, preparePluginManifestData } from './utils/manifest';
+import { verifyOutputDir } from './utils/bundler';
+import { buildWebview } from './utils/webview';
+
+/**
+ * Build a single plugin
   categorizeGeneratedFiles,
   ensureDirectoryExists,
   getPluginOutputInfo,
@@ -98,11 +115,14 @@ async function main() {
   // Parse plugin paths into plugin objects
   const plugins = parsePluginPathsIntoPlugins(pluginPaths);
   const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
+  // Parse plugin paths into plugin objects
+
+  await buildWebview(plugins, distDir);
+
   // Process each plugin
   for (const plugin of plugins) {
     await buildPlugin(plugin, distDir);
   }
-
   for (const plugin of corePlugins) {
     await buildPlugin(plugin, distDir); // Pass distDir for core plugins as well
   }
