@@ -12,6 +12,12 @@ importers:
         specifier: ^6.0.2
         version: 6.0.7(glob@8.1.0)
     devDependencies:
+      '@citizenfx/client':
+        specifier: 2.0.14427-1
+        version: 2.0.14427-1
+      '@citizenfx/server':
+        specifier: 2.0.14427-1
+        version: 2.0.14427-1
       '@types/glob':
         specifier: ^8.1.0
         version: 8.1.0
@@ -29,6 +35,12 @@ importers:
         version: 5.8.3
 
 packages:
+
+  '@citizenfx/client@2.0.14427-1':
+    resolution: {integrity: sha512-O4VbAnzHfppDQ4Nlh7WWzIj4UHYKFLsTiLmZ4qVPVzslFxAkVD6DViKGQbTvjlBE2/vY45yA4D6qenfAPX8BVQ==}
+
+  '@citizenfx/server@2.0.14427-1':
+    resolution: {integrity: sha512-t8BypxSAy4t5nVnhCyeqiGkv8IWtZaVr29TmHJddpIqXEqcHxK/W84pIN1hKJZ+ZGm5qbW78kAaZFSSc6bC4og==}
 
   '@esbuild/android-arm64@0.18.20':
     resolution: {integrity: sha512-Nz4rJcchGDtENV0eMKUNa6L12zz2zBDXuhj/Vjh18zGqB44Bi7MBMSXjgunJgjRhCmKOjnPuZp4Mb6OKqtMHLQ==}
@@ -247,6 +259,10 @@ packages:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
 snapshots:
+
+  '@citizenfx/client@2.0.14427-1': {}
+
+  '@citizenfx/server@2.0.14427-1': {}
 
   '@esbuild/android-arm64@0.18.20':
     optional: true
