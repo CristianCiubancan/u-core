@@ -98,7 +98,6 @@ async function main() {
   // Parse plugin paths into plugin objects
   const plugins = parsePluginPathsIntoPlugins(pluginPaths);
   const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
-  console.log('CACAT: ', [...plugins, ...corePlugins]);
   // Process each plugin
   for (const plugin of plugins) {
     await buildPlugin(plugin, distDir);
