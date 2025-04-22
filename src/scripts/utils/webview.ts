@@ -27,7 +27,8 @@ export async function buildWebview(
     throw new Error('Distribution directory must be provided');
   }
 
-  const webviewDir = path.join(__dirname, '../../webview');
+  // Path to the webview directory
+  const webviewDir = path.join(process.cwd(), 'src/webview');
   const webviewDistDir = path.join(distDir, 'webview');
 
   try {
@@ -41,21 +42,8 @@ export async function buildWebview(
     // Make sure the output directory exists (Vite will clean it)
     await ensureDirectoryExists(webviewDistDir);
 
-    // Find plugins with webview pages
-    const webviewPlugins = plugins.filter(async (plugin) => {
-      if (!plugin.hasHtml || !plugin.fullPath) {
-        return false;
-      }
-
-      // Verify the Page.tsx file exists
-      const pageFile = path.join(plugin.fullPath, 'html', 'Page.tsx');
-      try {
-        await fsPromises.access(pageFile);
-        return true;
-      } catch {
-        return false;
-      }
-    });
+    // Find plugins with webview pages - we'll use Promise.all below instead of this filter
+    // since async filters don't work as expected
 
     // Resolve the promises in the filter
     const resolvedWebviewPlugins = await Promise.all(
@@ -86,7 +74,7 @@ export async function buildWebview(
       return webviewDistDir;
     }
 
-    // Set up directories
+    // Set up directories - src directory is where the App.tsx and other files will be generated
     const srcDir = path.join(webviewDir, 'src');
     await ensureDirectoryExists(srcDir);
 
@@ -108,7 +96,13 @@ import React from 'react';\n\n`;
       const pageFile = path.join(plugin.fullPath, 'html', 'Page.tsx');
 
       // Calculate relative path from src directory (Vite root) to the Page.tsx file
+      // We need to make the import path relative to the src/webview/src directory
       const importPath = path.relative(srcDir, pageFile).replace(/\\/g, '/');
+      // Make sure the path is properly formatted for import
+      // If the path doesn't start with '.', it's not a relative path, so make it one
+      const formattedImportPath = importPath.startsWith('.')
+        ? importPath
+        : `../../${importPath}`;
 
       // Get the plugin's path relative to plugins directory
       const relPlugin = plugin.pathFromPluginsDir;
@@ -135,9 +129,10 @@ import React from 'react';\n\n`;
       }
       usedImportNames.add(importName);
 
+      // Create a key for React component - ensure it's unique and valid
       const key = namespace ? `${nsClean}/${pluginName}` : pluginName;
 
-      imports.push(`import ${importName} from '${importPath}';`);
+      imports.push(`import ${importName} from '${formattedImportPath}';`);
       components.push(`      <${importName} key="${key}" />`);
     }
 
@@ -250,7 +245,7 @@ body {
     console.log('Running Vite build...');
     try {
       // First check if package.json exists and has a build script
-      const packageJsonPath = path.join(webviewDir, 'package.json');
+      const packageJsonPath = path.join(process.cwd(), 'package.json');
       let useNpmRun = false;
 
       try {
@@ -265,11 +260,11 @@ body {
       }
 
       // Run the appropriate build command
-      const buildCommand = useNpmRun ? 'npm run build' : 'npx vite build';
+      const buildCommand = useNpmRun ? 'pnpm build' : 'npx vite build';
       console.log(`Executing: ${buildCommand}`);
 
       const { stdout, stderr } = await execAsync(buildCommand, {
-        cwd: webviewDir,
+        cwd: process.cwd(),
       });
       if (stderr && !stderr.includes('built in')) {
         console.warn('Vite build warnings:', stderr);
@@ -283,7 +278,7 @@ body {
 
       // Check if index.html exists and has correct format
       try {
-        const indexHtmlPath = path.join(webviewDir, 'src', 'index.html');
+        const indexHtmlPath = path.join(srcDir, 'index.html');
         const indexHtmlContent = await fsPromises.readFile(
           indexHtmlPath,
           'utf8'
