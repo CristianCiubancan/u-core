@@ -5,7 +5,7 @@
   "author": "Baloony Gaze",
   "description": "Example 3",
   "main": "index.js",
-  "client_scripts": ["client/*.js"],
-  "server_scripts": ["server/*.js"],
-  "shared_scripts": ["shared/*.js"]
+  "client_scripts": ["client/*.ts", "client/*.lua"],
+  "server_scripts": ["server/*.ts", "server/*.lua"],
+  "shared_scripts": ["shared/*.ts"]
 }

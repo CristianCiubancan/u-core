@@ -36,6 +36,15 @@ for (const plugin of plugins) {
 
   console.log(`Plugin files:`, JSON.stringify(plugin.files, null, 2));
 
+  // Get script files based on patterns in plugin.json
+  const scriptFiles = getPluginScripts(
+    parsedPluginJsonFileData,
+    plugin.fullPath
+  );
+
+  // Log the detected script files (optional but helpful for debugging)
+  console.log(`Detected script files:`, JSON.stringify(scriptFiles, null, 2));
+
   console.log(
     `Generating manifest for ${JSON.stringify(
       parsedPluginJsonFileData,
@@ -44,45 +53,15 @@ for (const plugin of plugins) {
     )}`
   );
 
-  // Get all script files for this plugin
-  const scriptFiles = getPluginScripts(
-    plugin.fullPath,
-    parsedPluginJsonFileData
-  );
-
   // Create updated plugin configuration with detected file patterns
-  const updatedPluginJson = { ...parsedPluginJsonFileData };
-
-  // Update the plugin JSON with actual patterns that match files (if you want to save these changes)
-  if (scriptFiles.client.length > 0) {
-    // Create patterns based on actual file extensions
-    const extensions = new Set(
-      scriptFiles.client.map((file) => path.extname(file))
-    );
-    updatedPluginJson.client_scripts = Array.from(extensions)
-      .filter((ext) => ext !== '')
-      .map((ext) => `client/*${ext}`);
-  }
-
-  if (scriptFiles.server.length > 0) {
-    // Create patterns based on actual file extensions
-    const extensions = new Set(
-      scriptFiles.server.map((file) => path.extname(file))
-    );
-    updatedPluginJson.server_scripts = Array.from(extensions)
-      .filter((ext) => ext !== '')
-      .map((ext) => `server/*${ext}`);
-  }
-
-  if (scriptFiles.shared.length > 0) {
-    // Create patterns based on actual file extensions
-    const extensions = new Set(
-      scriptFiles.shared.map((file) => path.extname(file))
-    );
-    updatedPluginJson.shared_scripts = Array.from(extensions)
-      .filter((ext) => ext !== '')
-      .map((ext) => `shared/*${ext}`);
-  }
+  const updatedPluginJson = {
+    ...parsedPluginJsonFileData,
+    // Optionally update the script patterns with the actual resolved files
+    // This is useful if your manifest generation uses the actual file list
+    _resolvedClientScripts: scriptFiles.client,
+    _resolvedServerScripts: scriptFiles.server,
+    _resolvedSharedScripts: scriptFiles.shared,
+  };
 
   // Generate manifest file for this plugin using the updated patterns
   const manifestPath = path.join(
