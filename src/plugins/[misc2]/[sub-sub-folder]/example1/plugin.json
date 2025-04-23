@@ -4,6 +4,7 @@
   "fx_version": "cerulean",
   "author": "Baloony Gaze",
   "description": "Example 3",
+  "games": ["gta5", "rdr3"],
   "main": "index.js",
   "client_scripts": ["client/*.ts"],
   "server_scripts": ["server/*.ts"]
