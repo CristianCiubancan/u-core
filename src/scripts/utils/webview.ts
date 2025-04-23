@@ -140,9 +140,9 @@ export async function buildWebview(
     // Create App component
     appContent += `const App = () => {
   return (
-    <div className="h-dvh">
+    <>
 ${components.join('\n')}
-    </div>
+    </>
   );
 };
 

@@ -590,7 +590,8 @@ function setupDistWatcher(distDir: string) {
     /.*/, // Match all files
     (filePath) => {
       const relativePath = path.relative(distDir, path.dirname(filePath));
-      const potentialResource = relativePath.split(path.sep)[0];
+      // last part of the path is the resource name
+      const potentialResource = relativePath.split(path.sep).pop();
 
       if (potentialResource && potentialResource !== 'scripts') {
         console.log(`Resource change detected: ${potentialResource}`);
