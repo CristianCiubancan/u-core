@@ -1,8 +1,8 @@
 import * as path from 'path';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
-import chokidar from 'chokidar'; // Add chokidar import for file watching
-import * as http from 'http';
+import chokidar from 'chokidar';
+import lodashDebounce from 'lodash.debounce';
 
 import {
   categorizeGeneratedFiles,
@@ -24,76 +24,37 @@ import { buildWebview } from './utils/webview.js';
 import { generatePluginHtmlFiles } from './utils/htmlGenerator.js';
 import { moveBuiltResources } from './utils/moveBuiltResources.js';
 
-/**
- * Build a single plugin
- */
-async function buildPlugin(
-  plugin: any,
-  distDir: string
-): Promise<
-  | {
-      updatedPluginJson: any;
-      manifestPath: string;
-    }
-  | undefined
-> {
-  if (!plugin.fullPath) {
-    console.log(`Skipping plugin with no path: ${plugin.name || 'unknown'}`);
-    return;
-  }
-
-  console.log(`Building plugin: ${plugin.name}`);
-
-  // Get plugin output info
-  const { outputDir, manifestPath } = getPluginOutputInfo(plugin, distDir);
-
-  // Ensure output directory exists
-  await ensureDirectoryExists(outputDir);
-
-  // Read plugin.json
-  const jsonPath = path.join(plugin.fullPath, 'plugin.json');
-  const pluginJsonData = readPluginJson(jsonPath);
-
-  // Get the files for this plugin
-  const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
-  plugin.files = plugin.files || [];
-  plugin.files.push(...pluginFiles);
-
-  // Get script files based on patterns in plugin.json
-  const scriptFiles = getPluginScripts(pluginJsonData, plugin.fullPath);
-
-  // Process all files
-  const processPromises = plugin.files.map((file: any) =>
-    processFile(file, outputDir)
-  );
-  const processedFiles = await Promise.all(processPromises);
-
-  // Categorize generated files
-  const generatedFiles = categorizeGeneratedFiles(processedFiles);
-
-  // Prepare manifest data
-  const updatedPluginJson = preparePluginManifestData(
-    pluginJsonData,
-    generatedFiles,
-    scriptFiles
-  );
-
-  // Verify the output directory content
-  await verifyOutputDir(outputDir);
-
-  return { updatedPluginJson, manifestPath };
+// Define types to replace 'any'
+interface Plugin {
+  name: string;
+  fullPath?: string;
+  files?: any[]; // Using any[] since we don't know the exact File structure
+  hasHtml?: boolean;
 }
 
-/**
- * Find a plugin by its path
- */
-function findPluginByPath(plugins: any[], filePath: string): any | undefined {
-  return plugins.find((plugin) => filePath.startsWith(plugin.fullPath));
+// Using the File interface as it appears to be in the original code
+// Adjust this based on actual File structure if needed
+interface File {
+  // Add properties based on what's actually used in the original code
+  // This is a placeholder that needs to match the actual structure
 }
 
-/**
- * Resource reloader configuration
- */
+interface ProcessedFile {
+  originalPath: string;
+  outputPath: string;
+  category?: string;
+}
+
+interface PluginBuildResult {
+  updatedPluginJson: Record<string, any>;
+  manifestPath: string;
+}
+
+interface CommandLineArgs {
+  watch: boolean;
+  reload: boolean;
+}
+
 interface ReloaderConfig {
   enabled: boolean;
   host: string;
@@ -101,10 +62,77 @@ interface ReloaderConfig {
   apiKey: string;
 }
 
+// Global variables
+let isBuilding = false;
+const debounceMap = new Map<string, () => void>();
+
+/**
+ * Build a single plugin
+ * @param plugin Plugin to build
+ * @param distDir Output directory
+ * @returns Build result or undefined if build failed
+ */
+async function buildPlugin(
+  plugin: Plugin,
+  distDir: string
+): Promise<PluginBuildResult | undefined> {
+  if (!plugin.fullPath) {
+    console.log(`Skipping plugin with no path: ${plugin.name || 'unknown'}`);
+    return;
+  }
+
+  console.log(`Building plugin: ${plugin.name}`);
+
+  try {
+    // Get plugin output info
+    const { outputDir, manifestPath } = getPluginOutputInfo(plugin, distDir);
+
+    // Ensure output directory exists
+    await ensureDirectoryExists(outputDir);
+
+    // Read plugin.json
+    const jsonPath = path.join(plugin.fullPath, 'plugin.json');
+    const pluginJsonData = readPluginJson(jsonPath);
+
+    // Get the files for this plugin
+    const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
+    plugin.files = plugin.files || [];
+    plugin.files.push(...pluginFiles);
+
+    // Get script files based on patterns in plugin.json
+    const scriptFiles = getPluginScripts(pluginJsonData, plugin.fullPath);
+
+    // Process all files
+    const processPromises = plugin.files.map((file) =>
+      processFile(file, outputDir)
+    );
+    const processedFiles = await Promise.all(processPromises);
+
+    // Categorize generated files
+    const generatedFiles = categorizeGeneratedFiles(processedFiles);
+
+    // Prepare manifest data
+    const updatedPluginJson = preparePluginManifestData(
+      pluginJsonData,
+      generatedFiles,
+      scriptFiles
+    );
+
+    // Verify the output directory content
+    await verifyOutputDir(outputDir);
+
+    return { updatedPluginJson, manifestPath };
+  } catch (error) {
+    console.error(`Error building plugin ${plugin.name}:`, error);
+    return undefined;
+  }
+}
+
 /**
  * Parse command line arguments
+ * @returns Parsed command line arguments
  */
-function parseArgs() {
+function parseArgs(): CommandLineArgs {
   const args = process.argv.slice(2);
   return {
     watch: args.includes('--watch') || args.includes('-w'),
@@ -113,389 +141,415 @@ function parseArgs() {
 }
 
 /**
- * Get resource reloader configuration from environment variables or defaults
+ * Create a debounced function that will only execute after wait time
+ * @param key Unique identifier for the debounced function
+ * @param fn Function to debounce
+ * @param wait Wait time in milliseconds
  */
-function getReloaderConfig(): ReloaderConfig {
-  // Log environment variables to help with debugging
-  console.log('RESOURCE_MANAGER_HOST:', process.env.RESOURCE_MANAGER_HOST);
-  console.log('RESOURCE_MANAGER_PORT:', process.env.RESOURCE_MANAGER_PORT);
-  console.log(
-    'API_KEY from env:',
-    process.env.API_KEY ? '[PRESENT]' : '[MISSING]'
-  );
+const debounce = (key: string, fn: () => Promise<void>, wait = 300) => {
+  if (debounceMap.has(key)) {
+    debounceMap.get(key)!();
+  }
+
+  const debouncedFn = lodashDebounce(async () => {
+    try {
+      await fn();
+    } catch (error) {
+      console.error(`Error in debounced function ${key}:`, error);
+    } finally {
+      debounceMap.delete(key);
+    }
+  }, wait);
+
+  debounceMap.set(key, debouncedFn);
+  debouncedFn();
+};
+
+/**
+ * Get paths for the project
+ * @returns Object containing various project paths
+ */
+function getProjectPaths() {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootDir = path.join(__dirname, '../../');
 
   return {
-    enabled: true,
-    host: process.env.RESOURCE_MANAGER_HOST || 'localhost',
-    port: parseInt(process.env.RESOURCE_MANAGER_PORT || '3414'),
-    // Important: Make sure this matches the API_KEY in your resource manager
-    apiKey: process.env.API_KEY || 'your-secure-api-key',
+    pluginsDir: path.join(__dirname, '../plugins'),
+    coreDir: path.join(__dirname, '../core'),
+    distDir: path.join(rootDir, 'dist'),
+    rootDir,
   };
 }
 
 /**
- * Send request to restart a resource
+ * Main build function to build all plugins and resources
+ * @returns Built plugins and core plugins
  */
-async function restartResource(
-  resourceName: string,
-  config: ReloaderConfig
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    // Log the request details for debugging
+async function build() {
+  const { pluginsDir, coreDir, distDir } = getProjectPaths();
+
+  try {
+    await ensureDirectoryExists(distDir);
+    await ensureDirectoryExists(coreDir);
+
+    const { pluginPaths } = getPluginsPaths(pluginsDir);
+    const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
+
+    const plugins = parsePluginPathsIntoPlugins(pluginPaths);
+    const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
+
     console.log(
-      `Attempting to restart resource '${resourceName}' via ${config.host}:${config.port}`
+      `Found ${plugins.length} plugins and ${corePlugins.length} core plugins`
     );
 
-    const options = {
-      hostname: config.host,
-      port: config.port,
-      path: `/restart?resource=${encodeURIComponent(resourceName)}`,
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
+    // Build webview resources
+    await buildWebview(plugins, distDir);
+
+    // Generate webview manifest
+    generateManifest(
+      {
+        name: 'webview',
+        version: '0.1.0',
+        fx_version: 'cerulean',
+        author: 'Baloony Gaze',
+        games: ['gta5', 'rdr3'],
+        description: 'Example 3',
+        files: ['index.html', 'assets/**/*'],
       },
-    };
+      path.join(distDir, 'webview', 'fxmanifest.lua')
+    );
 
-    const req = http.request(options, (res) => {
-      let data = '';
+    // Generate HTML files for plugins
+    await generatePluginHtmlFiles(plugins, distDir);
 
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
+    // Build regular plugins
+    await buildAndGenerateManifests(plugins, distDir, true);
 
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const response = JSON.parse(data);
-            console.log(
-              `Resource '${resourceName}' reloaded: ${
-                response.success ? 'success' : 'failed'
-              }`,
-              response
-            );
-            resolve(response.success);
-          } catch (error) {
-            console.error('Error parsing restart response:', error);
-            resolve(false);
-          }
-        } else {
-          console.error(
-            `Failed to restart resource ${resourceName}: HTTP ${res.statusCode}, Response: ${data}`
-          );
-          resolve(false);
-        }
-      });
-    });
+    // Build core plugins
+    await buildAndGenerateManifests(corePlugins, distDir, false);
 
-    req.on('error', (error) => {
-      console.error(
-        `Error sending restart request for ${resourceName}:`,
-        error
-      );
-      resolve(false);
-    });
+    console.log('Build completed successfully!');
+    await moveBuiltResources(distDir);
 
-    req.end();
-  });
+    return { plugins, corePlugins };
+  } catch (error) {
+    console.error('Build failed:', error);
+    throw error;
+  }
 }
 
 /**
- * Function to restart all resources
+ * Build plugins and generate manifests
+ * @param plugins Plugins to build
+ * @param distDir Output directory
+ * @param addWebviewDependencies Whether to add webview dependencies
  */
-async function restartAllResources(config: ReloaderConfig): Promise<boolean> {
-  return new Promise((resolve) => {
-    console.log(
-      `Attempting to restart all resources via ${config.host}:${config.port}`
-    );
-
-    const options = {
-      hostname: config.host,
-      port: config.port,
-      path: '/restart', // No resource parameter means restart all
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-    };
-
-    const req = http.request(options, (res) => {
-      let data = '';
-
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const response = JSON.parse(data);
-            console.log(
-              `All resources reloaded: ${
-                response.success ? 'success' : 'failed'
-              }`,
-              response
-            );
-            resolve(response.success);
-          } catch (error) {
-            console.error('Error parsing restart all response:', error);
-            resolve(false);
-          }
-        } else {
-          console.error(
-            `Failed to restart all resources: HTTP ${res.statusCode}, Response: ${data}`
-          );
-          resolve(false);
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      console.error(`Error sending restart all request:`, error);
-      resolve(false);
-    });
-
-    req.end();
-  });
-}
-
-/**
- * Set up file watching for plugins
- */
-function setupWatcher(
-  plugins: any[],
-  corePlugins: any[],
+async function buildAndGenerateManifests(
+  plugins: Plugin[],
   distDir: string,
-  pluginsDir: string,
-  coreDir: string,
-  autoReload: boolean = false
+  addWebviewDependencies: boolean
 ) {
-  // Get resource reloader configuration if auto-reload is enabled
-  const reloaderConfig = autoReload ? getReloaderConfig() : null;
-  const allPlugins = [...plugins, ...corePlugins];
-  const paths = [pluginsDir, coreDir];
-
-  console.log('Watching for file changes...');
-
-  const watcher = chokidar.watch(paths, {
-    ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
-    persistent: true,
-    ignoreInitial: true,
-    awaitWriteFinish: {
-      stabilityThreshold: 300,
-      pollInterval: 100,
-    },
-  });
-
-  watcher.on('change', async (filePath) => {
-    console.log(`File changed: ${filePath}`);
-    const plugin = findPluginByPath(allPlugins, filePath);
-
-    if (plugin) {
-      console.log(`Rebuilding plugin: ${plugin.name}`);
-
-      // Reset plugin files to force re-scanning
-      plugin.files = [];
-
-      try {
-        const result = await buildPlugin(plugin, distDir);
-        if (!result) return;
-
-        const { updatedPluginJson, manifestPath } = result;
-
-        if (plugin.hasHtml) {
-          updatedPluginJson.ui_page = 'html/index.html';
-          updatedPluginJson.files?.length
-            ? updatedPluginJson.files.push('html/**/*')
-            : (updatedPluginJson.files = ['html/**/*']);
-
-          updatedPluginJson.dependencies?.length
-            ? updatedPluginJson.dependencies.push('webview')
-            : (updatedPluginJson.dependencies = ['webview']);
-        }
-
-        generateManifest(updatedPluginJson, manifestPath);
-
-        // If webview related file changed, rebuild webview
-        if (filePath.includes('webview') || plugin.hasHtml) {
-          await buildWebview([plugin], distDir);
-          await generatePluginHtmlFiles([plugin], distDir);
-        }
-
-        console.log(`Plugin ${plugin.name} rebuilt successfully`);
-
-        // Trigger resource reload if enabled
-        if (reloaderConfig?.enabled) {
-          try {
-            // Make sure we're using a name that actually exists in FiveM
-            // Some plugins have folder structures like [misc2]/example3
-            // but the actual resource name is just "example3"
-            const resourceName = plugin.name.includes('/')
-              ? plugin.name.split('/').pop()
-              : plugin.name;
-
-            console.log(`Triggering reload for resource: ${resourceName}`);
-            const reloadSuccess = await restartResource(
-              resourceName,
-              reloaderConfig
-            );
-            if (reloadSuccess) {
-              console.log(`Resource ${resourceName} reloaded successfully`);
-            } else {
-              console.log(
-                `Resource ${resourceName} reload failed, trying to restart all resources...`
-              );
-              // Fallback to restarting all resources if specific resource restart fails
-              await restartAllResources(reloaderConfig);
-            }
-          } catch (reloadError) {
-            console.error(
-              `Failed to reload resource ${plugin.name}:`,
-              reloadError
-            );
-          }
-        }
-      } catch (error) {
-        console.error(`Error rebuilding plugin ${plugin.name}:`, error);
-      }
-    } else if (filePath.includes('webview')) {
-      // If it's a webview file but not part of a specific plugin
-      console.log('Rebuilding webview...');
-      try {
-        await buildWebview(plugins, distDir);
-        console.log('Webview rebuilt successfully');
-      } catch (error) {
-        console.error('Error rebuilding webview:', error);
-      }
-    }
-  });
-
-  watcher.on('add', (filePath) => {
-    console.log(`New file detected: ${filePath}`);
-    // If it's a new file, we'll do a full rebuild of the affected plugin
-    const plugin = findPluginByPath(allPlugins, filePath);
-    if (plugin) {
-      console.log(
-        `Scheduling rebuild for plugin: ${plugin.name} due to new file`
-      );
-      // Reset plugin files to force re-scanning
-      plugin.files = [];
-      // We'll let the 'change' handler above actually do the rebuild
-      watcher.emit('change', filePath);
-    }
-  });
-
-  watcher.on('unlink', (filePath) => {
-    console.log(`File deleted: ${filePath}`);
-    const plugin = findPluginByPath(allPlugins, filePath);
-    if (plugin) {
-      console.log(
-        `Scheduling rebuild for plugin: ${plugin.name} due to deleted file`
-      );
-      // Reset plugin files to force re-scanning
-      plugin.files = [];
-      // We'll let the 'change' handler do the rebuild
-      watcher.emit('change', filePath);
-    }
-  });
-
-  console.log('Watcher initialized. Press Ctrl+C to stop.');
-
-  return watcher;
-}
-
-/**
- * Main build function
- */
-async function main() {
-  const { watch, reload } = parseArgs();
-
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const pluginsDir = path.join(__dirname, '../plugins');
-  const rootDir = path.join(__dirname, '../../');
-  const distDir = path.join(rootDir, 'dist');
-
-  const coreDir = path.join(pluginsDir, '../core');
-
-  // Ensure dist directory exists
-  await ensureDirectoryExists(distDir);
-  await ensureDirectoryExists(coreDir);
-
-  // Get plugin directories
-  const { pluginPaths } = getPluginsPaths(pluginsDir);
-  const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
-
-  // Parse plugin paths into plugin objects
-  const plugins = parsePluginPathsIntoPlugins(pluginPaths);
-  const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
-
-  console.log(
-    `Found ${plugins.length} plugins and ${corePlugins.length} core plugins`
-  );
-
-  await buildWebview(plugins, distDir);
-
-  // write the webview fx manifest
-  generateManifest(
-    {
-      name: 'webview',
-      version: '0.1.0',
-      fx_version: 'cerulean',
-      author: 'Baloony Gaze',
-      games: ['gta5', 'rdr3'],
-      description: 'Example 3',
-      files: ['index.html', 'assets/**/*'],
-    },
-    path.join(distDir, 'webview', 'fxmanifest.lua')
-  );
-
-  // Generate HTML files for plugins with Page.tsx
-  await generatePluginHtmlFiles(plugins, distDir);
-
-  // Process each plugin
   for (const plugin of plugins) {
     const result = await buildPlugin(plugin, distDir);
     if (!result) continue;
+
     const { updatedPluginJson, manifestPath } = result;
-    if (plugin.hasHtml) {
+
+    if (addWebviewDependencies && plugin.hasHtml) {
       updatedPluginJson.ui_page = 'html/index.html';
-      updatedPluginJson.files?.length
-        ? updatedPluginJson.files.push('html/**/*')
-        : (updatedPluginJson.files = ['html/**/*']);
 
-      updatedPluginJson.dependencies?.length
-        ? updatedPluginJson.dependencies.push('webview')
-        : (updatedPluginJson.dependencies = ['webview']);
+      if (!updatedPluginJson.files) {
+        updatedPluginJson.files = ['html/**/*'];
+      } else if (!updatedPluginJson.files.includes('html/**/*')) {
+        updatedPluginJson.files.push('html/**/*');
+      }
+
+      if (!updatedPluginJson.dependencies) {
+        updatedPluginJson.dependencies = ['webview'];
+      } else if (!updatedPluginJson.dependencies.includes('webview')) {
+        updatedPluginJson.dependencies.push('webview');
+      }
     }
 
     generateManifest(updatedPluginJson, manifestPath);
-  }
-
-  for (const plugin of corePlugins) {
-    const result = await buildPlugin(plugin, distDir); // Pass distDir for core plugins as well
-    if (!result) continue;
-    const { updatedPluginJson, manifestPath } = result;
-    generateManifest(updatedPluginJson, manifestPath);
-  }
-
-  console.log('Build completed successfully!');
-
-  await moveBuiltResources(distDir);
-
-  // Set up watcher if watch mode is enabled
-  if (watch) {
-    setupWatcher(plugins, corePlugins, distDir, pluginsDir, coreDir, reload);
-
-    if (reload) {
-      console.log(
-        'Auto-reload is enabled. Resources will be reloaded automatically when rebuilt.'
-      );
-    }
   }
 }
 
-// Run the build process
+/**
+ * Rebuild a specific plugin
+ * @param pluginDir Plugin directory to rebuild
+ */
+async function rebuildPlugin(pluginDir: string) {
+  console.log(`Rebuilding plugin: ${pluginDir}`);
+
+  try {
+    const { pluginPaths } = getPluginsPaths(path.dirname(pluginDir));
+    const plugins = parsePluginPathsIntoPlugins(
+      pluginPaths.filter((p) => p === pluginDir)
+    );
+
+    const { distDir } = getProjectPaths();
+
+    await buildAndGenerateManifests(plugins, distDir, true);
+
+    // Move built resources after rebuilding
+    console.log(`Moving built resources for plugin: ${pluginDir}`);
+    await moveBuiltResources(distDir);
+  } catch (error) {
+    console.error(`Error rebuilding plugin ${pluginDir}:`, error);
+  }
+}
+
+/**
+ * Rebuild core plugins
+ */
+async function rebuildCore() {
+  console.log('Rebuilding core');
+
+  try {
+    const { coreDir, distDir } = getProjectPaths();
+    const { pluginPaths } = getPluginsPaths(coreDir);
+    const corePlugins = parsePluginPathsIntoPlugins(pluginPaths);
+
+    await buildAndGenerateManifests(corePlugins, distDir, false);
+
+    // Move built resources after rebuilding core
+    console.log('Moving built resources for core');
+    await moveBuiltResources(distDir);
+  } catch (error) {
+    console.error('Error rebuilding core:', error);
+  }
+}
+
+/**
+ * Rebuild webview resources
+ */
+async function rebuildWebview() {
+  console.log('Rebuilding webview');
+
+  try {
+    const { pluginsDir, distDir } = getProjectPaths();
+    const { pluginPaths } = getPluginsPaths(pluginsDir);
+    const plugins = parsePluginPathsIntoPlugins(pluginPaths);
+
+    await buildWebview(plugins, distDir);
+    await generatePluginHtmlFiles(plugins, distDir);
+
+    // Move built resources after rebuilding webview
+    console.log('Moving built resources for webview');
+    await moveBuiltResources(distDir);
+  } catch (error) {
+    console.error('Error rebuilding webview:', error);
+  }
+}
+
+/**
+ * Restart a resource
+ * @param resourceName Name of the resource to restart
+ */
+async function restartResource(resourceName: string) {
+  console.log(`Restarting resource: ${resourceName}`);
+  // Add logic to restart the resource, e.g., via an API call or server command
+  // Implementation depends on your specific environment
+}
+
+/**
+ * Set up file watchers for development
+ * @param pluginsDir Plugins directory
+ * @param coreDir Core directory
+ * @param distDir Output directory
+ */
+// Update the setupWatchers function with these changes
+function setupWatchers(pluginsDir: string, coreDir: string, distDir: string) {
+  const outputPaths = [distDir];
+  const { pluginPaths } = getPluginsPaths(pluginsDir);
+
+  // Log the paths we're going to watch
+  console.log('Setting up direct watchers for plugin paths:', pluginPaths);
+
+  // Set up watchers for each plugin directory individually
+  for (const pluginDir of pluginPaths) {
+    const normalizedPluginDir = path.normalize(pluginDir);
+    console.log(`Setting up watcher for plugin: ${normalizedPluginDir}`);
+
+    const pluginWatcher = chokidar.watch(normalizedPluginDir, {
+      ignoreInitial: true,
+      ignored: [
+        ...outputPaths,
+        // Exclude node_modules, .git, etc.
+        '**/node_modules/**',
+        '**/.git/**',
+      ],
+      persistent: true,
+      usePolling: true, // More reliable on Windows with special characters
+      interval: 1000,
+      depth: 99, // Make sure we catch deeply nested files
+    });
+
+    pluginWatcher
+      .on('ready', () => {
+        console.log(`Watcher ready for: ${normalizedPluginDir}`);
+      })
+      .on('all', (event, filePath) => {
+        console.log(`File event in ${normalizedPluginDir}:`, event, filePath);
+
+        // Only respond to changes in relevant file types
+        if (!/\.(ts|json|lua|tsx|jsx|css|html)$/.test(filePath)) {
+          console.log(`Ignoring non-source file: ${filePath}`);
+          return;
+        }
+
+        if (isBuilding) {
+          console.log('Build already in progress, skipping');
+          return;
+        }
+
+        // Handle the file change based on which directory it's in
+        if (filePath.includes('html/') || filePath.includes('html\\')) {
+          console.log('HTML file changed, rebuilding webview');
+          debounce('webview', async () => {
+            isBuilding = true;
+            try {
+              await rebuildWebview();
+            } finally {
+              isBuilding = false;
+            }
+          });
+        } else {
+          console.log(
+            `Source file changed in ${normalizedPluginDir}, rebuilding plugin`
+          );
+          debounce(normalizedPluginDir, async () => {
+            isBuilding = true;
+            try {
+              await rebuildPlugin(normalizedPluginDir);
+            } finally {
+              isBuilding = false;
+            }
+          });
+        }
+      });
+  }
+
+  // Similar approach for core directory
+  console.log(`Setting up watcher for core: ${coreDir}`);
+  chokidar
+    .watch(coreDir, {
+      ignoreInitial: true,
+      ignored: outputPaths,
+      persistent: true,
+      usePolling: true,
+      interval: 1000,
+    })
+    .on('ready', () => {
+      console.log(`Core watcher ready for: ${coreDir}`);
+    })
+    .on('all', (event, filePath) => {
+      console.log(`File event in core:`, event, filePath);
+
+      if (!/\.(ts|json|lua)$/.test(filePath)) {
+        console.log(`Ignoring non-source file: ${filePath}`);
+        return;
+      }
+
+      if (isBuilding) return;
+
+      debounce('core', async () => {
+        isBuilding = true;
+        try {
+          await rebuildCore();
+        } finally {
+          isBuilding = false;
+        }
+      });
+    });
+
+  // Watch webview directory separately
+  const webviewDir = path.join(pluginsDir, '..', 'webview');
+  console.log(`Setting up watcher for webview: ${webviewDir}`);
+  chokidar
+    .watch(webviewDir, {
+      ignoreInitial: true,
+      ignored: outputPaths,
+      persistent: true,
+      usePolling: true,
+      interval: 1000,
+    })
+    .on('ready', () => {
+      console.log(`Webview watcher ready for: ${webviewDir}`);
+    })
+    .on('all', (event, filePath) => {
+      console.log(`File event in webview:`, event, filePath);
+
+      if (isBuilding) return;
+
+      debounce('webview', async () => {
+        isBuilding = true;
+        try {
+          await rebuildWebview();
+        } finally {
+          isBuilding = false;
+        }
+      });
+    });
+
+  // Watch dist for resource restarts
+  console.log(`Setting up watcher for dist: ${distDir}`);
+  chokidar
+    .watch(distDir, {
+      ignoreInitial: true,
+      ignored: [...outputPaths, path.join(distDir, 'scripts', '**')],
+      persistent: true,
+    })
+    .on('ready', () => {
+      console.log(`Dist watcher ready for: ${distDir}`);
+    })
+    .on('all', (event, filePath) => {
+      console.log(`File event in dist:`, event, filePath);
+
+      if (isBuilding) return;
+
+      const relativePath = path.relative(distDir, path.dirname(filePath));
+      const potentialResource = relativePath.split(path.sep)[0];
+
+      if (potentialResource && potentialResource !== 'scripts') {
+        console.log(`Resource change detected: ${potentialResource}`);
+        debounce(`resource-${potentialResource}`, async () => {
+          await restartResource(potentialResource);
+        });
+      }
+    });
+}
+
+/**
+ * Main execution function
+ */
+async function main() {
+  const { watch, reload } = parseArgs();
+  const reloaderConfig: ReloaderConfig = {
+    enabled: reload,
+    host: process.env.RELOADER_HOST || 'localhost',
+    port: parseInt(process.env.RELOADER_PORT || '30120', 10),
+    apiKey: process.env.RELOADER_API_KEY || '',
+  };
+
+  console.log('Starting initial build...');
+  try {
+    await build();
+
+    if (watch) {
+      const { pluginsDir, coreDir, distDir } = getProjectPaths();
+      setupWatchers(pluginsDir, coreDir, distDir);
+      console.log('Watcher started. Press Ctrl+C to stop.');
+    }
+  } catch (error) {
+    console.error('Build process failed:', error);
+    process.exit(1);
+  }
+}
+
 main().catch((error) => {
-  console.error('Build failed:', error);
+  console.error('Unhandled error in main process:', error);
   process.exit(1);
 });

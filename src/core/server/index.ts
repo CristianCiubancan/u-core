@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Simple authentication - you should use a more secure method in production
-const API_KEY = process.env.API_KEY || 'your-secure-api-key';
+const API_KEY = process.env.RELOADER_API_KEY || 'your-secure-api-key';
 console.log(
   `[resource-manager] API_KEY is ${
     API_KEY ? 'configured' : 'using default value'

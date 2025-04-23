@@ -1,7 +1,3 @@
 export default function Page() {
-  return (
-    <div className="h-auto min-h-64 bg-red-500 p-4 text-white flex items-end">
-      asdasd123123123
-    </div>
-  );
+  return <div className="h-full bg-red-500">salut</div>;
 }

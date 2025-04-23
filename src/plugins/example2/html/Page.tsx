@@ -1,7 +1,7 @@
 export default function Page() {
   return (
-    <div className="h-auto min-h-32 bg-red-500 p-4 text-white">
-      <h2 className="font-bold">Message Receiver</h2>
+    <div className="h-full bg-red-200">
+      <h2 className="font-bold">12123 </h2>
     </div>
   );
 }

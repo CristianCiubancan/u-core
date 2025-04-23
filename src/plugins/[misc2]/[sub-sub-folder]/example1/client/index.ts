@@ -28,17 +28,3 @@ setTimeout(() => {
     },
   });
 }, 2000);
-
-// Register a command to send a test message on demand
-RegisterCommand(
-  'testnui',
-  () => {
-    safeSendNUIMessage({
-      action: 'ui',
-      data: {
-        message: 'Test message triggered by command',
-      },
-    });
-  },
-  false
-);
