@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
 import { Plugin, ensureDirectoryExists } from './file';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
@@ -259,17 +259,23 @@ body {
         // No package.json or can't parse it - use npx vite build directly
       }
 
-      // Run the appropriate build command
-      const buildCommand = useNpmRun ? 'pnpm build' : 'npx vite build';
+      // Always run Vite build directly to avoid recursion
+      const buildCommand = 'npx vite build';
       console.log(`Executing: ${buildCommand}`);
 
-      const { stdout, stderr } = await execAsync(buildCommand, {
+      // use spawn to stream logs without buffering large output
+      const child = spawn(buildCommand, {
         cwd: process.cwd(),
+        shell: true,
+        stdio: 'inherit',
       });
-      if (stderr && !stderr.includes('built in')) {
-        console.warn('Vite build warnings:', stderr);
-      }
-      console.log('Vite build output:', stdout);
+      await new Promise<void>((resolve, reject) => {
+        child.on('close', (code) =>
+          code === 0
+            ? resolve()
+            : reject(new Error(`Build command failed with exit code ${code}`))
+        );
+      });
     } catch (error) {
       console.error('Vite build failed:', error);
 
