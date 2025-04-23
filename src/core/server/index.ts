@@ -39,6 +39,12 @@ function restartResource(resourceName: string): boolean {
     `[resource-manager] Attempting to restart resource: ${resourceName}`
   );
 
+  // Skip if resource name is empty or undefined
+  if (!resourceName) {
+    console.error(`[resource-manager] Invalid resource name: ${resourceName}`);
+    return false;
+  }
+
   // Handle special case for core resource
   if (resourceName === 'core' || resourceName.endsWith('/core')) {
     // Extract the clean resource name if it's a path
@@ -57,15 +63,31 @@ function restartResource(resourceName: string): boolean {
     }
 
     try {
+      console.log(`[resource-manager] Stopping core resource: ${cleanName}`);
       StopResource(cleanName);
-      StartResource(cleanName);
-      console.log(
-        `[resource-manager] Successfully restarted core resource: ${cleanName}`
-      );
+
+      // Add a small delay to ensure the resource is fully stopped
+      setTimeout(() => {
+        try {
+          console.log(
+            `[resource-manager] Starting core resource: ${cleanName}`
+          );
+          StartResource(cleanName);
+          console.log(
+            `[resource-manager] Successfully restarted core resource: ${cleanName}`
+          );
+        } catch (startError) {
+          console.error(
+            `[resource-manager] Failed to start core resource ${cleanName}:`,
+            startError
+          );
+        }
+      }, 500);
+
       return true;
     } catch (error) {
       console.error(
-        `[resource-manager] Failed to restart core resource ${cleanName}:`,
+        `[resource-manager] Failed to stop core resource ${cleanName}:`,
         error
       );
       return false;
@@ -76,6 +98,14 @@ function restartResource(resourceName: string): boolean {
   const cleanResourceName = resourceName.includes('/')
     ? resourceName.split('/').pop()
     : resourceName;
+
+  // Skip if resource name is empty after cleaning
+  if (!cleanResourceName) {
+    console.error(
+      `[resource-manager] Invalid resource name after cleaning: ${resourceName}`
+    );
+    return false;
+  }
 
   // Check if resource exists by attempting to get its state
   const state = GetResourceState(cleanResourceName);
@@ -89,15 +119,29 @@ function restartResource(resourceName: string): boolean {
   try {
     console.log(`[resource-manager] Stopping resource: ${cleanResourceName}`);
     StopResource(cleanResourceName);
-    console.log(`[resource-manager] Starting resource: ${cleanResourceName}`);
-    StartResource(cleanResourceName);
-    console.log(
-      `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
-    );
+
+    // Add a small delay to ensure the resource is fully stopped
+    setTimeout(() => {
+      try {
+        console.log(
+          `[resource-manager] Starting resource: ${cleanResourceName}`
+        );
+        StartResource(cleanResourceName);
+        console.log(
+          `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
+        );
+      } catch (startError) {
+        console.error(
+          `[resource-manager] Failed to start resource ${cleanResourceName}:`,
+          startError
+        );
+      }
+    }, 500);
+
     return true;
   } catch (error) {
     console.error(
-      `[resource-manager] Failed to restart resource ${cleanResourceName}:`,
+      `[resource-manager] Failed to stop resource ${cleanResourceName}:`,
       error
     );
     return false;
