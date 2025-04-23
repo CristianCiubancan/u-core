@@ -34,7 +34,16 @@ import { verifyOutputDir } from './utils/bundler';
 /**
  * Build a single plugin
  */
-async function buildPlugin(plugin: any, distDir: string) {
+async function buildPlugin(
+  plugin: any,
+  distDir: string
+): Promise<
+  | {
+      updatedPluginJson: any;
+      manifestPath: string;
+    }
+  | undefined
+> {
   if (!plugin.fullPath) {
     console.log(`Skipping plugin with no path: ${plugin.name || 'unknown'}`);
     return;
@@ -84,14 +93,13 @@ async function buildPlugin(plugin: any, distDir: string) {
   );
 
   // Generate the manifest with the updated file paths
-  generateManifest(updatedPluginJson, manifestPath);
 
   // Verify the output directory content
   await verifyOutputDir(outputDir);
 
   console.log(`Successfully built plugin: ${plugin.pathFromPluginsDir}`);
 
-  return generatedFiles;
+  return { updatedPluginJson, manifestPath };
 }
 
 /**
@@ -119,12 +127,44 @@ async function main() {
 
   await buildWebview(plugins, distDir);
 
+  // write the webview fx manifest
+  generateManifest(
+    {
+      name: 'webview',
+      version: '0.1.0',
+      fx_version: 'cerulean',
+      author: 'Baloony Gaze',
+      description: 'Example 3',
+      files: ['index.html', 'assets/**/*'],
+    },
+    path.join(distDir, 'webview', 'fxmanifest.lua')
+  );
+
   // Process each plugin
   for (const plugin of plugins) {
-    await buildPlugin(plugin, distDir);
+    const result = await buildPlugin(plugin, distDir);
+    if (!result) continue;
+    const { updatedPluginJson, manifestPath } = result;
+    if (plugin.hasHtml) {
+      updatedPluginJson.files
+        ? updatedPluginJson.files.push('@webview/index.html')
+        : (updatedPluginJson.files = ['@webview/index.html']);
+
+      updatedPluginJson.files.push('@webview/assets/**/*');
+      updatedPluginJson.ui_page = '@webview/index.html';
+
+      updatedPluginJson.dependencies?.length
+        ? updatedPluginJson.dependencies.push('webview')
+        : (updatedPluginJson.dependencies = ['webview']);
+    }
+
+    generateManifest(updatedPluginJson, manifestPath);
   }
   for (const plugin of corePlugins) {
-    await buildPlugin(plugin, distDir); // Pass distDir for core plugins as well
+    const result = await buildPlugin(plugin, distDir); // Pass distDir for core plugins as well
+    if (!result) continue;
+    const { updatedPluginJson, manifestPath } = result;
+    generateManifest(updatedPluginJson, manifestPath);
   }
 
   console.log('Build completed successfully!');
