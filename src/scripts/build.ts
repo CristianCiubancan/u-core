@@ -34,13 +34,6 @@ interface Plugin {
   hasHtml?: boolean;
 }
 
-// Using the File interface as it appears to be in the original code
-// Adjust this based on actual File structure if needed
-interface File {
-  // Add properties based on what's actually used in the original code
-  // This is a placeholder that needs to match the actual structure
-}
-
 interface ProcessedFile {
   originalPath: string;
   outputPath: string;
@@ -64,15 +57,96 @@ interface ReloaderConfig {
   apiKey: string;
 }
 
-// Global variables
+interface ProjectPaths {
+  pluginsDir: string;
+  coreDir: string;
+  distDir: string;
+  rootDir: string;
+}
+
+// Define type for debounced function with cancel method
+interface DebouncedFunction {
+  (): void;
+  cancel?: () => void;
+}
+
+// Global state
 let isBuilding = false;
-const debounceMap = new Map<string, () => void>();
+const debounceMap = new Map<string, DebouncedFunction>();
+const resourceMap = new Map<string, string>(); // Maps path -> resource name
+
+/**
+ * Get paths for the project
+ */
+function getProjectPaths(): ProjectPaths {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootDir = path.join(__dirname, '../../');
+
+  return {
+    pluginsDir: path.join(__dirname, '../plugins'),
+    coreDir: path.join(__dirname, '../core'),
+    distDir: path.join(rootDir, 'dist'),
+    rootDir,
+  };
+}
+
+/**
+ * Create a debounced function that will only execute after wait time
+ */
+const debounce = (key: string, fn: () => Promise<void> | void, wait = 300) => {
+  console.log(`Debouncing function for key: ${key} with wait: ${wait}ms`);
+
+  // If we already have a debounced function for this key, cancel it
+  if (debounceMap.has(key)) {
+    console.log(`Cancelling previous debounced function for key: ${key}`);
+    const existingFn = debounceMap.get(key)!;
+    // Cancel the previous debounced function if it has a cancel method
+    if (existingFn.cancel) {
+      existingFn.cancel();
+    }
+    debounceMap.delete(key); // Remove it from the map
+  }
+
+  // Create a new debounced function with the specified wait time
+  const debouncedFn = lodashDebounce(async () => {
+    console.log(`Executing debounced function for key: ${key}`);
+    try {
+      const result = fn();
+      // Handle both Promise and non-Promise returns
+      if (result instanceof Promise) {
+        await result;
+      }
+    } catch (error) {
+      console.error(`Error in debounced function ${key}:`, error);
+    } finally {
+      // Clean up after execution
+      if (debounceMap.has(key)) {
+        debounceMap.delete(key);
+      }
+    }
+  }, wait);
+
+  // Store the debounced function in the map
+  debounceMap.set(key, debouncedFn);
+
+  // Execute the debounced function
+  debouncedFn();
+};
+
+/**
+ * Parse command line arguments
+ */
+function parseArgs(): CommandLineArgs {
+  const args = process.argv.slice(2);
+  return {
+    watch: args.includes('--watch') || args.includes('-w'),
+    reload: args.includes('--reload') || args.includes('-r'),
+  };
+}
 
 /**
  * Build a single plugin
- * @param plugin Plugin to build
- * @param distDir Output directory
- * @returns Build result or undefined if build failed
  */
 async function buildPlugin(
   plugin: Plugin,
@@ -131,121 +205,7 @@ async function buildPlugin(
 }
 
 /**
- * Parse command line arguments
- * @returns Parsed command line arguments
- */
-function parseArgs(): CommandLineArgs {
-  const args = process.argv.slice(2);
-  return {
-    watch: args.includes('--watch') || args.includes('-w'),
-    reload: args.includes('--reload') || args.includes('-r'),
-  };
-}
-
-/**
- * Create a debounced function that will only execute after wait time
- * @param key Unique identifier for the debounced function
- * @param fn Function to debounce
- * @param wait Wait time in milliseconds
- */
-const debounce = (key: string, fn: () => Promise<void>, wait = 300) => {
-  if (debounceMap.has(key)) {
-    debounceMap.get(key)!();
-  }
-
-  const debouncedFn = lodashDebounce(async () => {
-    try {
-      await fn();
-    } catch (error) {
-      console.error(`Error in debounced function ${key}:`, error);
-    } finally {
-      debounceMap.delete(key);
-    }
-  }, wait);
-
-  debounceMap.set(key, debouncedFn);
-  debouncedFn();
-};
-
-/**
- * Get paths for the project
- * @returns Object containing various project paths
- */
-function getProjectPaths() {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const rootDir = path.join(__dirname, '../../');
-
-  return {
-    pluginsDir: path.join(__dirname, '../plugins'),
-    coreDir: path.join(__dirname, '../core'),
-    distDir: path.join(rootDir, 'dist'),
-    rootDir,
-  };
-}
-
-/**
- * Main build function to build all plugins and resources
- * @returns Built plugins and core plugins
- */
-async function build() {
-  const { pluginsDir, coreDir, distDir } = getProjectPaths();
-
-  try {
-    await ensureDirectoryExists(distDir);
-    await ensureDirectoryExists(coreDir);
-
-    const { pluginPaths } = getPluginsPaths(pluginsDir);
-    const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
-
-    const plugins = parsePluginPathsIntoPlugins(pluginPaths);
-    const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
-
-    console.log(
-      `Found ${plugins.length} plugins and ${corePlugins.length} core plugins`
-    );
-
-    // Build webview resources
-    await buildWebview(plugins, distDir);
-
-    // Generate webview manifest
-    generateManifest(
-      {
-        name: 'webview',
-        version: '0.1.0',
-        fx_version: 'cerulean',
-        author: 'Baloony Gaze',
-        games: ['gta5', 'rdr3'],
-        description: 'Example 3',
-        files: ['index.html', 'assets/**/*'],
-      },
-      path.join(distDir, 'webview', 'fxmanifest.lua')
-    );
-
-    // Generate HTML files for plugins
-    await generatePluginHtmlFiles(plugins, distDir);
-
-    // Build regular plugins
-    await buildAndGenerateManifests(plugins, distDir, true);
-
-    // Build core plugins
-    await buildAndGenerateManifests(corePlugins, distDir, false);
-
-    console.log('Build completed successfully!');
-    await moveBuiltResources(distDir);
-
-    return { plugins, corePlugins };
-  } catch (error) {
-    console.error('Build failed:', error);
-    throw error;
-  }
-}
-
-/**
  * Build plugins and generate manifests
- * @param plugins Plugins to build
- * @param distDir Output directory
- * @param addWebviewDependencies Whether to add webview dependencies
  */
 async function buildAndGenerateManifests(
   plugins: Plugin[],
@@ -279,301 +239,456 @@ async function buildAndGenerateManifests(
 }
 
 /**
- * Rebuild a specific plugin
- * @param pluginDir Plugin directory to rebuild
+ * Main build function to build all plugins and resources
  */
-async function rebuildPlugin(pluginDir: string) {
-  console.log(`Rebuilding plugin: ${pluginDir}`);
+async function build() {
+  const { pluginsDir, coreDir, distDir } = getProjectPaths();
 
   try {
-    const { pluginPaths } = getPluginsPaths(path.dirname(pluginDir));
-    const plugins = parsePluginPathsIntoPlugins(
-      pluginPaths.filter((p) => p === pluginDir)
+    await ensureDirectoryExists(distDir);
+    await ensureDirectoryExists(coreDir);
+
+    const { pluginPaths } = getPluginsPaths(pluginsDir);
+    const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
+
+    const plugins = parsePluginPathsIntoPlugins(pluginPaths);
+    const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
+
+    console.log(
+      `Found ${plugins.length} plugins and ${corePlugins.length} core plugins`
     );
 
-    const { distDir } = getProjectPaths();
-
-    await buildAndGenerateManifests(plugins, distDir, true);
-
-    // Move built resources after rebuilding
-    console.log(`Moving built resources for plugin: ${pluginDir}`);
-    await moveBuiltResources(distDir);
-  } catch (error) {
-    console.error(`Error rebuilding plugin ${pluginDir}:`, error);
-  }
-}
-
-/**
- * Rebuild core plugins
- */
-async function rebuildCore() {
-  console.log('Rebuilding core');
-
-  try {
-    const { coreDir, distDir } = getProjectPaths();
-    const { pluginPaths } = getPluginsPaths(coreDir);
-    const corePlugins = parsePluginPathsIntoPlugins(pluginPaths);
-
-    await buildAndGenerateManifests(corePlugins, distDir, false);
-
-    // Move built resources after rebuilding core
-    console.log('Moving built resources for core');
-    await moveBuiltResources(distDir);
-  } catch (error) {
-    console.error('Error rebuilding core:', error);
-  }
-}
-
-/**
- * Rebuild webview resources
- */
-async function rebuildWebview() {
-  console.log('Rebuilding webview');
-
-  try {
-    const { pluginsDir, distDir } = getProjectPaths();
-    const { pluginPaths } = getPluginsPaths(pluginsDir);
-    const plugins = parsePluginPathsIntoPlugins(pluginPaths);
-
+    // Build order:
+    // 1. Build webview resources
     await buildWebview(plugins, distDir);
+
+    // 2. Generate webview manifest
+    generateManifest(
+      {
+        name: 'webview',
+        version: '0.1.0',
+        fx_version: 'cerulean',
+        author: 'Baloony Gaze',
+        games: ['gta5', 'rdr3'],
+        description: 'Example 3',
+        files: ['index.html', 'assets/**/*'],
+      },
+      path.join(distDir, 'webview', 'fxmanifest.lua')
+    );
+
+    // 3. Generate HTML files for plugins
     await generatePluginHtmlFiles(plugins, distDir);
 
-    // Move built resources after rebuilding webview
-    console.log('Moving built resources for webview');
+    // 4. Build regular plugins
+    await buildAndGenerateManifests(plugins, distDir, true);
+
+    // 5. Build core plugins
+    await buildAndGenerateManifests(corePlugins, distDir, false);
+
+    console.log('Build completed successfully!');
+
+    // 6. Move built resources
+    await moveBuiltResources(distDir);
+
+    return { plugins, corePlugins };
+  } catch (error) {
+    console.error('Build failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Rebuild component wrapper to handle common tasks
+ */
+async function rebuildComponent(
+  componentType: 'plugin' | 'core' | 'webview',
+  pluginDir?: string
+) {
+  console.log(
+    `Rebuilding ${componentType}${pluginDir ? `: ${pluginDir}` : ''}`
+  );
+  isBuilding = true;
+
+  try {
+    const { pluginsDir, coreDir, distDir } = getProjectPaths();
+
+    switch (componentType) {
+      case 'plugin': {
+        if (!pluginDir) throw new Error('Plugin directory is required');
+        const { pluginPaths } = getPluginsPaths(path.dirname(pluginDir));
+        const plugins = parsePluginPathsIntoPlugins(
+          pluginPaths.filter((p) => p === pluginDir)
+        );
+        await buildAndGenerateManifests(plugins, distDir, true);
+        break;
+      }
+      case 'core': {
+        const { pluginPaths } = getPluginsPaths(coreDir);
+        const corePlugins = parsePluginPathsIntoPlugins(pluginPaths);
+        await buildAndGenerateManifests(corePlugins, distDir, false);
+        break;
+      }
+      case 'webview': {
+        const { pluginPaths } = getPluginsPaths(pluginsDir);
+        const plugins = parsePluginPathsIntoPlugins(pluginPaths);
+        await buildWebview(plugins, distDir);
+        await generatePluginHtmlFiles(plugins, distDir);
+        break;
+      }
+    }
+
+    // Move built resources after rebuilding
     await moveBuiltResources(distDir);
   } catch (error) {
-    console.error('Error rebuilding webview:', error);
+    console.error(`Error rebuilding ${componentType}:`, error);
+  } finally {
+    isBuilding = false;
   }
 }
 
-function notifyResourceManager(resourceName: string) {
-  // Properly encode resource name
-  const encodedResourceName = encodeURIComponent(resourceName);
-
-  const options = {
-    hostname: process.env.RELOADER_HOST || 'localhost',
-    port: process.env.RELOADER_PORT || 3414,
-    path: `/restart?resource=${encodedResourceName}`,
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${
-        process.env.RELOADER_API_KEY || 'your-secure-api-key'
-      }`,
-    },
-  };
-
-  console.log(
-    `Sending restart request for resource: ${resourceName} (encoded as: ${encodedResourceName})`
-  );
-
-  const req = http.request(options, (res: any) => {
-    let data = '';
-
-    res.on('data', (chunk: any) => {
-      data += chunk;
-    });
-
-    res.on('end', () => {
-      try {
-        const response = JSON.parse(data);
-        console.log(
-          `Resource reload notification ${
-            response.success ? 'successful' : 'failed'
-          } for ${resourceName}`
-        );
-
-        if (!response.success) {
-          console.log(`Failed response details: ${JSON.stringify(response)}`);
-        }
-      } catch (error) {
-        console.error('Error parsing response:', error);
-        console.error('Raw response data:', data);
-      }
-    });
-  });
-
-  req.on('error', (error: any) => {
-    console.error(`Error notifying resource manager: ${error.message}`);
-  });
-
-  req.end();
-}
-/**
- * Restart a resource
- * @param resourceName Name of the resource to restart
- */
-async function restartResource(resourceName: string) {
-  console.log(`Restarting resource: ${resourceName}`);
-  notifyResourceManager(resourceName);
-}
+// Track resource restart requests to prevent duplicates
+const resourceRestartTimestamps = new Map<string, number>();
+const RESTART_COOLDOWN_MS = 2000; // 2 seconds cooldown between restarts of the same resource
 
 /**
- * Set up file watchers for development
- * @param pluginsDir Plugins directory
- * @param coreDir Core directory
- * @param distDir Output directory
+ * Notify resource manager to restart a resource
+ * @returns Promise that resolves when notification is complete
  */
-// Update the setupWatchers function with these changes
-function setupWatchers(pluginsDir: string, coreDir: string, distDir: string) {
-  const outputPaths = [distDir];
-  const { pluginPaths } = getPluginsPaths(pluginsDir);
+function notifyResourceManager(resourceName: string): Promise<void> {
+  return new Promise((resolve) => {
+    // Skip if resource name is empty or undefined
+    if (!resourceName) {
+      console.error(`Invalid resource name: ${resourceName}`);
+      resolve();
+      return;
+    }
 
-  // Log the paths we're going to watch
-  console.log('Setting up direct watchers for plugin paths:', pluginPaths);
+    // Check if this resource was recently restarted
+    const lastRestartTime = resourceRestartTimestamps.get(resourceName) || 0;
+    const now = Date.now();
+    const timeSinceLastRestart = now - lastRestartTime;
 
-  // Set up watchers for each plugin directory individually
-  for (const pluginDir of pluginPaths) {
-    const normalizedPluginDir = path.normalize(pluginDir);
-    console.log(`Setting up watcher for plugin: ${normalizedPluginDir}`);
+    if (timeSinceLastRestart < RESTART_COOLDOWN_MS) {
+      console.log(
+        `Skipping restart for ${resourceName} - last restart was ${timeSinceLastRestart}ms ago (cooldown: ${RESTART_COOLDOWN_MS}ms)`
+      );
+      resolve();
+      return;
+    }
 
-    const pluginWatcher = chokidar.watch(normalizedPluginDir, {
-      ignoreInitial: true,
-      ignored: [
-        ...outputPaths,
-        // Exclude node_modules, .git, etc.
-        '**/node_modules/**',
-        '**/.git/**',
-      ],
-      persistent: true,
-      usePolling: true, // More reliable on Windows with special characters
-      interval: 1000,
-      depth: 99, // Make sure we catch deeply nested files
-    });
+    // Update the timestamp for this resource
+    resourceRestartTimestamps.set(resourceName, now);
 
-    pluginWatcher
-      .on('ready', () => {
-        console.log(`Watcher ready for: ${normalizedPluginDir}`);
-      })
-      .on('all', (event, filePath) => {
-        console.log(`File event in ${normalizedPluginDir}:`, event, filePath);
+    // Check if reloader is enabled
+    if (process.env.RELOADER_ENABLED !== 'true') {
+      console.log(
+        `Resource reloader is disabled. Skipping restart for ${resourceName}`
+      );
+      resolve();
+      return;
+    }
 
-        // Only respond to changes in relevant file types
-        if (!/\.(ts|json|lua|tsx|jsx|css|html)$/.test(filePath)) {
-          console.log(`Ignoring non-source file: ${filePath}`);
-          return;
-        }
+    // Properly encode resource name
+    const encodedResourceName = encodeURIComponent(resourceName);
 
-        if (isBuilding) {
-          console.log('Build already in progress, skipping');
-          return;
-        }
+    const options = {
+      hostname: process.env.RELOADER_HOST || 'localhost',
+      port: parseInt(process.env.RELOADER_PORT || '3414', 10),
+      path: `/restart?resource=${encodedResourceName}`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${
+          process.env.RELOADER_API_KEY || 'your-secure-api-key'
+        }`,
+      },
+    };
 
-        // Handle the file change based on which directory it's in
-        if (filePath.includes('html/') || filePath.includes('html\\')) {
-          console.log('HTML file changed, rebuilding webview');
-          debounce('webview', async () => {
-            isBuilding = true;
-            try {
-              await rebuildWebview();
-            } finally {
-              isBuilding = false;
-            }
-          });
-        } else {
+    console.log(`Sending restart request for resource: ${resourceName}`);
+
+    const req = http.request(options, (res: any) => {
+      let data = '';
+
+      res.on('data', (chunk: any) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
           console.log(
-            `Source file changed in ${normalizedPluginDir}, rebuilding plugin`
+            `Resource reload ${
+              response.success ? 'successful' : 'failed'
+            } for ${resourceName}`
           );
-          debounce(normalizedPluginDir, async () => {
-            isBuilding = true;
-            try {
-              await rebuildPlugin(normalizedPluginDir);
-            } finally {
-              isBuilding = false;
-            }
-          });
+
+          if (!response.success) {
+            console.log(`Failed response: ${JSON.stringify(response)}`);
+          }
+
+          // Add a delay before resolving to prevent rapid-fire restarts
+          setTimeout(() => {
+            resolve();
+          }, 500);
+        } catch (error) {
+          console.error('Error parsing response:', error);
+          console.error('Raw response data:', data);
+          resolve(); // Still resolve to prevent chain from breaking
         }
       });
-  }
+    });
 
-  // Similar approach for core directory
-  console.log(`Setting up watcher for core: ${coreDir}`);
+    req.on('error', (error: any) => {
+      console.error(`Error notifying resource manager: ${error.message}`);
+      // Still resolve to prevent chain from breaking
+      setTimeout(() => {
+        resolve();
+      }, 500);
+    });
+
+    // Set a timeout for the request
+    req.setTimeout(5000, () => {
+      console.error(`Request timeout for resource: ${resourceName}`);
+      req.destroy();
+      resolve(); // Still resolve to prevent chain from breaking
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * Restart a resource
+ */
+async function restartResource(resourceName: string): Promise<void> {
+  console.log(`Restarting resource: ${resourceName}`);
+  await notifyResourceManager(resourceName);
+}
+
+/**
+ * Extract resource name from manifest file
+ */
+function getResourceNameFromManifest(manifestPath: string): string | null {
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const content = fs.readFileSync(manifestPath, 'utf8');
+      const nameMatch = content.match(/name\s*=\s*["']([^"']+)["']/);
+      if (nameMatch && nameMatch[1]) {
+        return nameMatch[1];
+      }
+    }
+  } catch (error) {
+    console.error('Error reading manifest:', error);
+  }
+  return null;
+}
+
+/**
+ * Set up watcher for a directory with consistent options
+ */
+function setupDirectoryWatcher(
+  dir: string,
+  description: string,
+  ignoredPaths: string[],
+  filePattern: RegExp,
+  onChange: (filePath: string) => void
+) {
+  console.log(`Setting up watcher for ${description}: ${dir}`);
+
   chokidar
-    .watch(coreDir, {
+    .watch(dir, {
       ignoreInitial: true,
-      ignored: outputPaths,
+      ignored: [...ignoredPaths, '**/node_modules/**', '**/.git/**'],
       persistent: true,
       usePolling: true,
       interval: 1000,
+      depth: 99,
     })
     .on('ready', () => {
-      console.log(`Core watcher ready for: ${coreDir}`);
+      console.log(`Watcher ready for ${description}: ${dir}`);
     })
     .on('all', (event, filePath) => {
-      console.log(`File event in core:`, event, filePath);
+      console.log(`File event in ${description}:`, event, filePath);
 
-      if (!/\.(ts|json|lua)$/.test(filePath)) {
+      // Only respond to changes in relevant file types
+      if (!filePattern.test(filePath)) {
         console.log(`Ignoring non-source file: ${filePath}`);
         return;
       }
 
-      if (isBuilding) return;
+      if (isBuilding) {
+        console.log('Build already in progress, skipping');
+        return;
+      }
 
-      debounce('core', async () => {
-        isBuilding = true;
-        try {
-          await rebuildCore();
-        } finally {
-          isBuilding = false;
-        }
-      });
+      onChange(filePath);
     });
+}
 
-  // Watch webview directory separately
+/**
+ * Set up file watchers for plugins
+ */
+function setupPluginWatchers(pluginsDir: string, distDir: string) {
+  const { pluginPaths } = getPluginsPaths(pluginsDir);
+  const outputPaths = [distDir];
+
+  // Set up individual plugin watchers
+  for (const pluginDir of pluginPaths) {
+    const normalizedPluginDir = path.normalize(pluginDir);
+
+    setupDirectoryWatcher(
+      normalizedPluginDir,
+      `plugin ${path.basename(normalizedPluginDir)}`,
+      outputPaths,
+      /\.(ts|json|lua|tsx|jsx|css|html)$/,
+      (filePath) => {
+        if (filePath.includes('html/') || filePath.includes('html\\')) {
+          debounce('webview', () => rebuildComponent('webview'));
+        } else {
+          debounce(normalizedPluginDir, () =>
+            rebuildComponent('plugin', normalizedPluginDir)
+          );
+        }
+      }
+    );
+  }
+}
+
+/**
+ * Set up file watchers for core
+ */
+function setupCoreWatcher(coreDir: string, distDir: string) {
+  setupDirectoryWatcher(coreDir, 'core', [distDir], /\.(ts|json|lua)$/, () => {
+    debounce('core', () => rebuildComponent('core'));
+  });
+}
+
+/**
+ * Set up file watchers for webview
+ */
+function setupWebviewWatcher(pluginsDir: string, distDir: string) {
   const webviewDir = path.join(pluginsDir, '..', 'webview');
-  console.log(`Setting up watcher for webview: ${webviewDir}`);
-  chokidar
-    .watch(webviewDir, {
-      ignoreInitial: true,
-      ignored: outputPaths,
-      persistent: true,
-      usePolling: true,
-      interval: 1000,
-    })
-    .on('ready', () => {
-      console.log(`Webview watcher ready for: ${webviewDir}`);
-    })
-    .on('all', (event, filePath) => {
-      console.log(`File event in webview:`, event, filePath);
 
-      if (isBuilding) return;
+  setupDirectoryWatcher(
+    webviewDir,
+    'webview',
+    [distDir],
+    /\.(ts|json|lua|tsx|jsx|css|html)$/,
+    () => {
+      debounce('webview', () => rebuildComponent('webview'));
+    }
+  );
+}
 
-      debounce('webview', async () => {
-        isBuilding = true;
-        try {
-          await rebuildWebview();
-        } finally {
-          isBuilding = false;
-        }
-      });
-    });
-
-  // Watch dist for resource restarts
-  console.log(`Setting up watcher for dist: ${distDir}`);
-  chokidar
-    .watch(distDir, {
-      ignoreInitial: true,
-      ignored: [...outputPaths, path.join(distDir, 'scripts', '**')],
-      persistent: true,
-    })
-    .on('ready', () => {
-      console.log(`Dist watcher ready for: ${distDir}`);
-    })
-    .on('all', (event, filePath) => {
-      console.log(`File event in dist:`, event, filePath);
-
-      if (isBuilding) return;
-
+/**
+ * Set up watcher for dist directory to restart resources
+ */
+function setupDistWatcher(distDir: string) {
+  setupDirectoryWatcher(
+    distDir,
+    'dist',
+    [path.join(distDir, 'scripts', '**')],
+    /.*/, // Match all files
+    (filePath) => {
       const relativePath = path.relative(distDir, path.dirname(filePath));
       const potentialResource = relativePath.split(path.sep)[0];
 
       if (potentialResource && potentialResource !== 'scripts') {
         console.log(`Resource change detected: ${potentialResource}`);
-        debounce(`resource-${potentialResource}`, async () => {
-          await restartResource(potentialResource);
-        });
+        debounce(
+          `resource-${potentialResource}`,
+          async () => await restartResource(potentialResource)
+        );
       }
-    });
+    }
+  );
 }
+
+/**
+ * Determine resource name from a path
+ */
+function getResourceName(
+  filePath: string,
+  generatedDir: string
+): string | null {
+  // Start from the directory containing the file
+  let currentDir = path.dirname(filePath);
+
+  // Walk up the directory tree looking for a manifest
+  while (currentDir && currentDir !== generatedDir) {
+    const manifestPath = path.join(currentDir, 'fxmanifest.lua');
+
+    // Check if we've already mapped this directory to a resource
+    if (resourceMap.has(currentDir)) {
+      return resourceMap.get(currentDir)!;
+    }
+
+    // Check if this directory has a manifest
+    if (fs.existsSync(manifestPath)) {
+      // First check if the manifest defines a name
+      const manifestName = getResourceNameFromManifest(manifestPath);
+      if (manifestName) {
+        resourceMap.set(currentDir, manifestName);
+        return manifestName;
+      }
+
+      // If no name in manifest, use the leaf directory name
+      const leafDirName = path.basename(currentDir);
+      resourceMap.set(currentDir, leafDirName);
+      return leafDirName;
+    }
+
+    // Move up one directory
+    currentDir = path.dirname(currentDir);
+  }
+
+  // Fallback: if we couldn't find a manifest, use first directory in relative path
+  const relativePath = path.relative(generatedDir, filePath);
+  const pathParts = relativePath.split(path.sep);
+  return pathParts[0] || null;
+}
+
+/**
+ * Scan directory for resources and build resource map
+ */
+function scanForResources(dir: string) {
+  try {
+    const entries = fs.readdirSync(dir);
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry);
+
+      try {
+        const stats = fs.statSync(fullPath);
+
+        if (stats.isDirectory()) {
+          // Check if this directory has a manifest
+          const manifestPath = path.join(fullPath, 'fxmanifest.lua');
+          if (fs.existsSync(manifestPath)) {
+            // Get resource name from manifest or use directory name
+            const manifestName = getResourceNameFromManifest(manifestPath);
+            const resourceName = manifestName || entry;
+
+            resourceMap.set(fullPath, resourceName);
+            console.log(
+              `Mapped directory ${fullPath} to resource ${resourceName}`
+            );
+          }
+
+          // Recursively scan subdirectories
+          scanForResources(fullPath);
+        }
+      } catch (error) {
+        // Skip if can't access
+      }
+    }
+  } catch (error) {
+    console.error('Error scanning directory:', error);
+  }
+}
+
+/**
+ * Set up watcher for generated resources folder
+ */
 function setupGeneratedFolderWatcher() {
   if (!process.env.SERVER_NAME) {
     console.error(
@@ -592,125 +707,12 @@ function setupGeneratedFolderWatcher() {
 
   console.log(`Setting up watcher for generated resources: ${generatedDir}`);
 
-  // Keep track of resource manifests and their actual resource names
-  const resourceMap = new Map(); // Maps path -> resource name
-
-  // Function to find the resource name from a manifest file
-  function getResourceNameFromManifest(manifestPath: string) {
-    try {
-      if (fs.existsSync(manifestPath)) {
-        const content = fs.readFileSync(manifestPath, 'utf8');
-
-        // Try to extract the name property from fxmanifest.lua
-        const nameMatch = content.match(/name\s*=\s*["']([^"']+)["']/);
-        if (nameMatch && nameMatch[1]) {
-          console.log(`Found resource name in manifest: ${nameMatch[1]}`);
-          return nameMatch[1];
-        }
-      }
-    } catch (error) {
-      console.error('Error reading manifest:', error);
-    }
-
-    // If we can't determine from manifest, return null
-    return null;
-  }
-
-  // Function to determine the resource name from a path
-  function getResourceName(filePath: string) {
-    const relativePath = path.relative(generatedDir, filePath);
-    const pathParts = relativePath.split(path.sep);
-
-    // Start from the directory containing the file
-    let currentDir = path.dirname(filePath);
-
-    // Walk up the directory tree looking for a manifest
-    while (currentDir && currentDir !== generatedDir) {
-      const manifestPath = path.join(currentDir, 'fxmanifest.lua');
-
-      // Check if we've already mapped this directory to a resource
-      if (resourceMap.has(currentDir)) {
-        return resourceMap.get(currentDir);
-      }
-
-      // Check if this directory has a manifest
-      if (fs.existsSync(manifestPath)) {
-        // First check if the manifest defines a name
-        const manifestName = getResourceNameFromManifest(manifestPath);
-        if (manifestName) {
-          resourceMap.set(currentDir, manifestName);
-          return manifestName;
-        }
-
-        // If no name in manifest, use the leaf directory name as the resource name
-        // This appears to be your convention based on the logs
-        const leafDirName = path.basename(currentDir);
-        resourceMap.set(currentDir, leafDirName);
-        return leafDirName;
-      }
-
-      // Move up one directory
-      currentDir = path.dirname(currentDir);
-    }
-
-    // Fallback: if we couldn't find a manifest, use the first directory as the resource
-    return pathParts[0];
-  }
-
-  // Initial scan to build resource map
-  function scanForResources(dir: string) {
-    try {
-      const entries = fs.readdirSync(dir);
-
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-
-        try {
-          const stats = fs.statSync(fullPath);
-
-          if (stats.isDirectory()) {
-            // Check if this directory has a manifest
-            const manifestPath = path.join(fullPath, 'fxmanifest.lua');
-            if (fs.existsSync(manifestPath)) {
-              // Get resource name from manifest or use directory name
-              const manifestName = getResourceNameFromManifest(manifestPath);
-              const resourceName = manifestName || entry;
-
-              resourceMap.set(fullPath, resourceName);
-              console.log(
-                `Mapped directory ${fullPath} to resource ${resourceName}`
-              );
-            }
-
-            // Recursively scan subdirectories
-            scanForResources(fullPath);
-          }
-        } catch (error) {
-          // Skip if can't access
-        }
-      }
-    } catch (error) {
-      console.error('Error scanning directory:', error);
-    }
-  }
-
-  chokidar
-    .watch(generatedDir, {
-      ignoreInitial: true,
-      persistent: true,
-      usePolling: true,
-      interval: 1000,
-    })
-    .on('ready', () => {
-      console.log(`Generated folder watcher ready for: ${generatedDir}`);
-
-      // Scan for resources to initialize our map
-      scanForResources(generatedDir);
-      console.log(`Initially mapped ${resourceMap.size} resources`);
-    })
-    .on('all', (event, filePath) => {
-      console.log(`File event in generated folder:`, event, filePath);
-
+  setupDirectoryWatcher(
+    generatedDir,
+    'generated resources',
+    [],
+    /.*/, // Match all files
+    (filePath) => {
       // Skip webview and scripts directories
       if (
         filePath.includes('/webview/') ||
@@ -723,46 +725,80 @@ function setupGeneratedFolderWatcher() {
 
       try {
         // Determine the actual resource name
-        const resourceName = getResourceName(filePath);
+        const resourceName = getResourceName(filePath, generatedDir);
 
         if (
           resourceName &&
           resourceName !== 'webview' &&
           resourceName !== 'scripts'
         ) {
-          console.log(
-            `Resource change detected, restarting resource: ${resourceName}`
+          console.log(`Resource change detected, restarting: ${resourceName}`);
+          // Use a longer debounce time for generated resources to prevent rapid restarts
+          debounce(
+            `generated-resource-${resourceName}`,
+            async () => {
+              console.log(
+                `Debounced restart for generated resource: ${resourceName}`
+              );
+              await notifyResourceManager(resourceName);
+            },
+            1000 // Use a longer debounce time (1 second)
           );
-
-          debounce(`generated-resource-${resourceName}`, async () => {
-            await notifyResourceManager(resourceName);
-          });
         }
       } catch (error) {
         console.error('Error processing file change:', error);
       }
-    });
+    }
+  );
+
+  // Initial scan to build resource map
+  scanForResources(generatedDir);
+  console.log(`Initially mapped ${resourceMap.size} resources`);
 }
+
+/**
+ * Set up all watchers
+ */
+function setupWatchers() {
+  const { pluginsDir, coreDir, distDir } = getProjectPaths();
+
+  // Setup different watchers
+  setupPluginWatchers(pluginsDir, distDir);
+  setupCoreWatcher(coreDir, distDir);
+  setupWebviewWatcher(pluginsDir, distDir);
+  setupDistWatcher(distDir);
+  setupGeneratedFolderWatcher();
+}
+
 /**
  * Main execution function
  */
 async function main() {
   const { watch, reload } = parseArgs();
-  const reloaderConfig: ReloaderConfig = {
-    enabled: reload,
-    host: process.env.RELOADER_HOST || 'localhost',
-    port: parseInt(process.env.RELOADER_PORT || '30120', 10),
-    apiKey: process.env.RELOADER_API_KEY || '',
-  };
 
-  console.log('Starting initial build...');
+  // Configure environment variables for resource reloading
+  if (reload) {
+    process.env.RELOADER_ENABLED = 'true';
+    process.env.RELOADER_HOST = process.env.RELOADER_HOST || 'localhost';
+    process.env.RELOADER_PORT = process.env.RELOADER_PORT || '3414';
+    process.env.RELOADER_API_KEY =
+      process.env.RELOADER_API_KEY || 'your-secure-api-key';
+  } else {
+    process.env.RELOADER_ENABLED = 'false';
+  }
+
+  console.log(
+    'Starting initial build with reload:',
+    reload ? 'enabled' : 'disabled'
+  );
+
   try {
+    // Perform the full build first
     await build();
 
+    // Set up watchers if in watch mode
     if (watch) {
-      const { pluginsDir, coreDir, distDir } = getProjectPaths();
-      setupWatchers(pluginsDir, coreDir, distDir);
-      setupGeneratedFolderWatcher(); // Add this line to set up the generated folder watcher
+      setupWatchers();
       console.log('Watchers started. Press Ctrl+C to stop.');
     }
   } catch (error) {
@@ -771,6 +807,7 @@ async function main() {
   }
 }
 
+// Execute main function
 main().catch((error) => {
   console.error('Unhandled error in main process:', error);
   process.exit(1);
