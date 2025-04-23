@@ -1,10 +1,8 @@
 /// <reference types="@citizenfx/client" />
 
 // Main client script that uses the event handler
-console.log('example1 resource initialized');
 
 // Import the safe message sender (if using a module system)
-// If not using modules, this function should be available from the previous script
 // const { safeSendNUIMessage } = require('./eventHandler.js');
 
 // Function to safely send messages (simplified version if not using the full handler)
