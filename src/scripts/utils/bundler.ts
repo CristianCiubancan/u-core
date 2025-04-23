@@ -10,10 +10,6 @@ export async function bundleTypeScript(
   outputFile: string,
   isReact = false
 ): Promise<void> {
-  console.log(
-    `Bundling TypeScript with inlined imports: ${path.basename(inputFile)}`
-  );
-
   try {
     const loader: Record<string, esbuild.Loader> = isReact
       ? { '.tsx': 'tsx', '.ts': 'ts', '.js': 'js' }
@@ -71,9 +67,6 @@ export async function bundleTypeScript(
         .catch(() => false);
 
       if (exists) {
-        console.log(
-          `Successfully bundled with inlined imports to: ${outputFile}`
-        );
       } else {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
@@ -93,10 +86,6 @@ export async function bundleJavaScript(
   inputFile: string,
   outputFile: string
 ): Promise<void> {
-  console.log(
-    `Bundling JavaScript with inlined imports: ${path.basename(inputFile)}`
-  );
-
   try {
     // Determine if this is a server-side script by checking the path
     const isServerScript =
@@ -147,9 +136,6 @@ export async function bundleJavaScript(
         .catch(() => false);
 
       if (exists) {
-        console.log(
-          `Successfully bundled with inlined imports to: ${outputFile}`
-        );
       } else {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
@@ -169,7 +155,6 @@ export async function copyLuaFile(
   inputFile: string,
   outputFile: string
 ): Promise<void> {
-  console.log(`Copying Lua file: ${path.basename(inputFile)}`);
   try {
     await fsPromises.copyFile(inputFile, outputFile);
     // Verify the file was created
@@ -179,7 +164,6 @@ export async function copyLuaFile(
       .catch(() => false);
 
     if (exists) {
-      console.log(`Successfully copied to: ${outputFile}`);
     } else {
       console.error(`Failed to verify file exists after copy: ${outputFile}`);
     }
@@ -196,8 +180,6 @@ export async function copyLuaFile(
  * Helper function to verify files in the output directory
  */
 export async function verifyOutputDir(dir: string): Promise<void> {
-  console.log(`\n--- Verifying output directory: ${dir} ---`);
-
   try {
     // Check if directory exists
     const stats = await fsPromises.stat(dir);
@@ -213,8 +195,6 @@ export async function verifyOutputDir(dir: string): Promise<void> {
       console.log(`Directory is empty: ${dir}`);
       return;
     }
-
-    console.log(`Found ${files.length} entries in ${dir}:`);
 
     // Process each entry
     for (const file of files) {
