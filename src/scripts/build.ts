@@ -1,7 +1,8 @@
 import * as path from 'path';
-import * as fsPromises from 'fs/promises';
+import 'dotenv/config';
 import { fileURLToPath } from 'url';
 import chokidar from 'chokidar'; // Add chokidar import for file watching
+import * as http from 'http';
 
 import {
   categorizeGeneratedFiles,
@@ -91,6 +92,173 @@ function findPluginByPath(plugins: any[], filePath: string): any | undefined {
 }
 
 /**
+ * Resource reloader configuration
+ */
+interface ReloaderConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  apiKey: string;
+}
+
+/**
+ * Parse command line arguments
+ */
+function parseArgs() {
+  const args = process.argv.slice(2);
+  return {
+    watch: args.includes('--watch') || args.includes('-w'),
+    reload: args.includes('--reload') || args.includes('-r'),
+  };
+}
+
+/**
+ * Get resource reloader configuration from environment variables or defaults
+ */
+function getReloaderConfig(): ReloaderConfig {
+  // Log environment variables to help with debugging
+  console.log('RESOURCE_MANAGER_HOST:', process.env.RESOURCE_MANAGER_HOST);
+  console.log('RESOURCE_MANAGER_PORT:', process.env.RESOURCE_MANAGER_PORT);
+  console.log(
+    'API_KEY from env:',
+    process.env.API_KEY ? '[PRESENT]' : '[MISSING]'
+  );
+
+  return {
+    enabled: true,
+    host: process.env.RESOURCE_MANAGER_HOST || 'localhost',
+    port: parseInt(process.env.RESOURCE_MANAGER_PORT || '3414'),
+    // Important: Make sure this matches the API_KEY in your resource manager
+    apiKey: process.env.API_KEY || 'your-secure-api-key',
+  };
+}
+
+/**
+ * Send request to restart a resource
+ */
+async function restartResource(
+  resourceName: string,
+  config: ReloaderConfig
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Log the request details for debugging
+    console.log(
+      `Attempting to restart resource '${resourceName}' via ${config.host}:${config.port}`
+    );
+
+    const options = {
+      hostname: config.host,
+      port: config.port,
+      path: `/restart?resource=${encodeURIComponent(resourceName)}`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const response = JSON.parse(data);
+            console.log(
+              `Resource '${resourceName}' reloaded: ${
+                response.success ? 'success' : 'failed'
+              }`,
+              response
+            );
+            resolve(response.success);
+          } catch (error) {
+            console.error('Error parsing restart response:', error);
+            resolve(false);
+          }
+        } else {
+          console.error(
+            `Failed to restart resource ${resourceName}: HTTP ${res.statusCode}, Response: ${data}`
+          );
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(
+        `Error sending restart request for ${resourceName}:`,
+        error
+      );
+      resolve(false);
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * Function to restart all resources
+ */
+async function restartAllResources(config: ReloaderConfig): Promise<boolean> {
+  return new Promise((resolve) => {
+    console.log(
+      `Attempting to restart all resources via ${config.host}:${config.port}`
+    );
+
+    const options = {
+      hostname: config.host,
+      port: config.port,
+      path: '/restart', // No resource parameter means restart all
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const response = JSON.parse(data);
+            console.log(
+              `All resources reloaded: ${
+                response.success ? 'success' : 'failed'
+              }`,
+              response
+            );
+            resolve(response.success);
+          } catch (error) {
+            console.error('Error parsing restart all response:', error);
+            resolve(false);
+          }
+        } else {
+          console.error(
+            `Failed to restart all resources: HTTP ${res.statusCode}, Response: ${data}`
+          );
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error(`Error sending restart all request:`, error);
+      resolve(false);
+    });
+
+    req.end();
+  });
+}
+
+/**
  * Set up file watching for plugins
  */
 function setupWatcher(
@@ -98,8 +266,11 @@ function setupWatcher(
   corePlugins: any[],
   distDir: string,
   pluginsDir: string,
-  coreDir: string
+  coreDir: string,
+  autoReload: boolean = false
 ) {
+  // Get resource reloader configuration if auto-reload is enabled
+  const reloaderConfig = autoReload ? getReloaderConfig() : null;
   const allPlugins = [...plugins, ...corePlugins];
   const paths = [pluginsDir, coreDir];
 
@@ -151,6 +322,38 @@ function setupWatcher(
         }
 
         console.log(`Plugin ${plugin.name} rebuilt successfully`);
+
+        // Trigger resource reload if enabled
+        if (reloaderConfig?.enabled) {
+          try {
+            // Make sure we're using a name that actually exists in FiveM
+            // Some plugins have folder structures like [misc2]/example3
+            // but the actual resource name is just "example3"
+            const resourceName = plugin.name.includes('/')
+              ? plugin.name.split('/').pop()
+              : plugin.name;
+
+            console.log(`Triggering reload for resource: ${resourceName}`);
+            const reloadSuccess = await restartResource(
+              resourceName,
+              reloaderConfig
+            );
+            if (reloadSuccess) {
+              console.log(`Resource ${resourceName} reloaded successfully`);
+            } else {
+              console.log(
+                `Resource ${resourceName} reload failed, trying to restart all resources...`
+              );
+              // Fallback to restarting all resources if specific resource restart fails
+              await restartAllResources(reloaderConfig);
+            }
+          } catch (reloadError) {
+            console.error(
+              `Failed to reload resource ${plugin.name}:`,
+              reloadError
+            );
+          }
+        }
       } catch (error) {
         console.error(`Error rebuilding plugin ${plugin.name}:`, error);
       }
@@ -201,20 +404,10 @@ function setupWatcher(
 }
 
 /**
- * Parse command line arguments
- */
-function parseArgs() {
-  const args = process.argv.slice(2);
-  return {
-    watch: args.includes('--watch') || args.includes('-w'),
-  };
-}
-
-/**
  * Main build function
  */
 async function main() {
-  const { watch } = parseArgs();
+  const { watch, reload } = parseArgs();
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -291,7 +484,13 @@ async function main() {
 
   // Set up watcher if watch mode is enabled
   if (watch) {
-    setupWatcher(plugins, corePlugins, distDir, pluginsDir, coreDir);
+    setupWatcher(plugins, corePlugins, distDir, pluginsDir, coreDir, reload);
+
+    if (reload) {
+      console.log(
+        'Auto-reload is enabled. Resources will be reloaded automatically when rebuilt.'
+      );
+    }
   }
 }
 

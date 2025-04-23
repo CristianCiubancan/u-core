@@ -7,6 +7,11 @@ import * as path from 'path';
 
 // Simple authentication - you should use a more secure method in production
 const API_KEY = process.env.API_KEY || 'your-secure-api-key';
+console.log(
+  `[resource-manager] API_KEY is ${
+    API_KEY ? 'configured' : 'using default value'
+  }`
+);
 
 // File watcher for auto-reload on rebuilds
 const WATCH_PATHS = ['dist'];
@@ -30,18 +35,71 @@ function getAllResources(): string[] {
 
 // Function to restart a specific resource
 function restartResource(resourceName: string): boolean {
+  console.log(
+    `[resource-manager] Attempting to restart resource: ${resourceName}`
+  );
+
+  // Handle special case for core resource
+  if (resourceName === 'core' || resourceName.endsWith('/core')) {
+    // Extract the clean resource name if it's a path
+    const cleanName = resourceName.includes('/')
+      ? resourceName.split('/').pop()
+      : resourceName;
+    console.log(`[resource-manager] Restarting core resource: ${cleanName}`);
+
+    // Check if resource exists
+    const state = GetResourceState(cleanName);
+    if (state === 'missing') {
+      console.error(
+        `[resource-manager] Core resource '${cleanName}' not found!`
+      );
+      return false;
+    }
+
+    try {
+      StopResource(cleanName);
+      StartResource(cleanName);
+      console.log(
+        `[resource-manager] Successfully restarted core resource: ${cleanName}`
+      );
+      return true;
+    } catch (error) {
+      console.error(
+        `[resource-manager] Failed to restart core resource ${cleanName}:`,
+        error
+      );
+      return false;
+    }
+  }
+
+  // Handle resource names with folder paths
+  const cleanResourceName = resourceName.includes('/')
+    ? resourceName.split('/').pop()
+    : resourceName;
+
   // Check if resource exists by attempting to get its state
-  const state = GetResourceState(resourceName);
+  const state = GetResourceState(cleanResourceName);
   if (state === 'missing') {
+    console.error(
+      `[resource-manager] Resource '${cleanResourceName}' not found (state: missing)`
+    );
     return false;
   }
 
   try {
-    StopResource(resourceName);
-    StartResource(resourceName);
+    console.log(`[resource-manager] Stopping resource: ${cleanResourceName}`);
+    StopResource(cleanResourceName);
+    console.log(`[resource-manager] Starting resource: ${cleanResourceName}`);
+    StartResource(cleanResourceName);
+    console.log(
+      `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
+    );
     return true;
   } catch (error) {
-    console.error(`Failed to restart resource ${resourceName}:`, error);
+    console.error(
+      `[resource-manager] Failed to restart resource ${cleanResourceName}:`,
+      error
+    );
     return false;
   }
 }
@@ -51,6 +109,7 @@ function restartAllResources(): {
   success: boolean;
   results: Record<string, boolean>;
 } {
+  console.log(`[resource-manager] Restarting all resources...`);
   const resources = getAllResources();
   const results: Record<string, boolean> = {};
 
@@ -88,11 +147,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Log incoming requests
+  console.log(`[resource-manager] Received ${req.method} request to ${path}`);
+
   // Authenticate all requests
   const authHeader = req.headers.authorization || '';
   const providedKey = authHeader.replace('Bearer ', '');
 
   if (providedKey !== API_KEY) {
+    console.error(
+      `[resource-manager] Authentication failed - invalid API key provided`
+    );
     res.statusCode = 401;
     res.setHeader('Content-Type', 'application/json');
     res.end(
@@ -124,6 +189,9 @@ const server = http.createServer((req, res) => {
     // Restart a specific resource
     if (query.resource) {
       const resourceName = query.resource as string;
+      console.log(
+        `[resource-manager] Processing restart request for resource: ${resourceName}`
+      );
       const success = restartResource(resourceName);
 
       res.statusCode = success ? 200 : 404;
@@ -140,6 +208,9 @@ const server = http.createServer((req, res) => {
     }
     // Restart all resources
     else {
+      console.log(
+        `[resource-manager] Processing restart request for all resources`
+      );
       const result = restartAllResources();
 
       res.statusCode = 200;
@@ -153,6 +224,7 @@ const server = http.createServer((req, res) => {
       );
     }
   } else {
+    console.error(`[resource-manager] Invalid endpoint requested: ${path}`);
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
     res.end(
@@ -168,14 +240,16 @@ const server = http.createServer((req, res) => {
 const PORT = GetConvarInt('resource_manager_port', 3414);
 
 server.listen(PORT, () => {
-  console.log(`Resource management server running on port ${PORT}`);
+  console.log(
+    `[resource-manager] Resource management server running on port ${PORT}`
+  );
 
   // Initialize file monitoring
   initializeFileWatcher();
 });
 
 server.on('error', (err) => {
-  console.error('Server error:', err);
+  console.error('[resource-manager] Server error:', err);
 });
 
 // Function to recursively get all files in a directory

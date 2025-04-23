@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm tsx src/scripts/build.ts",
-    "dev": "pnpm tsx src/scripts/build.ts --watch"
+    "dev": "pnpm tsx src/scripts/build.ts --watch --reload"
   },
   "keywords": [],
   "author": "",
