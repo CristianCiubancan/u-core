@@ -1,16 +1,18 @@
 import * as path from 'path';
-import * as esbuild from 'esbuild';
+import * as esbuild from 'esbuild'; // Use native esbuild
 import * as fsPromises from 'fs/promises';
 
 /**
- * Bundle TypeScript file to ES2017 JS
+ * Bundle TypeScript file to ES2017 JS with all imports inlined
  */
 export async function bundleTypeScript(
   inputFile: string,
   outputFile: string,
   isReact = false
 ): Promise<void> {
-  console.log(`Bundling TypeScript: ${path.basename(inputFile)}`);
+  console.log(
+    `Bundling TypeScript with inlined imports: ${path.basename(inputFile)}`
+  );
 
   try {
     const loader: Record<string, esbuild.Loader> = isReact
@@ -21,23 +23,23 @@ export async function bundleTypeScript(
     const isServerScript =
       inputFile.includes('/server/') || inputFile.includes('\\server\\');
 
-    // Configure platform and external modules based on script type
-    const platform = isServerScript ? 'node' : 'browser';
+    // List of packages to not inline (empty array means inline everything)
+    // You can add any packages you don't want to inline here
+    const externalPackages: string[] = [];
 
     const result = await esbuild.build({
       entryPoints: [inputFile],
-      bundle: true,
+      bundle: true, // Enable bundling to inline imports
       outfile: outputFile,
-      platform: platform, // Use appropriate platform based on script type
       format: 'esm',
       target: 'es2017',
       minify: false,
       sourcemap: 'external',
       loader: loader,
-      // If this is a React component, you might need to add specific settings
       jsx: isReact ? 'transform' : undefined,
-      // Log level for better debugging
       logLevel: 'info',
+      external: externalPackages,
+      platform: 'node',
     });
 
     if (result.errors.length > 0) {
@@ -50,7 +52,9 @@ export async function bundleTypeScript(
         .catch(() => false);
 
       if (exists) {
-        console.log(`Successfully bundled to: ${outputFile}`);
+        console.log(
+          `Successfully bundled with inlined imports to: ${outputFile}`
+        );
       } else {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
@@ -64,24 +68,30 @@ export async function bundleTypeScript(
 }
 
 /**
- * Bundle JavaScript file
+ * Bundle JavaScript file with all imports inlined
  */
 export async function bundleJavaScript(
   inputFile: string,
   outputFile: string
 ): Promise<void> {
-  console.log(`Bundling JavaScript: ${path.basename(inputFile)}`);
+  console.log(
+    `Bundling JavaScript with inlined imports: ${path.basename(inputFile)}`
+  );
 
   try {
+    // List of packages to not inline (empty array means inline everything)
+    const externalPackages: string[] = [];
+
     const result = await esbuild.build({
       entryPoints: [inputFile],
-      bundle: true,
+      bundle: true, // Enable bundling to inline imports
       outfile: outputFile,
-      platform: 'browser',
       format: 'esm',
       target: 'es2017',
       minify: false,
       sourcemap: 'external',
+      external: externalPackages,
+      platform: 'node',
     });
 
     if (result.errors.length > 0) {
@@ -94,7 +104,9 @@ export async function bundleJavaScript(
         .catch(() => false);
 
       if (exists) {
-        console.log(`Successfully bundled to: ${outputFile}`);
+        console.log(
+          `Successfully bundled with inlined imports to: ${outputFile}`
+        );
       } else {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
@@ -136,8 +148,6 @@ export async function copyLuaFile(
     throw err;
   }
 }
-
-// Add this helper function at the bottom of your build.ts file
 
 /**
  * Helper function to verify files in the output directory

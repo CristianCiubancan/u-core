@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'glob';
 import * as fsPromises from 'fs/promises';
-import { bundleJavaScript, bundleTypeScript, copyLuaFile } from './bundler';
+import { bundleJavaScript, bundleTypeScript, copyLuaFile } from './bundler.js';
 
 export interface File {
   name: string;

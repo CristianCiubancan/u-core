@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "build": "pnpm tsx src/scripts/build.ts",
     "dev": "pnpm tsx src/scripts/build.ts --watch"
@@ -16,6 +17,8 @@
     "autoprefixer": "^10.4.21",
     "chokidar": "^4.0.3",
     "dotenv": "^16.5.0",
+    "esbuild-wasm": "^0.25.2",
+    "glob": "^11.0.1",
     "glob-promise": "^6.0.7",
     "i18next": "^25.0.1",
     "postcss": "^8.5.3",
