@@ -3,6 +3,8 @@ import 'dotenv/config';
 import { fileURLToPath } from 'url';
 import chokidar from 'chokidar';
 import lodashDebounce from 'lodash.debounce';
+import http from 'http';
+import fs from 'fs';
 
 import {
   categorizeGeneratedFiles,
@@ -344,14 +346,65 @@ async function rebuildWebview() {
   }
 }
 
+function notifyResourceManager(resourceName: string) {
+  // Properly encode resource name
+  const encodedResourceName = encodeURIComponent(resourceName);
+
+  const options = {
+    hostname: process.env.RELOADER_HOST || 'localhost',
+    port: process.env.RELOADER_PORT || 3414,
+    path: `/restart?resource=${encodedResourceName}`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${
+        process.env.RELOADER_API_KEY || 'your-secure-api-key'
+      }`,
+    },
+  };
+
+  console.log(
+    `Sending restart request for resource: ${resourceName} (encoded as: ${encodedResourceName})`
+  );
+
+  const req = http.request(options, (res: any) => {
+    let data = '';
+
+    res.on('data', (chunk: any) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      try {
+        const response = JSON.parse(data);
+        console.log(
+          `Resource reload notification ${
+            response.success ? 'successful' : 'failed'
+          } for ${resourceName}`
+        );
+
+        if (!response.success) {
+          console.log(`Failed response details: ${JSON.stringify(response)}`);
+        }
+      } catch (error) {
+        console.error('Error parsing response:', error);
+        console.error('Raw response data:', data);
+      }
+    });
+  });
+
+  req.on('error', (error: any) => {
+    console.error(`Error notifying resource manager: ${error.message}`);
+  });
+
+  req.end();
+}
 /**
  * Restart a resource
  * @param resourceName Name of the resource to restart
  */
 async function restartResource(resourceName: string) {
   console.log(`Restarting resource: ${resourceName}`);
-  // Add logic to restart the resource, e.g., via an API call or server command
-  // Implementation depends on your specific environment
+  notifyResourceManager(resourceName);
 }
 
 /**
@@ -521,7 +574,175 @@ function setupWatchers(pluginsDir: string, coreDir: string, distDir: string) {
       }
     });
 }
+function setupGeneratedFolderWatcher() {
+  if (!process.env.SERVER_NAME) {
+    console.error(
+      'SERVER_NAME environment variable is not set. Skipping generated folder watcher.'
+    );
+    return;
+  }
 
+  const generatedDirName = '[GENERATED]';
+  const destinationBase = path.join(
+    'txData',
+    process.env.SERVER_NAME,
+    'resources'
+  );
+  const generatedDir = path.join(destinationBase, generatedDirName);
+
+  console.log(`Setting up watcher for generated resources: ${generatedDir}`);
+
+  // Keep track of resource manifests and their actual resource names
+  const resourceMap = new Map(); // Maps path -> resource name
+
+  // Function to find the resource name from a manifest file
+  function getResourceNameFromManifest(manifestPath: string) {
+    try {
+      if (fs.existsSync(manifestPath)) {
+        const content = fs.readFileSync(manifestPath, 'utf8');
+
+        // Try to extract the name property from fxmanifest.lua
+        const nameMatch = content.match(/name\s*=\s*["']([^"']+)["']/);
+        if (nameMatch && nameMatch[1]) {
+          console.log(`Found resource name in manifest: ${nameMatch[1]}`);
+          return nameMatch[1];
+        }
+      }
+    } catch (error) {
+      console.error('Error reading manifest:', error);
+    }
+
+    // If we can't determine from manifest, return null
+    return null;
+  }
+
+  // Function to determine the resource name from a path
+  function getResourceName(filePath: string) {
+    const relativePath = path.relative(generatedDir, filePath);
+    const pathParts = relativePath.split(path.sep);
+
+    // Start from the directory containing the file
+    let currentDir = path.dirname(filePath);
+
+    // Walk up the directory tree looking for a manifest
+    while (currentDir && currentDir !== generatedDir) {
+      const manifestPath = path.join(currentDir, 'fxmanifest.lua');
+
+      // Check if we've already mapped this directory to a resource
+      if (resourceMap.has(currentDir)) {
+        return resourceMap.get(currentDir);
+      }
+
+      // Check if this directory has a manifest
+      if (fs.existsSync(manifestPath)) {
+        // First check if the manifest defines a name
+        const manifestName = getResourceNameFromManifest(manifestPath);
+        if (manifestName) {
+          resourceMap.set(currentDir, manifestName);
+          return manifestName;
+        }
+
+        // If no name in manifest, use the leaf directory name as the resource name
+        // This appears to be your convention based on the logs
+        const leafDirName = path.basename(currentDir);
+        resourceMap.set(currentDir, leafDirName);
+        return leafDirName;
+      }
+
+      // Move up one directory
+      currentDir = path.dirname(currentDir);
+    }
+
+    // Fallback: if we couldn't find a manifest, use the first directory as the resource
+    return pathParts[0];
+  }
+
+  // Initial scan to build resource map
+  function scanForResources(dir: string) {
+    try {
+      const entries = fs.readdirSync(dir);
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+
+        try {
+          const stats = fs.statSync(fullPath);
+
+          if (stats.isDirectory()) {
+            // Check if this directory has a manifest
+            const manifestPath = path.join(fullPath, 'fxmanifest.lua');
+            if (fs.existsSync(manifestPath)) {
+              // Get resource name from manifest or use directory name
+              const manifestName = getResourceNameFromManifest(manifestPath);
+              const resourceName = manifestName || entry;
+
+              resourceMap.set(fullPath, resourceName);
+              console.log(
+                `Mapped directory ${fullPath} to resource ${resourceName}`
+              );
+            }
+
+            // Recursively scan subdirectories
+            scanForResources(fullPath);
+          }
+        } catch (error) {
+          // Skip if can't access
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning directory:', error);
+    }
+  }
+
+  chokidar
+    .watch(generatedDir, {
+      ignoreInitial: true,
+      persistent: true,
+      usePolling: true,
+      interval: 1000,
+    })
+    .on('ready', () => {
+      console.log(`Generated folder watcher ready for: ${generatedDir}`);
+
+      // Scan for resources to initialize our map
+      scanForResources(generatedDir);
+      console.log(`Initially mapped ${resourceMap.size} resources`);
+    })
+    .on('all', (event, filePath) => {
+      console.log(`File event in generated folder:`, event, filePath);
+
+      // Skip webview and scripts directories
+      if (
+        filePath.includes('/webview/') ||
+        filePath.includes('\\webview\\') ||
+        filePath.includes('/scripts/') ||
+        filePath.includes('\\scripts\\')
+      ) {
+        return;
+      }
+
+      try {
+        // Determine the actual resource name
+        const resourceName = getResourceName(filePath);
+
+        if (
+          resourceName &&
+          resourceName !== 'webview' &&
+          resourceName !== 'scripts'
+        ) {
+          console.log(
+            `Resource change detected, restarting resource: ${resourceName}`
+          );
+
+          debounce(`generated-resource-${resourceName}`, async () => {
+            await notifyResourceManager(resourceName);
+          });
+        }
+      } catch (error) {
+        console.error('Error processing file change:', error);
+      }
+    });
+}
 /**
  * Main execution function
  */
@@ -541,7 +762,8 @@ async function main() {
     if (watch) {
       const { pluginsDir, coreDir, distDir } = getProjectPaths();
       setupWatchers(pluginsDir, coreDir, distDir);
-      console.log('Watcher started. Press Ctrl+C to stop.');
+      setupGeneratedFolderWatcher(); // Add this line to set up the generated folder watcher
+      console.log('Watchers started. Press Ctrl+C to stop.');
     }
   } catch (error) {
     console.error('Build process failed:', error);
