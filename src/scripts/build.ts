@@ -20,6 +20,7 @@ import {
 import { verifyOutputDir } from './utils/bundler.js';
 import { buildWebview } from './utils/webview.js';
 import { generatePluginHtmlFiles } from './utils/htmlGenerator.js';
+import { moveBuiltResources } from './utils/moveBuiltResources.js';
 
 /**
  * Build a single plugin
@@ -177,6 +178,8 @@ async function main() {
   }
 
   console.log('Build completed successfully!');
+
+  await moveBuiltResources(distDir);
 }
 
 // Run the build process
