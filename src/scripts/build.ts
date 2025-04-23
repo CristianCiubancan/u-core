@@ -19,6 +19,7 @@ import {
 } from './utils/manifest.js';
 import { verifyOutputDir } from './utils/bundler.js';
 import { buildWebview } from './utils/webview.js';
+import { generatePluginHtmlFiles } from './utils/htmlGenerator.js';
 
 /**
  * Build a single plugin
@@ -147,18 +148,19 @@ async function main() {
     path.join(distDir, 'webview', 'fxmanifest.lua')
   );
 
+  // Generate HTML files for plugins with Page.tsx
+  await generatePluginHtmlFiles(plugins, distDir);
+
   // Process each plugin
   for (const plugin of plugins) {
     const result = await buildPlugin(plugin, distDir);
     if (!result) continue;
     const { updatedPluginJson, manifestPath } = result;
     if (plugin.hasHtml) {
-      updatedPluginJson.files
-        ? updatedPluginJson.files.push('@webview/index.html')
-        : (updatedPluginJson.files = ['@webview/index.html']);
-
-      updatedPluginJson.files.push('@webview/assets/**/*');
-      updatedPluginJson.ui_page = '@webview/index.html';
+      updatedPluginJson.ui_page = 'html/index.html';
+      updatedPluginJson.files?.length
+        ? updatedPluginJson.files.push('html/**/*')
+        : (updatedPluginJson.files = ['html/**/*']);
 
       updatedPluginJson.dependencies?.length
         ? updatedPluginJson.dependencies.push('webview')
