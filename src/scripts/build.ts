@@ -134,6 +134,7 @@ async function main() {
       version: '0.1.0',
       fx_version: 'cerulean',
       author: 'Baloony Gaze',
+      games: ['gta5', 'rdr3'],
       description: 'Example 3',
       files: ['index.html', 'assets/**/*'],
     },
