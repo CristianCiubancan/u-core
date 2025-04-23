@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
+import { fileURLToPath } from 'url';
 
 import {
   categorizeGeneratedFiles,
@@ -11,10 +12,13 @@ import {
   parsePluginPathsIntoPlugins,
   processFile,
   readPluginJson,
-} from './utils/file';
-import { generateManifest, preparePluginManifestData } from './utils/manifest';
-import { verifyOutputDir } from './utils/bundler';
-import { buildWebview } from './utils/webview';
+} from './utils/file.js';
+import {
+  generateManifest,
+  preparePluginManifestData,
+} from './utils/manifest.js';
+import { verifyOutputDir } from './utils/bundler.js';
+import { buildWebview } from './utils/webview.js';
 
 /**
  * Build a single plugin
@@ -72,7 +76,7 @@ async function buildPlugin(
   console.log(`Detected script files:`, JSON.stringify(scriptFiles, null, 2));
 
   // Process all files
-  const processPromises = plugin.files.map((file) =>
+  const processPromises = plugin.files.map((file: any) =>
     processFile(file, outputDir)
   );
   const processedFiles = await Promise.all(processPromises);
@@ -106,6 +110,8 @@ async function buildPlugin(
  * Main build function
  */
 async function main() {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
   const pluginsDir = path.join(__dirname, '../plugins');
   const rootDir = path.join(__dirname, '../../');
   const distDir = path.join(rootDir, 'dist');

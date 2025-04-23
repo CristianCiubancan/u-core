@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fsPromises from 'fs/promises';
-import { Plugin, ensureDirectoryExists } from './file';
+import { Plugin, ensureDirectoryExists } from './file.js';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -276,11 +276,11 @@ body {
             : reject(new Error(`Build command failed with exit code ${code}`))
         );
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Vite build failed:', error);
 
       // Add more helpful error information
-      let errorMessage = `Vite build failed: ${error.message || error}`;
+      let errorMessage = `Vite build failed: ${error?.message || error}`;
 
       // Check if index.html exists and has correct format
       try {
