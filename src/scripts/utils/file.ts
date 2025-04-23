@@ -345,7 +345,6 @@ export async function ensureDirectoryExists(dirPath: string): Promise<void> {
  * Process a single file based on its type
  */
 export async function processFile(file: any, outputDir: string) {
-  console.log('Processing file:', JSON.stringify(file, null, 2));
   // Skip plugin.json as it's handled separately
   if (file.isPluginJsonFile) {
     return null;

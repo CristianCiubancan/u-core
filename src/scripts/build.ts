@@ -58,8 +58,6 @@ async function buildPlugin(
   // Get plugin output info
   const { outputDir, manifestPath } = getPluginOutputInfo(plugin, distDir);
 
-  console.log(`\nBuilding plugin files to: ${outputDir}`);
-
   // Ensure output directory exists
   await ensureDirectoryExists(outputDir);
 
@@ -71,11 +69,8 @@ async function buildPlugin(
   const pluginFiles = parseFilePathsIntoFiles(plugin.fullPath);
   plugin.files.push(...pluginFiles);
 
-  console.log(`Plugin files:`, JSON.stringify(plugin.files, null, 2));
-
   // Get script files based on patterns in plugin.json
   const scriptFiles = getPluginScripts(pluginJsonData, plugin.fullPath);
-  console.log(`Detected script files:`, JSON.stringify(scriptFiles, null, 2));
 
   // Process all files
   const processPromises = plugin.files.map((file: any) =>
@@ -93,17 +88,10 @@ async function buildPlugin(
     scriptFiles
   );
 
-  console.log(
-    `Final manifest configuration:`,
-    JSON.stringify(updatedPluginJson, null, 2)
-  );
-
   // Generate the manifest with the updated file paths
 
   // Verify the output directory content
   await verifyOutputDir(outputDir);
-
-  console.log(`Successfully built plugin: ${plugin.pathFromPluginsDir}`);
 
   return { updatedPluginJson, manifestPath };
 }
