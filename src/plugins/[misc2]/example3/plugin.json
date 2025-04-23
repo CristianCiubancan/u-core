@@ -7,6 +7,5 @@
   "main": "index.js",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.ts"],
-  "server_scripts": ["server/*.ts"],
-  "shared_scripts": ["shared/*.ts"]
+  "server_scripts": ["server/*.ts"]
 }
