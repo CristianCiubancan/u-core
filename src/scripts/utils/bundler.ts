@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as esbuild from 'esbuild'; // Use native esbuild
+import * as esbuild from 'esbuild';
 import * as fsPromises from 'fs/promises';
 
 /**
@@ -23,15 +23,33 @@ export async function bundleTypeScript(
     const isServerScript =
       inputFile.includes('/server/') || inputFile.includes('\\server\\');
 
-    // List of packages to not inline (empty array means inline everything)
-    // You can add any packages you don't want to inline here
-    const externalPackages: string[] = [];
+    // List of packages to not inline - for server scripts, make Node.js modules external
+    const externalPackages: string[] = isServerScript
+      ? [
+          'http',
+          'https',
+          'url',
+          'fs',
+          'path',
+          'os',
+          'crypto',
+          'buffer',
+          'stream',
+          'util',
+          'events',
+          'zlib',
+          'net',
+          'tls',
+          'dns',
+          'child_process',
+        ]
+      : [];
 
     const result = await esbuild.build({
       entryPoints: [inputFile],
-      bundle: true, // Enable bundling to inline imports
+      bundle: true,
       outfile: outputFile,
-      format: 'esm',
+      format: 'iife', // Use IIFE format for FiveM compatibility
       target: 'es2017',
       minify: false,
       sourcemap: 'external',
@@ -39,7 +57,8 @@ export async function bundleTypeScript(
       jsx: isReact ? 'transform' : undefined,
       logLevel: 'info',
       external: externalPackages,
-      platform: 'node',
+      // Use node platform for server scripts, browser platform for client scripts
+      platform: isServerScript ? 'node' : 'browser',
     });
 
     if (result.errors.length > 0) {
@@ -79,19 +98,43 @@ export async function bundleJavaScript(
   );
 
   try {
-    // List of packages to not inline (empty array means inline everything)
-    const externalPackages: string[] = [];
+    // Determine if this is a server-side script by checking the path
+    const isServerScript =
+      inputFile.includes('/server/') || inputFile.includes('\\server\\');
+
+    // List of packages to not inline - for server scripts, make Node.js modules external
+    const externalPackages: string[] = isServerScript
+      ? [
+          'http',
+          'https',
+          'url',
+          'fs',
+          'path',
+          'os',
+          'crypto',
+          'buffer',
+          'stream',
+          'util',
+          'events',
+          'zlib',
+          'net',
+          'tls',
+          'dns',
+          'child_process',
+        ]
+      : [];
 
     const result = await esbuild.build({
       entryPoints: [inputFile],
-      bundle: true, // Enable bundling to inline imports
+      bundle: true,
       outfile: outputFile,
-      format: 'esm',
+      format: 'iife', // Use IIFE format for FiveM compatibility
       target: 'es2017',
       minify: false,
       sourcemap: 'external',
       external: externalPackages,
-      platform: 'node',
+      // Use node platform for server scripts, browser platform for client scripts
+      platform: isServerScript ? 'node' : 'browser',
     });
 
     if (result.errors.length > 0) {
