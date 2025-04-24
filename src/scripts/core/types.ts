@@ -209,6 +209,10 @@ export interface FileSystem {
   findPathsWithFile(dirPath: string, targetFileName: string): string[];
   /** Normalize a path for cross-platform consistency */
   normalizePath(filePath: string): string;
+  /** Read directory contents asynchronously */
+  readdir(dirPath: string): Promise<string[]>;
+  /** Read directory contents synchronously */
+  readdirSync(dirPath: string): string[];
 }
 
 /**

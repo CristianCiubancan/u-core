@@ -225,7 +225,7 @@ files {
             // If the files section is not empty, add html/**/* to it
             updatedContent = updatedContent.replace(
               /files\s*{([^}]*)}/s,
-              (match, filesContent) => {
+              (_match, filesContent) => {
                 return `files {${filesContent}    'html/**/*',\n}`;
               }
             );

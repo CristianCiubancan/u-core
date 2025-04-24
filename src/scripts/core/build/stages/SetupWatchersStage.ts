@@ -5,8 +5,11 @@ import 'dotenv/config'; // Load environment variables from .env file
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { BuildContext } from '../../types.js';
-import { WatcherManagerImpl, DebouncedTaskManager } from '../WatcherManager.js';
-import { ResourceManager } from '../../../utils/fs/ResourceManager.js';
+import {
+  WatcherManager,
+  DebouncedTaskManager,
+  ResourceManager,
+} from '../../../utils/fs/index.js';
 
 /**
  * Setup watchers
@@ -36,7 +39,11 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
     });
 
     // Create watcher manager
-    const watcherManager = new WatcherManagerImpl(logger, debouncedTaskManager);
+    const watcherManager = new WatcherManager(
+      debouncedTaskManager,
+      resourceManager,
+      logger
+    );
 
     // Store watcher manager in context for later use
     (context as any).watcherManager = watcherManager;
@@ -45,7 +52,10 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
     watcherManager.setupPluginWatchers(
       pluginsDir,
       distDir,
-      async (componentType, pluginDir) => {
+      async (
+        componentType: 'plugin' | 'core' | 'webview',
+        pluginDir?: string
+      ) => {
         // Rebuild the component
         await rebuildComponent(componentType, pluginDir, context);
       }
@@ -55,7 +65,10 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
     watcherManager.setupCoreWatcher(
       coreDir,
       distDir,
-      async (componentType, pluginDir) => {
+      async (
+        componentType: 'plugin' | 'core' | 'webview',
+        pluginDir?: string
+      ) => {
         // Rebuild the component
         await rebuildComponent(componentType, pluginDir, context);
       }
@@ -65,7 +78,10 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
     watcherManager.setupWebviewWatcher(
       pluginsDir,
       distDir,
-      async (componentType, pluginDir) => {
+      async (
+        componentType: 'plugin' | 'core' | 'webview',
+        pluginDir?: string
+      ) => {
         // Rebuild the component
         await rebuildComponent(componentType, pluginDir, context);
       }
@@ -89,7 +105,7 @@ async function rebuildComponent(
   pluginDir: string | undefined,
   context: BuildContext
 ): Promise<void> {
-  const { logger, distDir } = context;
+  const { logger } = context;
 
   logger.info(
     `Rebuilding ${componentType}${pluginDir ? `: ${pluginDir}` : ''}`
@@ -106,7 +122,7 @@ async function rebuildComponent(
     const rebuildContext = { ...context };
 
     // Import all the stages
-    const { cleanStage } = await import('./CleanStage.js');
+    // const { cleanStage } = await import('./CleanStage.js'); // Uncomment if needed
     const { buildCorePluginsStage } = await import(
       './BuildCorePluginsStage.js'
     );
