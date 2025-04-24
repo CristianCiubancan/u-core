@@ -23,7 +23,9 @@ export async function generatePluginHtmlFiles(
   try {
     // Verify webview assets directory exists
     if (!(await fileSystem.exists(webviewAssetsDir))) {
-      throw new Error(`Webview assets directory not found: ${webviewAssetsDir}`);
+      throw new Error(
+        `Webview assets directory not found: ${webviewAssetsDir}`
+      );
     }
 
     // Get the asset filenames
@@ -31,13 +33,13 @@ export async function generatePluginHtmlFiles(
 
     // Find the JS and CSS files
     const indexJsFile = assetFiles.find(
-      (file) => file.startsWith('index-') && file.endsWith('.js')
+      (file: string) => file.startsWith('index-') && file.endsWith('.js')
     );
     const vendorJsFile = assetFiles.find(
-      (file) => file.startsWith('vendor-') && file.endsWith('.js')
+      (file: string) => file.startsWith('vendor-') && file.endsWith('.js')
     );
     const indexCssFile = assetFiles.find(
-      (file) => file.startsWith('index-') && file.endsWith('.css')
+      (file: string) => file.startsWith('index-') && file.endsWith('.css')
     );
 
     if (!indexJsFile) {
@@ -95,7 +97,10 @@ export async function generatePluginHtmlFiles(
       const pluginJsonPath = path.join(plugin.fullPath, 'plugin.json');
       let pluginManifest;
       try {
-        const pluginJsonContent = await fileSystem.readFile(pluginJsonPath, 'utf8');
+        const pluginJsonContent = await fileSystem.readFile(
+          pluginJsonPath,
+          'utf8'
+        );
         pluginManifest = JSON.parse(pluginJsonContent);
       } catch (error) {
         console.error(`Error reading plugin.json for ${plugin.name}:`, error);
@@ -104,7 +109,12 @@ export async function generatePluginHtmlFiles(
 
       // Generate the HTML content
       const title = pluginManifest.name || 'UI Resource';
-      const html = generateHtmlContent(title, indexJsFile, vendorJsFile, indexCssFile);
+      const html = generateHtmlContent(
+        title,
+        indexJsFile,
+        vendorJsFile,
+        indexCssFile
+      );
 
       // Write the HTML file
       const htmlFilePath = path.join(htmlDir, 'index.html');

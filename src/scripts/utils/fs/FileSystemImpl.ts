@@ -5,7 +5,7 @@ import * as fsPromises from 'fs/promises';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'glob';
-import { FileSystem } from '../../core/types.js';
+import type { FileSystem } from '../../core/types.js';
 
 /**
  * File system implementation with enhanced functionality
@@ -232,5 +232,23 @@ export class FileSystemImpl implements FileSystem {
    */
   normalizePath(filePath: string): string {
     return path.normalize(filePath).replace(/\\/g, '/');
+  }
+
+  /**
+   * Read directory contents
+   * @param dirPath Directory path
+   * @returns Array of file and directory names
+   */
+  async readdir(dirPath: string): Promise<string[]> {
+    return fsPromises.readdir(dirPath);
+  }
+
+  /**
+   * Read directory contents synchronously
+   * @param dirPath Directory path
+   * @returns Array of file and directory names
+   */
+  readdirSync(dirPath: string): string[] {
+    return fs.readdirSync(dirPath);
   }
 }
