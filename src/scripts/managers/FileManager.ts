@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import glob from 'glob-promise'; // For pattern matching in file paths
+import { glob } from 'glob'; // For pattern matching in file paths
 
 /**
  * File manager
@@ -42,15 +42,42 @@ class FileManager {
   }
 
   /**
+   * Safely escapes special characters in paths for glob patterns
+   * @param pathStr The path to escape for glob pattern
+   * @returns Safely escaped path for glob pattern
+   */
+  private escapeGlobPattern(pathStr: string): string {
+    // First, normalize using forward slashes for glob patterns
+    let normalized = pathStr.replace(/\\/g, '/');
+    
+    // Use a more thorough escaping approach - replace each square bracket individually
+    // to handle cases with nested square brackets
+    let result = '';
+    for (let i = 0; i < normalized.length; i++) {
+      if (normalized[i] === '[') {
+        result += '[[]';
+      } else if (normalized[i] === ']') {
+        result += '[]]';
+      } else {
+        result += normalized[i];
+      }
+    }
+    
+    console.log(`Original path: ${pathStr}`);
+    console.log(`Escaped path: ${result}`);
+    
+    return result;
+  }
+
+  /**
    * Scans the plugins directory to discover all plugins
    */
   private async scanPlugins(): Promise<void> {
     try {
       // Use glob to find all plugin.json files
-      // Note: Using forward slashes for glob patterns to ensure cross-platform compatibility
-      const pluginJsonPattern = path
-        .join(this.rootPath, '**', 'plugin.json')
-        .replace(/\\/g, '/');
+      const pluginJsonRawPattern = path.join(this.rootPath, '**', 'plugin.json');
+      const pluginJsonPattern = this.escapeGlobPattern(pluginJsonRawPattern);
+      
       const options = {
         windowsPathsNoEscape: true, // Important for paths with square brackets
         nodir: true,
@@ -59,7 +86,7 @@ class FileManager {
       const pluginJsonPaths = await glob(pluginJsonPattern, options);
 
       if (pluginJsonPaths.length === 0) {
-        console.warn(`No plugins found in ${this.rootPath}`);
+        console.warn(`No plugins found in ${this.pathToDisplay(this.rootPath)}`);
       }
 
       for (const pluginJsonPath of pluginJsonPaths) {
@@ -71,7 +98,7 @@ class FileManager {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
           console.error(
-            `Error registering plugin at ${pluginJsonPath}:`,
+            `Error registering plugin at ${this.pathToDisplay(pluginJsonPath)}:`,
             errorMessage
           );
           // Continue with other plugins even if one fails
@@ -94,34 +121,47 @@ class FileManager {
     const pluginPathParts = relativePath.split(path.sep);
     const pluginName = pluginPathParts[pluginPathParts.length - 1];
 
+    // Extract and build parent paths using forward slashes
+    const parents: string[] = [];
+    if (pluginPathParts.length > 1) {
+      // Create an array of all parent paths
+      for (let i = 0; i < pluginPathParts.length - 1; i++) {
+        // Build path up to this parent level with forward slashes
+        const parentPath = pluginPathParts.slice(0, i + 1).join('/');
+        parents.push(parentPath);
+      }
+    }
+
     // Create a path-based identifier for the plugin
     const pluginPathIdentifier =
       this.generatePluginPathIdentifier(relativePath);
 
     // Check for duplicate plugin paths
     if (this.plugins.has(pluginPathIdentifier)) {
-      throw new Error(`Duplicate plugin detected at path: ${relativePath}`);
+      throw new Error(`Duplicate plugin detected at path: ${this.pathToDisplay(relativePath)}`);
     }
 
     // Parse plugin.json to get additional info if needed
     const pluginJsonPath = path.join(pluginDir, 'plugin.json');
-    let pluginJsonContent = {};
 
     try {
-      const jsonData = await fs.readFile(pluginJsonPath, 'utf-8');
-      pluginJsonContent = JSON.parse(jsonData);
+      // Read plugin.json but we don't use its content yet
+      // This is just to verify it exists and is valid JSON
+      await fs.readFile(pluginJsonPath, 'utf-8');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.warn(
-        `Warning: Could not parse plugin.json for ${pluginName}: ${errorMessage}`
+        `Warning: Could not read plugin.json for ${pluginName}: ${errorMessage}`
       );
     }
 
     const plugin: Plugin = {
       pluginName,
       fullPath: pluginDir,
+      displayPath: this.pathToDisplay(pluginDir),
       files: [],
+      parents,
     };
 
     this.plugins.set(pluginPathIdentifier, plugin);
@@ -142,44 +182,40 @@ class FileManager {
   /**
    * Scans all files in a plugin
    */
-  private async scanPluginFiles(plugin: Plugin): Promise<void> {
+  private async scanPluginFiles(plugin: Plugin, currentDir = plugin.fullPath): Promise<void> {
     try {
-      // Use glob to find all files in the plugin directory
-      // Handle special characters in path, including square brackets
-      const filePattern = path
-        .join(plugin.fullPath, '**', '*')
-        .replace(/\\/g, '/');
-      const options = {
-        windowsPathsNoEscape: true,
-        nodir: true,
-      };
-
-      const filePaths = await glob(filePattern, options);
-
-      for (const filePath of filePaths) {
-        // Skip the plugin.json file since we already processed it
-        if (path.basename(filePath) === 'plugin.json') continue;
-
-        const file: File = {
-          fileName: path.basename(filePath),
-          fullPath: filePath,
-          plugin,
-        };
-
-        this.files.set(filePath, file);
-        plugin.files.push(file);
+      const entries = await fs.readdir(currentDir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        
+        if (entry.isDirectory()) {
+          // Recursively scan subdirectories
+          await this.scanPluginFiles(plugin, fullPath);
+        } else if (entry.isFile() && entry.name !== 'plugin.json') {
+          // Register the file
+          const file: File = {
+            fileName: entry.name,
+            fullPath: fullPath,
+            displayPath: this.pathToDisplay(fullPath),
+            plugin,
+          };
+          
+          this.files.set(fullPath, file);
+          plugin.files.push(file);
+        }
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(
-        `Error scanning files for plugin ${plugin.pluginName}:`,
-        error
-      );
-      throw new Error(
-        `Failed to scan files for plugin ${plugin.pluginName}: ${errorMessage}`
-      );
+      console.error(`Error scanning directory ${currentDir}:`, error);
     }
+  }
+
+  /**
+   * Converts a path to use forward slashes for display
+   * @param filePath The path to convert
+   */
+  pathToDisplay(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
   }
 
   /**
@@ -288,9 +324,10 @@ class FileManager {
     const results: File[] = [];
 
     for (const plugin of plugins) {
-      const filePattern = path
-        .join(plugin.fullPath, pattern)
-        .replace(/\\/g, '/');
+      // Make sure we escape square brackets in both the plugin path and pattern
+      const fileRawPattern = path.join(plugin.fullPath, pattern);
+      const filePattern = this.escapeGlobPattern(fileRawPattern);
+      
       const options = { windowsPathsNoEscape: true };
 
       const matchingPaths = await glob(filePattern, options);
@@ -329,15 +366,15 @@ class FileManager {
       const file = this.files.get(normalizedPath);
 
       if (!file) {
-        throw new Error(`File not found: ${filePath}`);
+        throw new Error(`File not found: ${this.pathToDisplay(filePath)}`);
       }
 
       return await fs.readFile(normalizedPath, 'utf-8');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error reading file ${filePath}:`, error);
-      throw new Error(`Failed to read file ${filePath}: ${errorMessage}`);
+      console.error(`Error reading file ${this.pathToDisplay(filePath)}:`, error);
+      throw new Error(`Failed to read file ${this.pathToDisplay(filePath)}: ${errorMessage}`);
     }
   }
 
@@ -355,7 +392,7 @@ class FileManager {
         // If the file doesn't exist, we need to determine which plugin it belongs to
         const plugin = this.findPluginForPath(normalizedPath);
         if (!plugin) {
-          throw new Error(`Cannot determine plugin for path: ${filePath}`);
+          throw new Error(`Cannot determine plugin for path: ${this.pathToDisplay(filePath)}`);
         }
 
         // Create the directory if it doesn't exist
@@ -369,6 +406,7 @@ class FileManager {
         file = {
           fileName: path.basename(normalizedPath),
           fullPath: normalizedPath,
+          displayPath: this.pathToDisplay(normalizedPath),
           plugin,
         };
 
@@ -383,8 +421,8 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error writing file ${filePath}:`, error);
-      throw new Error(`Failed to write file ${filePath}: ${errorMessage}`);
+      console.error(`Error writing file ${this.pathToDisplay(filePath)}:`, error);
+      throw new Error(`Failed to write file ${this.pathToDisplay(filePath)}: ${errorMessage}`);
     }
   }
 
@@ -416,8 +454,8 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error deleting file ${filePath}:`, error);
-      throw new Error(`Failed to delete file ${filePath}: ${errorMessage}`);
+      console.error(`Error deleting file ${this.pathToDisplay(filePath)}:`, error);
+      throw new Error(`Failed to delete file ${this.pathToDisplay(filePath)}: ${errorMessage}`);
     }
   }
 
@@ -436,14 +474,14 @@ class FileManager {
 
       const sourceFile = this.files.get(sourceNormalizedPath);
       if (!sourceFile) {
-        throw new Error(`Source file not found: ${sourceFilePath}`);
+        throw new Error(`Source file not found: ${this.pathToDisplay(sourceFilePath)}`);
       }
 
       // Determine the destination plugin
       const destPlugin = this.findPluginForPath(destNormalizedPath);
       if (!destPlugin) {
         throw new Error(
-          `Cannot determine plugin for destination path: ${destinationFilePath}`
+          `Cannot determine plugin for destination path: ${this.pathToDisplay(destinationFilePath)}`
         );
       }
 
@@ -458,6 +496,7 @@ class FileManager {
       const destFile: File = {
         fileName: path.basename(destNormalizedPath),
         fullPath: destNormalizedPath,
+        displayPath: this.pathToDisplay(destNormalizedPath),
         plugin: destPlugin,
       };
 
@@ -469,7 +508,7 @@ class FileManager {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(
-        `Error copying file ${sourceFilePath} to ${destinationFilePath}:`,
+        `Error copying file ${this.pathToDisplay(sourceFilePath)} to ${this.pathToDisplay(destinationFilePath)}:`,
         error
       );
       throw new Error(`Failed to copy file: ${errorMessage}`);
@@ -503,7 +542,7 @@ class FileManager {
 
       // Check if the plugin already exists at this path
       if (fsSync.existsSync(path.join(pluginPath, 'plugin.json'))) {
-        throw new Error(`Plugin already exists at path: ${pluginPath}`);
+        throw new Error(`Plugin already exists at path: ${this.pathToDisplay(pluginPath)}`);
       }
 
       // Create the plugin directory
@@ -647,7 +686,7 @@ class FileManager {
 
       if (parts.length > 1) {
         // If there are parent folders
-        const parentFolder = parts.slice(0, -1).join(path.sep);
+        const parentFolder = parts.slice(0, -1).join('/'); // Use forward slash here
         parentFolders.add(parentFolder);
       }
     }
@@ -673,12 +712,15 @@ class FileManager {
 interface Plugin {
   pluginName: string;
   fullPath: string;
+  displayPath: string; // New property for display with forward slashes
+  parents: string[]; // Array of parent directories with forward slashes
   files: File[];
 }
 
 interface File {
   fileName: string;
   fullPath: string;
+  displayPath: string; // New property for display with forward slashes
   plugin: Plugin;
 }
 

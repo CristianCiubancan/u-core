@@ -5,8 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "pnpm tsx src/scripts/index.ts build",
-    "dev": "pnpm tsx src/scripts/index.ts dev"
+    "example": "npx tsx src/scripts/index.ts"
   },
   "keywords": [],
   "author": "",
