@@ -5,8 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import chokidar from 'chokidar';
 import { DebouncedTaskManager } from './DebouncedTaskManager.js';
-import { ResourceManager } from './ResourceManager.js';
-import { findPluginPaths } from './fs/index.js';
+import { ResourceManager, findPluginPaths } from './fs/index.js';
 
 /**
  * Watcher Manager to handle file watching

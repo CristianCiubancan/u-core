@@ -1,25 +1,78 @@
 /**
- * Resource Manager to handle resource-related operations
+ * Unified Resource Manager
+ * Combines functionality from both ResourceManager implementations
  */
 import * as path from 'path';
 import * as fs from 'fs';
-import http from 'http';
+import * as http from 'http';
+import { FileSystem, Logger } from '../../core/types.js';
+import { FileSystemImpl } from './FileSystemImpl.js';
+import { ConsoleLogger, LogLevel } from '../logger/ConsoleLogger.js';
 
 /**
- * Resource Manager to handle resource-related operations
+ * Options for the resource manager
+ */
+export interface ResourceManagerOptions {
+  reloaderEnabled: boolean;
+  reloaderHost: string;
+  reloaderPort: number;
+  reloaderApiKey: string;
+  generatedDir?: string;
+}
+
+/**
+ * Default options for the resource manager
+ */
+const DEFAULT_OPTIONS: ResourceManagerOptions = {
+  reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+  reloaderHost: process.env.RELOADER_HOST || 'localhost',
+  reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+  reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+};
+
+/**
+ * Unified Resource Manager
+ * Handles resource deployment, reloading, and tracking
  */
 export class ResourceManager {
+  private fs: FileSystem;
+  private logger: Logger;
   private resourceMap = new Map<string, string>(); // Maps path -> resource name
   private resourceRestartTimestamps = new Map<string, number>();
   private readonly RESTART_COOLDOWN_MS = 2000; // 2 seconds cooldown
-  private readonly generatedDir?: string;
+  
+  // Options
+  private reloaderEnabled: boolean;
+  private reloaderHost: string;
+  private reloaderPort: number;
+  private reloaderApiKey: string;
+  private generatedDir?: string;
 
-  constructor(generatedDir?: string) {
-    this.generatedDir = generatedDir;
-    if (generatedDir) {
-      console.log(
-        `ResourceManager initialized with generatedDir: ${generatedDir}`
-      );
+  /**
+   * Create a new resource manager
+   * @param fs File system implementation
+   * @param logger Logger implementation
+   * @param options Resource manager options
+   */
+  constructor(
+    fs: FileSystem = new FileSystemImpl(),
+    logger: Logger = new ConsoleLogger({ minLevel: LogLevel.Info }),
+    options: Partial<ResourceManagerOptions> = {}
+  ) {
+    this.fs = fs;
+    this.logger = logger;
+    
+    // Merge default options with provided options
+    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+    
+    this.reloaderEnabled = mergedOptions.reloaderEnabled;
+    this.reloaderHost = mergedOptions.reloaderHost;
+    this.reloaderPort = mergedOptions.reloaderPort;
+    this.reloaderApiKey = mergedOptions.reloaderApiKey;
+    this.generatedDir = mergedOptions.generatedDir;
+    
+    if (this.generatedDir) {
+      this.logger.debug(`ResourceManager initialized with generatedDir: ${this.generatedDir}`);
     }
   }
 
@@ -28,6 +81,50 @@ export class ResourceManager {
    */
   getResourceCount(): number {
     return this.resourceMap.size;
+  }
+
+  /**
+   * Deploy resources to the server
+   * @param distDir Distribution directory
+   */
+  async deployResources(distDir: string): Promise<void> {
+    this.logger.debug(`Deploying resources from ${distDir}`);
+
+    try {
+      // Get server name from environment variables
+      const serverName = process.env.SERVER_NAME;
+
+      if (!serverName) {
+        this.logger.warn(
+          'SERVER_NAME environment variable is not set. Skipping resource deployment.'
+        );
+        return;
+      }
+
+      const generatedDirName = `[GENERATED]`;
+      const destinationBase = path.join('txData', serverName, 'resources');
+      const destinationDir = path.join(destinationBase, generatedDirName);
+
+      // Ensure destination directory exists
+      this.logger.debug(
+        `Ensuring destination directory exists: ${destinationDir}`
+      );
+      await this.fs.ensureDir(destinationDir);
+
+      // Copy built resources
+      this.logger.debug(
+        `Copying built resources from ${distDir} to ${destinationDir}`
+      );
+
+      // Use Node.js fs module for recursive copying
+      const fsPromises = await import('fs/promises');
+      await fsPromises.cp(distDir, destinationDir, { recursive: true });
+
+      this.logger.info('Built resources deployed successfully.');
+    } catch (error) {
+      this.logger.error('Error deploying resources:', error);
+      throw error;
+    }
   }
 
   /**
@@ -182,7 +279,7 @@ export class ResourceManager {
         }
       }
     } catch (error) {
-      console.error('Error reading manifest:', error);
+      this.logger.error('Error reading manifest:', error);
     }
     return null;
   }
@@ -210,7 +307,7 @@ export class ResourceManager {
               const resourceName = manifestName || entry;
 
               this.resourceMap.set(fullPath, resourceName);
-              console.log(
+              this.logger.debug(
                 `Mapped directory ${fullPath} to resource ${resourceName}`
               );
             }
@@ -223,7 +320,7 @@ export class ResourceManager {
         }
       }
     } catch (error) {
-      console.error('Error scanning directory:', error);
+      this.logger.error('Error scanning directory:', error);
     }
   }
 
@@ -242,7 +339,7 @@ export class ResourceManager {
     ];
 
     if (commonSubdirs.includes(resourceName)) {
-      console.log(
+      this.logger.debug(
         `Skipping restart for '${resourceName}' as it appears to be a subdirectory, not a resource`
       );
       return;
@@ -250,17 +347,17 @@ export class ResourceManager {
 
     // Skip if resource name is in brackets (these are directory containers, not actual resources)
     if (resourceName.startsWith('[') && resourceName.endsWith(']')) {
-      console.log(
+      this.logger.debug(
         `Skipping restart for '${resourceName}' as it appears to be a directory container, not a resource`
       );
       return;
     }
 
-    console.log(`Restarting resource: ${resourceName}`);
+    this.logger.debug(`Restarting resource: ${resourceName}`);
 
     // Skip if resource name is empty or undefined
     if (!resourceName) {
-      console.error(`Invalid resource name: ${resourceName}`);
+      this.logger.error(`Invalid resource name: ${resourceName}`);
       return;
     }
 
@@ -271,7 +368,7 @@ export class ResourceManager {
     const timeSinceLastRestart = now - lastRestartTime;
 
     if (timeSinceLastRestart < this.RESTART_COOLDOWN_MS) {
-      console.log(
+      this.logger.debug(
         `Skipping restart for ${resourceName} - last restart was ${timeSinceLastRestart}ms ago (cooldown: ${this.RESTART_COOLDOWN_MS}ms)`
       );
       return;
@@ -280,85 +377,65 @@ export class ResourceManager {
     // Update the timestamp for this resource
     this.resourceRestartTimestamps.set(resourceName, now);
 
-    await this.notifyResourceManager(resourceName);
+    if (!this.reloaderEnabled) {
+      this.logger.debug(
+        `Resource reloader is disabled. Skipping reload of ${resourceName}.`
+      );
+      return;
+    }
+
+    try {
+      // Construct the URL for the reload request
+      const url = `http://${this.reloaderHost}:${this.reloaderPort}/reload/${resourceName}`;
+
+      // Send the request
+      await this.sendReloadRequest(url);
+
+      this.logger.info(`Resource ${resourceName} reloaded successfully.`);
+    } catch (error) {
+      this.logger.error(`Error reloading resource ${resourceName}:`, error);
+    }
   }
 
   /**
-   * Notify resource manager to restart a resource
+   * Send a reload request
+   * @param url URL to send the request to
    */
-  private notifyResourceManager(resourceName: string): Promise<void> {
-    return new Promise((resolve) => {
-      // Check if reloader is enabled
-      if (process.env.RELOADER_ENABLED !== 'true') {
-        console.log(
-          `Resource reloader is disabled. Skipping restart for ${resourceName}`
-        );
-        resolve();
-        return;
-      }
-
-      // Properly encode resource name
-      const encodedResourceName = encodeURIComponent(resourceName);
-
+  private sendReloadRequest(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
       const options = {
-        hostname: process.env.RELOADER_HOST || 'localhost',
-        port: parseInt(process.env.RELOADER_PORT || '3414', 10),
-        path: `/restart?resource=${encodedResourceName}`,
-        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${
-            process.env.RELOADER_API_KEY || 'your-secure-api-key'
-          }`,
+          'X-API-Key': this.reloaderApiKey,
         },
       };
 
-      console.log(`Sending restart request for resource: ${resourceName}`);
-
-      const req = http.request(options, (res: any) => {
+      const req = http.get(url, options, (res) => {
         let data = '';
 
-        res.on('data', (chunk: any) => {
+        res.on('data', (chunk) => {
           data += chunk;
         });
 
         res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            console.log(
-              `Resource reload ${
-                response.success ? 'successful' : 'failed'
-              } for ${resourceName}`
+          if (res.statusCode === 200) {
+            resolve();
+          } else {
+            reject(
+              new Error(`Failed to reload resource: ${res.statusCode} ${data}`)
             );
-
-            if (!response.success) {
-              console.log(`Failed response: ${JSON.stringify(response)}`);
-            }
-
-            // Add a delay before resolving to prevent rapid-fire restarts
-            setTimeout(() => {
-              resolve();
-            }, 500);
-          } catch (error) {
-            console.error('Error parsing response:', error);
-            console.error('Raw response data:', data);
-            resolve(); // Still resolve to prevent chain from breaking
           }
         });
       });
 
-      req.on('error', (error: any) => {
-        console.error(`Error notifying resource manager: ${error.message}`);
-        // Still resolve to prevent chain from breaking
-        setTimeout(() => {
-          resolve();
-        }, 500);
+      req.on('error', (error) => {
+        reject(error);
       });
 
       // Set a timeout for the request
       req.setTimeout(5000, () => {
-        console.error(`Request timeout for resource: ${resourceName}`);
+        this.logger.error(`Request timeout for resource reload`);
         req.destroy();
-        resolve(); // Still resolve to prevent chain from breaking
+        reject(new Error('Request timeout'));
       });
 
       req.end();

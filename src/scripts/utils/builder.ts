@@ -14,6 +14,7 @@ import {
   parsePluginPaths as parsePluginPathsIntoPlugins,
   processFile,
   readPluginJson,
+  ResourceManager,
 } from './fs/index.js';
 import {
   generateManifest,
@@ -21,7 +22,6 @@ import {
 } from './fs/ConfigUtils.js';
 import { verifyOutputDir } from './bundler.js';
 import { buildPluginWebview } from './webview.js';
-import { ResourceManagerImpl } from '../core/resources/ResourceManager.js';
 import { ConsoleLogger } from './logger/ConsoleLogger.js';
 import { getProjectPaths } from './fs/PathUtils.js';
 
@@ -250,7 +250,7 @@ export async function build() {
 
     // 4. Deploy built resources
     const logger = new ConsoleLogger();
-    const resourceManager = new ResourceManagerImpl(undefined, logger, {
+    const resourceManager = new ResourceManager(fileSystem, logger, {
       reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
       reloaderHost: process.env.RELOADER_HOST || 'localhost',
       reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
@@ -326,7 +326,7 @@ export async function rebuildComponent(
 
     // Deploy built resources
     const logger = new ConsoleLogger();
-    const resourceManager = new ResourceManagerImpl(undefined, logger, {
+    const resourceManager = new ResourceManager(fileSystem, logger, {
       reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
       reloaderHost: process.env.RELOADER_HOST || 'localhost',
       reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),

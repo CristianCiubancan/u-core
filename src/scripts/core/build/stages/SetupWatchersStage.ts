@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { BuildContext } from '../../types.js';
 import { WatcherManagerImpl, DebouncedTaskManager } from '../WatcherManager.js';
-import { ResourceManagerImpl } from '../../resources/ResourceManager.js';
+import { ResourceManager } from '../../../utils/fs/ResourceManager.js';
 
 /**
  * Setup watchers
@@ -28,7 +28,7 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
     const debouncedTaskManager = new DebouncedTaskManager();
 
     // Create resource manager
-    const resourceManager = new ResourceManagerImpl(undefined, logger, {
+    const resourceManager = new ResourceManager(undefined, logger, {
       reloaderEnabled: config.reloader.enabled,
       reloaderHost: config.reloader.host,
       reloaderPort: config.reloader.port,

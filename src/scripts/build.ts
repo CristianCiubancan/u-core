@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 // Import refactored utility modules
 import { DebouncedTaskManager } from './utils/DebouncedTaskManager.js';
-import { ResourceManager } from './utils/ResourceManager.js';
+import { ResourceManager } from './utils/fs/index.js';
 import { WatcherManager } from './utils/WatcherManager.js';
 import { getProjectPaths } from './utils/fs/PathUtils.js';
 import { parseArgs } from './utils/args.js';
@@ -35,7 +35,12 @@ async function main() {
     // Set up watchers if in watch mode
     if (watch) {
       const debouncedTaskManager = new DebouncedTaskManager();
-      const resourceManager = new ResourceManager();
+      const resourceManager = new ResourceManager(undefined, undefined, {
+        reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+        reloaderHost: process.env.RELOADER_HOST || 'localhost',
+        reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+        reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+      });
       const watcherManager = new WatcherManager(
         debouncedTaskManager,
         resourceManager
