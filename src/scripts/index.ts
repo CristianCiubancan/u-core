@@ -1,6 +1,7 @@
 import { FileManager } from './managers/FileManager.js';
 import { ManifestManager } from './managers/ManifestManager.js';
 import { PluginManager } from './managers/PluginManager.js';
+import { BuildManager } from './managers/BuildManager.js';
 import { Plugin } from './types/Plugin.js';
 import { File } from './types/File.js';
 import { PluginManifest } from './types/Manifest.js';
@@ -12,6 +13,7 @@ import { PluginManifest } from './types/Manifest.js';
  * 1. Get all plugins
  * 2. Get all files from all plugins
  * 3. Load and display plugin manifests with formatted output
+ * 4. Build plugins to distribution directory
  */
 async function main() {
   try {
@@ -42,6 +44,9 @@ async function main() {
 
     const pluginManager = new PluginManager(fileManager);
     await pluginManager.initialize();
+
+    const buildManager = new BuildManager(fileManager);
+    await buildManager.initialize();
 
     console.log('✓ All managers initialized successfully\n');
 
@@ -210,11 +215,73 @@ async function main() {
       console.log('  --------------------------------------------------');
     }
 
+    // 4. Demonstrate the plugin build process
+    createDivider('PLUGIN BUILD DEMONSTRATION');
+
+    // First, clean the dist directory
+    console.log('Cleaning distribution directory...');
+    await buildManager.clean();
+    console.log('✓ Distribution directory cleaned\n');
+
+    // Build a specific plugin if any exists
+    if (allPlugins.length > 0) {
+      const firstPlugin = allPlugins[0];
+      console.log(`\n🛠️ Building specific plugin: ${firstPlugin.pluginName}`);
+
+      // Show build process for specific file types
+      console.log('\nBuilding by file type:');
+      console.log('----------------------');
+
+      await buildManager.buildPluginJson(firstPlugin);
+      await buildManager.buildPluginLua(firstPlugin);
+      await buildManager.buildPluginTs(firstPlugin);
+      await buildManager.buildPluginJs(firstPlugin);
+      await buildManager.buildPluginPageTsx(firstPlugin);
+
+      console.log('\n✓ Individual file type builds completed');
+
+      // Build first plugin completely in one go
+      console.log(`\n🔨 Building complete plugin: ${firstPlugin.pluginName}`);
+      await buildManager.buildPlugin(firstPlugin.pluginName);
+      console.log(`✓ Complete build of ${firstPlugin.pluginName} finished`);
+    }
+
+    // Build all plugins
+    console.log('\n🏗️ Building all plugins...');
+    await buildManager.buildAllPlugins();
+    console.log('✓ All plugins built successfully');
+
+    // Count files in dist directory
+    const builtPluginsCount = allPlugins.length;
+    const filesByExtension = new Map<string, number>();
+    allPlugins.forEach((plugin) => {
+      plugin.files.forEach((file) => {
+        const extension = file.fileName.includes('.')
+          ? file.fileName.substring(file.fileName.lastIndexOf('.') + 1)
+          : 'unknown';
+        filesByExtension.set(
+          extension,
+          (filesByExtension.get(extension) || 0) + 1
+        );
+      });
+    });
+
+    // Output build statistics
+    console.log('\n📊 Build Statistics:');
+    console.log(`  Total plugins built: ${builtPluginsCount}`);
+    console.log('  Files by extension:');
+    for (const [extension, count] of filesByExtension.entries()) {
+      console.log(`    .${extension}: ${count} files`);
+    }
+
     createDivider('DEMO COMPLETE');
     console.log('Plugin Explorer demo finished successfully. Summary:');
     console.log(`✓ Scanned ${allPlugins.length} plugins`);
     console.log(`✓ Found ${totalFiles} total files`);
     console.log(`✓ Displayed ${allPlugins.length} manifests`);
+    console.log(
+      `✓ Built ${builtPluginsCount} plugins to distribution directory`
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('\n❌ ERROR: ' + errorMessage);
