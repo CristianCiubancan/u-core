@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
+import * as esbuild from 'esbuild';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
@@ -227,7 +228,73 @@ class BuildManager {
         return;
       }
 
-      await this.copyFilesToDist(plugin, tsFiles);
+      const destDir = this.getPluginDestDir(plugin);
+
+      // Process each TypeScript file
+      for (const file of tsFiles) {
+        // Get the relative path within the plugin
+        const relativePath = path.relative(plugin.fullPath, file.fullPath);
+
+        // Change the extension from .ts to .js for the output file
+        const outputRelativePath = relativePath.replace(/\.ts$/, '.js');
+        const outputPath = path.join(destDir, outputRelativePath);
+
+        // Create the destination directory if it doesn't exist
+        const outputDir = path.dirname(outputPath);
+        await fs.mkdir(outputDir, { recursive: true });
+
+        // Determine if this is a server-side script
+        const isServerScript = this.isServerScript(file.fullPath);
+        const externalPackages = this.getExternalPackages(isServerScript);
+
+        // Configure loader based on file type
+        const loader: Record<string, esbuild.Loader> = {
+          '.ts': 'ts',
+          '.js': 'js',
+        };
+
+        console.log(`Bundling TypeScript file: ${relativePath}`);
+
+        try {
+          // Bundle the file
+          const result = await esbuild.build({
+            entryPoints: [file.fullPath],
+            bundle: true,
+            outfile: outputPath,
+            format: 'iife', // Use IIFE format for FiveM compatibility
+            target: 'es2017',
+            minify: false,
+            sourcemap: 'external',
+            loader,
+            logLevel: 'info',
+            external: externalPackages,
+            // Use node platform for server scripts, browser platform for client scripts
+            platform: isServerScript ? 'node' : 'browser',
+          });
+
+          // Check for errors
+          if (result.errors.length > 0) {
+            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
+            throw new Error(
+              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            );
+          }
+
+          // Verify the file was created
+          if (!fsSync.existsSync(outputPath)) {
+            throw new Error(
+              `Failed to verify file exists after bundling: ${outputPath}`
+            );
+          }
+        } catch (bundleError) {
+          console.error(
+            `Error bundling TypeScript file ${file.fullPath}:`,
+            bundleError
+          );
+          throw bundleError;
+        }
+      }
+
       console.log(
         `✓ Built ${tsFiles.length} TypeScript file(s) for plugin ${plugin.pluginName}`
       );
@@ -282,7 +349,62 @@ class BuildManager {
         return;
       }
 
-      await this.copyFilesToDist(plugin, jsFiles);
+      const destDir = this.getPluginDestDir(plugin);
+
+      // Process each JavaScript file
+      for (const file of jsFiles) {
+        // Get the relative path within the plugin
+        const relativePath = path.relative(plugin.fullPath, file.fullPath);
+        const outputPath = path.join(destDir, relativePath);
+
+        // Create the destination directory if it doesn't exist
+        const outputDir = path.dirname(outputPath);
+        await fs.mkdir(outputDir, { recursive: true });
+
+        // Determine if this is a server-side script
+        const isServerScript = this.isServerScript(file.fullPath);
+        const externalPackages = this.getExternalPackages(isServerScript);
+
+        console.log(`Bundling JavaScript file: ${relativePath}`);
+
+        try {
+          // Bundle the file
+          const result = await esbuild.build({
+            entryPoints: [file.fullPath],
+            bundle: true,
+            outfile: outputPath,
+            format: 'iife', // Use IIFE format for FiveM compatibility
+            target: 'es2017',
+            minify: false,
+            sourcemap: 'external',
+            external: externalPackages,
+            // Use node platform for server scripts, browser platform for client scripts
+            platform: isServerScript ? 'node' : 'browser',
+          });
+
+          // Check for errors
+          if (result.errors.length > 0) {
+            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
+            throw new Error(
+              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            );
+          }
+
+          // Verify the file was created
+          if (!fsSync.existsSync(outputPath)) {
+            throw new Error(
+              `Failed to verify file exists after bundling: ${outputPath}`
+            );
+          }
+        } catch (bundleError) {
+          console.error(
+            `Error bundling JavaScript file ${file.fullPath}:`,
+            bundleError
+          );
+          throw bundleError;
+        }
+      }
+
       console.log(
         `✓ Built ${jsFiles.length} JavaScript file(s) for plugin ${plugin.pluginName}`
       );
@@ -510,6 +632,46 @@ class BuildManager {
         'BuildManager must be initialized before use. Call initialize() first.'
       );
     }
+  }
+
+  /**
+   * Determines if a file is a server-side script based on its path
+   * @param filePath Path to check
+   * @returns Whether the file is a server-side script
+   * @private
+   */
+  private isServerScript(filePath: string): boolean {
+    return filePath.includes('/server/') || filePath.includes('\\server\\');
+  }
+
+  /**
+   * Gets the list of packages to not inline
+   * @param isServerScript Whether the file is a server-side script
+   * @returns List of external packages
+   * @private
+   */
+  private getExternalPackages(isServerScript: boolean): string[] {
+    // For server scripts, make Node.js modules external
+    return isServerScript
+      ? [
+          'http',
+          'https',
+          'url',
+          'fs',
+          'path',
+          'os',
+          'crypto',
+          'buffer',
+          'stream',
+          'util',
+          'events',
+          'zlib',
+          'net',
+          'tls',
+          'dns',
+          'child_process',
+        ]
+      : [];
   }
 }
 
