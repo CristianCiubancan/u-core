@@ -119,7 +119,59 @@ class ResourceManager {
    * Determine resource name from a path
    */
   getResourceName(filePath: string): string | null {
-    if (!this.generatedDir) return path.basename(path.dirname(filePath));
+    // Common subdirectories that aren't resources
+    const commonSubdirs = [
+      'client',
+      'server',
+      'shared',
+      'html',
+      'translations',
+      'assets',
+    ];
+
+    if (!this.generatedDir) {
+      // If no generatedDir is provided, we need to determine the resource name from the path
+
+      // Start from the directory containing the file
+      let currentDir = path.dirname(filePath);
+      let dirName = path.basename(currentDir);
+
+      // If the current directory is a common subdirectory, move up one level
+      if (commonSubdirs.includes(dirName)) {
+        currentDir = path.dirname(currentDir);
+        dirName = path.basename(currentDir);
+      }
+
+      // Check if the directory has a manifest
+      const manifestPath = path.join(currentDir, 'fxmanifest.lua');
+      if (fs.existsSync(manifestPath)) {
+        // First check if the manifest defines a name
+        const manifestName = this.getResourceNameFromManifest(manifestPath);
+        if (manifestName) {
+          return manifestName;
+        }
+      }
+
+      // If the directory name is in brackets, try to find a non-bracketed parent directory
+      if (dirName.startsWith('[') && dirName.endsWith(']')) {
+        // Split the path into parts
+        const pathParts = currentDir.split(path.sep);
+
+        // Start from the end and work backwards to find a non-bracketed directory
+        for (let i = pathParts.length - 2; i >= 0; i--) {
+          if (
+            !pathParts[i].startsWith('[') &&
+            !pathParts[i].endsWith(']') &&
+            !commonSubdirs.includes(pathParts[i])
+          ) {
+            return pathParts[i];
+          }
+        }
+      }
+
+      // Return the resource name (directory name)
+      return dirName;
+    }
 
     // Start from the directory containing the file
     let currentDir = path.dirname(filePath);
@@ -144,6 +196,26 @@ class ResourceManager {
 
         // If no name in manifest, use the leaf directory name
         const leafDirName = path.basename(currentDir);
+
+        // If the leaf directory is in brackets, try to find a non-bracketed parent
+        if (leafDirName.startsWith('[') && leafDirName.endsWith(']')) {
+          // Split the path into parts
+          const pathParts = currentDir.split(path.sep);
+
+          // Start from the end and work backwards to find a non-bracketed directory
+          for (let i = pathParts.length - 2; i >= 0; i--) {
+            if (
+              !pathParts[i].startsWith('[') &&
+              !pathParts[i].endsWith(']') &&
+              !commonSubdirs.includes(pathParts[i])
+            ) {
+              const resourceName = pathParts[i];
+              this.resourceMap.set(currentDir, resourceName);
+              return resourceName;
+            }
+          }
+        }
+
         this.resourceMap.set(currentDir, leafDirName);
         return leafDirName;
       }
@@ -153,8 +225,32 @@ class ResourceManager {
     }
 
     // Fallback: if we couldn't find a manifest, use first directory in relative path
-    const relativePath = path.relative(this.generatedDir, filePath);
+    const relativePath = path.relative(this.generatedDir || '', filePath);
     const pathParts = relativePath.split(path.sep);
+
+    // If the first part is in brackets, try to find a non-bracketed part
+    if (
+      pathParts.length > 0 &&
+      pathParts[0].startsWith('[') &&
+      pathParts[0].endsWith(']')
+    ) {
+      // Look for the first non-bracketed, non-common subdirectory
+      for (let i = 1; i < pathParts.length; i++) {
+        if (
+          !pathParts[i].startsWith('[') &&
+          !pathParts[i].endsWith(']') &&
+          !commonSubdirs.includes(pathParts[i])
+        ) {
+          return pathParts[i];
+        }
+      }
+    }
+
+    // Skip common subdirectories that aren't resources
+    if (pathParts.length > 1 && commonSubdirs.includes(pathParts[1])) {
+      return pathParts[0];
+    }
+
     return pathParts[0] || null;
   }
 
@@ -220,6 +316,31 @@ class ResourceManager {
    * Restart a resource with cooldown protection
    */
   async restartResource(resourceName: string): Promise<void> {
+    // Skip common subdirectories that aren't resources
+    const commonSubdirs = [
+      'client',
+      'server',
+      'shared',
+      'html',
+      'translations',
+      'assets',
+    ];
+
+    if (commonSubdirs.includes(resourceName)) {
+      console.log(
+        `Skipping restart for '${resourceName}' as it appears to be a subdirectory, not a resource`
+      );
+      return;
+    }
+
+    // Skip if resource name is in brackets (these are directory containers, not actual resources)
+    if (resourceName.startsWith('[') && resourceName.endsWith(']')) {
+      console.log(
+        `Skipping restart for '${resourceName}' as it appears to be a directory container, not a resource`
+      );
+      return;
+    }
+
     console.log(`Restarting resource: ${resourceName}`);
 
     // Skip if resource name is empty or undefined
@@ -448,16 +569,120 @@ class WatcherManager {
       [path.join(distDir, 'scripts', '**')],
       /.*/, // Match all files
       (filePath) => {
-        const relativePath = path.relative(distDir, path.dirname(filePath));
-        // last part of the path is the resource name
-        const potentialResource = relativePath.split(path.sep).pop();
+        // Get the relative path from the dist directory
+        const relativePath = path.relative(distDir, filePath);
+        const pathParts = relativePath.split(path.sep);
 
-        if (potentialResource && potentialResource !== 'scripts') {
-          console.log(`Resource change detected: ${potentialResource}`);
+        // Skip if this is in the scripts directory
+        if (pathParts[0] === 'scripts') {
+          return;
+        }
+
+        // Find the actual resource by looking for the manifest file
+        let resourcePath = '';
+        let resourceName = null;
+        let manifestFound = false;
+
+        // Common subdirectories that aren't resources
+        const commonSubdirs = [
+          'client',
+          'server',
+          'shared',
+          'html',
+          'translations',
+          'assets',
+        ];
+
+        // First, try to find a manifest file by walking up the directory tree
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          // Build the path incrementally
+          resourcePath = path.join(resourcePath, pathParts[i]);
+          const fullResourcePath = path.join(distDir, resourcePath);
+          const manifestPath = path.join(fullResourcePath, 'fxmanifest.lua');
+
+          if (fs.existsSync(manifestPath)) {
+            // Found a manifest, this is a resource
+            resourceName = path.basename(resourcePath);
+            manifestFound = true;
+            console.log(`Found resource with manifest: ${resourceName}`);
+            break;
+          }
+        }
+
+        // If we didn't find a manifest, try to determine the resource name from the path
+        if (!manifestFound) {
+          // Check if the file is in a common subdirectory
+          if (
+            pathParts.length >= 2 &&
+            commonSubdirs.includes(pathParts[pathParts.length - 2])
+          ) {
+            // Find the last directory that's not a common subdirectory and not in brackets
+            let foundResource = false;
+
+            // Start from the end and work backwards to find the resource name
+            for (let i = pathParts.length - 3; i >= 0; i--) {
+              if (
+                !commonSubdirs.includes(pathParts[i]) &&
+                !pathParts[i].startsWith('[') &&
+                !pathParts[i].endsWith(']')
+              ) {
+                resourceName = pathParts[i];
+                foundResource = true;
+                console.log(
+                  `Found resource from path structure: ${resourceName}`
+                );
+                break;
+              }
+            }
+
+            // If we couldn't find a non-bracketed directory, use the last non-common directory
+            if (!foundResource) {
+              for (let i = pathParts.length - 3; i >= 0; i--) {
+                if (!commonSubdirs.includes(pathParts[i])) {
+                  resourceName = pathParts[i];
+                  console.log(
+                    `Using last non-common directory as resource: ${resourceName}`
+                  );
+                  break;
+                }
+              }
+            }
+
+            // If we still don't have a resource name, use the leaf directory
+            if (!resourceName && pathParts.length > 1) {
+              resourceName = pathParts[pathParts.length - 3];
+              console.log(`Using leaf directory as resource: ${resourceName}`);
+            }
+          } else {
+            // If not in a common subdirectory, find the last directory that's not in brackets
+            for (let i = pathParts.length - 1; i >= 0; i--) {
+              if (
+                !pathParts[i].startsWith('[') &&
+                !pathParts[i].endsWith(']') &&
+                !commonSubdirs.includes(pathParts[i])
+              ) {
+                resourceName = pathParts[i];
+                console.log(
+                  `Using non-bracketed directory as resource: ${resourceName}`
+                );
+                break;
+              }
+            }
+
+            // If we couldn't find a non-bracketed directory, use the leaf directory
+            if (!resourceName && pathParts.length > 0) {
+              resourceName = pathParts[pathParts.length - 1];
+              console.log(`Using leaf directory as resource: ${resourceName}`);
+            }
+          }
+        }
+
+        // If we found a resource name, restart it
+        if (resourceName && resourceName !== 'scripts') {
+          console.log(`Resource change detected: ${resourceName}`);
           this.debouncedTaskManager.execute(
-            `resource-${potentialResource}`,
-            async () =>
-              await this.resourceManager.restartResource(potentialResource)
+            `resource-${resourceName}`,
+            async () => await this.resourceManager.restartResource(resourceName)
           );
         }
       }
