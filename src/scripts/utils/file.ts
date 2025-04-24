@@ -309,9 +309,13 @@ export function getPluginOutputInfo(plugin: any, distDir: string) {
   // Calculate relative path consistently
   let pluginRelativePath = normalizedPluginPath;
   if (pathContainsPluginsPrefix) {
+    // Strip the 'plugins/' prefix to place resources directly in dist
     pluginRelativePath = path.relative(
       pluginsPathNormalized,
       normalizedPluginPath
+    );
+    console.log(
+      `Stripped 'plugins/' prefix from path: ${normalizedPluginPath} -> ${pluginRelativePath}`
     );
   } else if (plugin.name === 'core') {
     // Special case for the core plugin
