@@ -316,6 +316,20 @@ export function preparePluginManifestData(
   generatedFiles: any,
   scriptFiles: any
 ) {
+  // If pluginJsonData is null, create a default minimal configuration
+  if (pluginJsonData === null) {
+    console.warn(
+      'No plugin JSON data provided, creating default configuration'
+    );
+    pluginJsonData = {
+      name: 'unknown',
+      version: '0.1.0',
+      fx_version: 'cerulean',
+      games: ['gta5', 'rdr3'],
+      description: 'Auto-generated plugin configuration',
+    };
+  }
+
   console.log(
     'Preparing plugin manifest data...',
     JSON.stringify(pluginJsonData, null, 2)

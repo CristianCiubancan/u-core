@@ -142,38 +142,71 @@ export class PluginManager {
    */
   private async getPluginFiles(pluginDir: string): Promise<PluginFile[]> {
     this.logger.debug(`Getting files for plugin ${path.basename(pluginDir)}`);
+    console.log(`Getting files for plugin directory: ${pluginDir}`);
 
     try {
-      // Use glob directly to get all files
-      const glob = await import('glob');
-      const files = await glob.glob(
-        path.join(pluginDir, '**/*').replace(/\\/g, '/'),
-        {
-          nodir: true,
-          ignore: ['**/node_modules/**', '**/dist/**'],
-        }
-      );
+      // Check if plugin.json exists first
+      const pluginJsonPath = path.join(pluginDir, 'plugin.json');
+      const pluginJsonExists = await this.fs.exists(pluginJsonPath);
 
-      // Parse files into plugin files
+      if (pluginJsonExists) {
+        console.log(`Found plugin.json at ${pluginJsonPath}`);
+      } else {
+        console.log(`plugin.json not found at ${pluginJsonPath}`);
+      }
+
+      // Use Node.js fs module directly instead of glob for better handling of special characters
+      const fs = await import('fs');
       const pluginFiles: PluginFile[] = [];
 
-      for (const filePath of files) {
-        const normalizedFilePath = path.normalize(filePath);
-        const fileName = path.basename(normalizedFilePath);
-        const isPluginJsonFile = fileName === 'plugin.json';
+      // Helper function to scan directories recursively
+      const scanDirectory = async (dir: string, relativePath: string = '') => {
+        try {
+          const entries = await fs.promises.readdir(dir, {
+            withFileTypes: true,
+          });
 
-        // Calculate the path relative to the plugin directory
-        const pathFromPluginDir = path.relative(pluginDir, normalizedFilePath);
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            const entryRelativePath = path.join(relativePath, entry.name);
 
-        // Create plugin file object
-        const file: PluginFile = {
-          name: fileName,
-          pathFromPluginDir,
-          isPluginJsonFile,
-          fullPath: normalizedFilePath,
-        };
+            if (entry.isDirectory()) {
+              // Skip node_modules and dist directories
+              if (entry.name !== 'node_modules' && entry.name !== 'dist') {
+                await scanDirectory(fullPath, entryRelativePath);
+              }
+            } else {
+              // This is a file
+              const fileName = entry.name;
+              const isPluginJsonFile = fileName === 'plugin.json';
 
-        pluginFiles.push(file);
+              // Create plugin file object
+              const file: PluginFile = {
+                name: fileName,
+                pathFromPluginDir: entryRelativePath,
+                isPluginJsonFile,
+                fullPath: fullPath,
+              };
+
+              pluginFiles.push(file);
+            }
+          }
+        } catch (error) {
+          console.log(`Error scanning directory ${dir}: ${error}`);
+        }
+      };
+
+      // Start scanning from the plugin directory
+      await scanDirectory(pluginDir);
+
+      // Parse files into plugin files
+      const pluginJsonFile = pluginFiles.find((file) => file.isPluginJsonFile);
+      if (pluginJsonFile) {
+        console.log(`Found plugin.json file: ${pluginJsonFile.fullPath}`);
+      } else {
+        console.log(
+          `No plugin.json file found in plugin directory: ${pluginDir}`
+        );
       }
 
       this.logger.debug(
@@ -197,10 +230,32 @@ export class PluginManager {
     this.logger.debug(`Reading plugin JSON from ${jsonPath}`);
 
     try {
+      // Check if the file exists first
+      if (!(await this.fs.exists(jsonPath))) {
+        this.logger.warn(`Plugin.json file not found at path: ${jsonPath}`);
+        console.log(`Plugin.json file not found at path: ${jsonPath}`);
+        console.log(`Absolute path: ${path.resolve(jsonPath)}`);
+
+        // Try to list the directory contents to see what's there
+        try {
+          const dirPath = path.dirname(jsonPath);
+          console.log(`Directory contents of ${dirPath}:`);
+          const fs = await import('fs');
+          const files = await fs.promises.readdir(dirPath);
+          files.forEach((file) => console.log(`- ${file}`));
+        } catch (dirErr) {
+          console.log(`Could not read directory: ${dirErr}`);
+        }
+
+        return null;
+      }
+
       const content = await this.fs.readFile(jsonPath);
       return JSON.parse(content);
     } catch (error) {
       this.logger.error(`Error reading plugin JSON: ${error}`);
+      console.log(`Error reading plugin.json at ${jsonPath}:`, error);
+      console.log(`Absolute path: ${path.resolve(jsonPath)}`);
       throw error;
     }
   }

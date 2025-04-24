@@ -18,7 +18,8 @@ export class CLI {
    * Create a new CLI
    */
   constructor() {
-    this.logger = new ConsoleLogger({ minLevel: LogLevel.Info });
+    // Set log level to Debug to see all logs
+    this.logger = new ConsoleLogger({ minLevel: LogLevel.Debug });
     this.commands = new Map();
 
     // Register commands
@@ -48,7 +49,10 @@ export class CLI {
    * @param args Command-line arguments
    * @returns Command and arguments
    */
-  private parseArgs(args: string[]): { commandName: string; commandArgs: string[] } {
+  private parseArgs(args: string[]): {
+    commandName: string;
+    commandArgs: string[];
+  } {
     // Default command is 'build'
     let commandName = 'build';
     let commandArgs = args;
