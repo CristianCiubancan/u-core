@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { Plugin } from '../core/types.js';
-import { fileSystem } from './fs/index.js';
+import { fileSystem, generateSimpleHtmlContent } from './fs/index.js';
 import { spawn } from 'child_process';
 
 /**
@@ -168,19 +168,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     const indexHtmlExists = await fileSystem.exists(indexHtmlPath);
 
     if (!indexHtmlExists) {
-      const indexHtmlContent = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Webview</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./main.tsx"></script>
-  </body>
-</html>
-`;
+      const indexHtmlContent = generateSimpleHtmlContent(
+        'Webview',
+        './main.tsx'
+      );
       await fileSystem.writeFile(indexHtmlPath, indexHtmlContent);
       console.log(`Generated ${indexHtmlPath}`);
     } else {
@@ -228,12 +219,6 @@ body {
     // Run Vite build - it will output directly to distDir/webview per vite.config.ts
     console.log('Running Vite build...');
     try {
-      // First check if package.json exists and has a build script
-      const packageJsonPath = path.join(process.cwd(), 'package.json');
-
-      // We'll always use npx vite build directly to avoid recursion
-      // No need to check package.json
-
       // Always run Vite build directly to avoid recursion
       const buildCommand = 'npx vite build';
       console.log(`Executing: ${buildCommand}`);
@@ -496,19 +481,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     const indexHtmlExists = await fileSystem.exists(indexHtmlPath);
 
     if (!indexHtmlExists) {
-      const indexHtmlContent = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Plugin Webview - ${plugin.name || relPlugin}</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./main.tsx"></script>
-  </body>
-</html>
-`;
+      const indexHtmlContent = generateSimpleHtmlContent(
+        `Plugin Webview - ${plugin.name || relPlugin}`,
+        './main.tsx'
+      );
       await fileSystem.writeFile(indexHtmlPath, indexHtmlContent);
       console.log(`Generated ${indexHtmlPath}`);
     } else {

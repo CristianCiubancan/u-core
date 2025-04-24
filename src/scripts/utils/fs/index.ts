@@ -25,6 +25,9 @@ export * from './LogUtils.js';
 // Export process utilities
 export * from './ProcessUtils.js';
 
+// Export HTML utilities
+export * from './HtmlUtils.js';
+
 // Create and export a singleton instance of FileSystemImpl for convenience
 import { FileSystemImpl } from './FileSystemImpl.js';
 export const fileSystem = new FileSystemImpl();

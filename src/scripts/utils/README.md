@@ -6,30 +6,19 @@ This directory contains utility functions and modules used throughout the codeba
 
 - **fs/**: File system and related utilities (see [fs/README.md](./fs/README.md) for details)
 - **bundler.js**: JavaScript and TypeScript bundling utilities
-- **file.ts**: Legacy file utilities (deprecated, use fs/ instead)
-- **paths.ts**: Legacy path utilities (deprecated, use fs/ instead)
 - **webview.ts**: Webview building and processing utilities
 
-## Migration Guide
+## Usage
 
-The codebase is transitioning from the older, less organized utility files to the new modular structure in the `fs/` directory.
-
-### Before:
+Import utilities from the fs directory:
 
 ```typescript
-import * as fs from 'fs';
-import * as path from 'path';
-import { ensureDirectoryExists, getPluginsPaths } from './utils/file.js';
-import { getProjectPaths } from './utils/paths.js';
-```
-
-### After:
-
-```typescript
-import { 
-  fileSystem, 
-  findPluginPaths, 
-  getProjectPaths 
+import {
+  fileSystem,
+  findPluginPaths,
+  getProjectPaths,
+  generateHtmlContent,
+  generateManifest,
 } from './utils/fs/index.js';
 ```
 

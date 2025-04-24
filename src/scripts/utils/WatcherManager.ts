@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import chokidar from 'chokidar';
 import { DebouncedTaskManager } from './DebouncedTaskManager.js';
 import { ResourceManager } from './ResourceManager.js';
-import { getPluginsPaths } from './file.js';
+import { findPluginPaths } from './fs/index.js';
 
 /**
  * Watcher Manager to handle file watching
@@ -85,7 +85,7 @@ export class WatcherManager {
     distDir: string,
     rebuildComponent: Function
   ): void {
-    const { pluginPaths } = getPluginsPaths(pluginsDir);
+    const pluginPaths = findPluginPaths(pluginsDir);
     const outputPaths = [distDir];
 
     // Set up individual plugin watchers

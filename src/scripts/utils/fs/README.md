@@ -19,14 +19,14 @@ The utilities are organized into several modules:
 Import the utilities from the index file:
 
 ```typescript
-import { 
+import {
   fileSystem,
   normalizePath,
   findPluginPaths,
   processFile,
   loadEnvFile,
   info,
-  executeCommand
+  executeCommand,
 } from './utils/fs/index.js';
 ```
 
@@ -113,7 +113,34 @@ const env = await loadEnvFile('.env');
 const config = getConfig();
 
 // Generate a manifest file
-await generateManifest('resource-name', files, 'path/to/manifest.lua');
+await generateManifest(pluginJson, 'path/to/manifest.lua');
+
+// Prepare plugin manifest data
+const updatedPluginJson = preparePluginManifestData(
+  pluginJsonData,
+  generatedFiles,
+  scriptFiles
+);
+```
+
+### HTML Utilities
+
+Functions for generating HTML content:
+
+```typescript
+// Generate HTML files for plugins
+await generatePluginHtmlFiles(plugins, distDir);
+
+// Generate HTML content for a plugin
+const html = generateHtmlContent(
+  'Page Title',
+  'index.js',
+  'vendor.js',
+  'styles.css'
+);
+
+// Generate simple HTML content
+const html = generateSimpleHtmlContent('Page Title', './script.js');
 ```
 
 ### Logging Utilities

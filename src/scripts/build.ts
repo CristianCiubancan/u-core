@@ -4,7 +4,7 @@ import 'dotenv/config';
 import { DebouncedTaskManager } from './utils/DebouncedTaskManager.js';
 import { ResourceManager } from './utils/ResourceManager.js';
 import { WatcherManager } from './utils/WatcherManager.js';
-import { getProjectPaths } from './utils/paths.js';
+import { getProjectPaths } from './utils/fs/PathUtils.js';
 import { parseArgs } from './utils/args.js';
 import { configureEnvironment } from './utils/env.js';
 import { build, rebuildComponent } from './utils/builder.js';
