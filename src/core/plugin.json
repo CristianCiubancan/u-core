@@ -5,5 +5,5 @@
   "games": ["gta5", "rdr3"],
   "author": "Baloony Gaze",
   "description": "Example 3",
-  "server_scripts": ["server/*.ts"]
+  "server_scripts": ["server/*.js"]
 }
