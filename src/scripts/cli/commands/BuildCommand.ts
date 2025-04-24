@@ -1,6 +1,7 @@
 /**
  * Build command
  */
+import 'dotenv/config'; // Load environment variables from .env file
 import { Command } from '../../core/types.js';
 import { ConsoleLogger } from '../../utils/logger/ConsoleLogger.js';
 import { ConfigLoader } from '../../config/ConfigLoader.js';
