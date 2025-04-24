@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
 import { Plugin, ensureDirectoryExists } from './file.js';
 import { exec, spawn } from 'child_process';
@@ -317,6 +318,12 @@ body {
  * @param distDir The main distribution directory
  * @returns Promise<string> Path to the built plugin webview directory
  */
+/**
+ * Builds a webview UI for a single plugin by generating App.tsx and running the Vite build.
+ * @param plugin The plugin object to build the webview for
+ * @param distDir The main distribution directory
+ * @returns Promise<string> Path to the built plugin webview directory
+ */
 export async function buildPluginWebview(
   plugin: Plugin,
   distDir: string
@@ -339,19 +346,63 @@ export async function buildPluginWebview(
   // Path to the webview directory
   const webviewDir = path.join(process.cwd(), 'src/webview');
 
-  // Create a unique directory for this plugin's webview
-  const pluginId = plugin.pathFromPluginsDir?.replace(/\//g, '_') || 'unknown';
-  const webviewPluginDistDir = path.join(
-    distDir,
-    'webview',
-    'plugins',
-    pluginId
-  );
+  // Determine the plugin's resource path in the dist directory
+  let resourcePath;
+  let pluginRelativePath;
+
+  if (plugin.pathFromPluginsDir) {
+    // Check if the path starts with 'plugins/' and strip it if needed
+    const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
+    const pluginsPathNormalized = path.normalize('plugins');
+    const pathContainsPluginsPrefix =
+      normalizedPluginPath.startsWith(pluginsPathNormalized) ||
+      normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
+
+    if (pathContainsPluginsPrefix) {
+      // Strip the 'plugins/' prefix to place resources directly in dist
+      pluginRelativePath = path.relative(
+        pluginsPathNormalized,
+        normalizedPluginPath
+      );
+      console.log(
+        `Webview: Stripped 'plugins/' prefix from path: ${normalizedPluginPath} -> ${pluginRelativePath}`
+      );
+    } else {
+      pluginRelativePath = normalizedPluginPath;
+    }
+
+    // Convert the plugin path to a resource path in dist
+    // For example: "[misc]/example" -> "dist/[misc]/example"
+    resourcePath = path.join(distDir, pluginRelativePath);
+  } else if (plugin.fullPath) {
+    // Extract resource name from fullPath if possible
+    const pluginDir = path.basename(plugin.fullPath);
+    resourcePath = path.join(distDir, pluginDir);
+    pluginRelativePath = pluginDir;
+  } else {
+    // Fallback to name if nothing else is available
+    resourcePath = path.join(distDir, plugin.name);
+    pluginRelativePath = plugin.name;
+  }
+
+  // Create the html directory within the resource where webview files will be placed
+  const htmlOutputDir = path.join(resourcePath, 'html');
+
+  // Extract plugin path parts for the build output directory
+  const pluginDistPathParts = pluginRelativePath
+    ? pluginRelativePath.split('/')
+    : [plugin.name];
+
+  console.log('Plugin path parts for webview build:', pluginDistPathParts);
+
+  // This is where Vite will directly output the build
+  const webviewPluginDistDir = path.join(distDir, ...pluginDistPathParts);
+  console.log('Webview plugin dist directory:', webviewPluginDistDir);
 
   try {
     // Verify webview source directory exists
     try {
-      await fsPromises.access(webviewDir);
+      await fs.promises.access(webviewDir);
     } catch (error) {
       throw new Error(`Webview directory not found: ${webviewDir}`);
     }
@@ -368,7 +419,7 @@ export async function buildPluginWebview(
     const pageFile = path.join(plugin.fullPath, 'html', 'Page.tsx');
 
     try {
-      await fsPromises.access(pageFile);
+      await fs.promises.access(pageFile);
     } catch {
       console.log('Plugin does not have a Page.tsx file, skipping build');
       return webviewPluginDistDir;
@@ -391,7 +442,15 @@ export async function buildPluginWebview(
       : `../../${importPath}`;
 
     // Get unique import name for this plugin
-    const relPlugin = plugin.pathFromPluginsDir || '';
+    let relPlugin = '';
+
+    // Use pathFromPluginsDir if available, otherwise use name
+    if (plugin.pathFromPluginsDir) {
+      relPlugin = plugin.pathFromPluginsDir;
+    } else if (plugin.name) {
+      relPlugin = plugin.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
     const parts = relPlugin.split('/');
     const namespace = parts.length > 1 ? parts[0] : '';
     const pluginName = parts.length > 1 ? parts.slice(1).join('_') : parts[0];
@@ -426,7 +485,7 @@ export default App;\n`;
 
     // Write generated content to App.tsx
     const appFilePath = path.join(srcDir, 'App.tsx');
-    await fsPromises.writeFile(appFilePath, appContent);
+    await fs.promises.writeFile(appFilePath, appContent);
     console.log(`Generated ${appFilePath}`);
 
     // Create main.tsx file (same as in buildWebview)
@@ -443,7 +502,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 `;
 
     const mainTsxPath = path.join(srcDir, 'main.tsx');
-    await fsPromises.writeFile(mainTsxPath, mainTsxContent);
+    await fs.promises.writeFile(mainTsxPath, mainTsxContent);
     console.log(`Generated ${mainTsxPath}`);
 
     // Create or verify index.html
@@ -451,7 +510,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     let indexHtmlExists = false;
 
     try {
-      await fsPromises.access(indexHtmlPath);
+      await fs.promises.access(indexHtmlPath);
       indexHtmlExists = true;
     } catch {
       // File doesn't exist
@@ -463,7 +522,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Plugin Webview - ${plugin.name || pluginId}</title>
+    <title>Plugin Webview - ${plugin.name || relPlugin}</title>
   </head>
   <body>
     <div id="root"></div>
@@ -471,11 +530,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </body>
 </html>
 `;
-      await fsPromises.writeFile(indexHtmlPath, indexHtmlContent);
+      await fs.promises.writeFile(indexHtmlPath, indexHtmlContent);
       console.log(`Generated ${indexHtmlPath}`);
     } else {
       // File exists, check if it has the correct main.tsx reference
-      const indexHtmlContent = await fsPromises.readFile(indexHtmlPath, 'utf8');
+      const indexHtmlContent = await fs.promises.readFile(
+        indexHtmlPath,
+        'utf8'
+      );
       if (
         !indexHtmlContent.includes('./main.tsx') &&
         (indexHtmlContent.includes('/webview/main.tsx') ||
@@ -486,7 +548,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           .replace(/["']\/webview\/main\.tsx["']/g, '"./main.tsx"')
           .replace(/["']\/main\.tsx["']/g, '"./main.tsx"');
 
-        await fsPromises.writeFile(indexHtmlPath, updatedContent);
+        await fs.promises.writeFile(indexHtmlPath, updatedContent);
         console.log(`Updated ${indexHtmlPath} with correct main.tsx path`);
       }
     }
@@ -494,7 +556,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     // Create index.css if it doesn't exist
     const indexCssPath = path.join(srcDir, 'index.css');
     try {
-      await fsPromises.access(indexCssPath);
+      await fs.promises.access(indexCssPath);
     } catch {
       // Create a basic CSS file
       const indexCssContent = `* {
@@ -511,15 +573,15 @@ body {
   height: 100dvh;
 }
 `;
-      await fsPromises.writeFile(indexCssPath, indexCssContent);
+      await fs.promises.writeFile(indexCssPath, indexCssContent);
       console.log(`Generated ${indexCssPath}`);
     }
 
-    // Run Vite build - with custom output directory for this plugin
-    console.log(`Running Vite build for plugin: ${pluginId}...`);
+    // Run Vite build directly to the plugin's directory
+    console.log(`Running Vite build for plugin: ${relPlugin}...`);
     try {
-      // Customize the build output path for this specific plugin
-      const buildCommand = `npx vite build --outDir=${webviewPluginDistDir}`;
+      // Build directly to the plugin's html directory
+      const buildCommand = `npx vite build --outDir=${htmlOutputDir}`;
       console.log(`Executing: ${buildCommand}`);
 
       // Use spawn to stream logs without buffering large output
@@ -529,7 +591,7 @@ body {
         stdio: 'inherit',
         env: {
           ...process.env,
-          PLUGIN_WEBVIEW_ID: pluginId, // Can be used in vite.config.ts to customize the build
+          PLUGIN_WEBVIEW_ID: relPlugin, // Can be used in vite.config.ts to customize the build
         },
       });
       await new Promise<void>((resolve, reject) => {
@@ -539,17 +601,35 @@ body {
             : reject(new Error(`Build command failed with exit code ${code}`))
         );
       });
+
+      console.log(`Webview built successfully at: ${htmlOutputDir}`);
+      const files = await fs.promises.readdir(htmlOutputDir, {
+        withFileTypes: true,
+      });
+
+      // Log the contents for verification
+      for (const file of files) {
+        if (file.isDirectory()) {
+          console.log(`  [DIR] ${file.name}`);
+        } else {
+          const stats = await fs.promises.stat(
+            path.join(htmlOutputDir, file.name)
+          );
+          console.log(`  [FILE] ${file.name} (${stats.size} bytes)`);
+        }
+      }
+      console.log(`--- End verification of ${webviewPluginDistDir} ---`);
     } catch (error: any) {
-      console.error(`Vite build for plugin ${pluginId} failed:`, error);
+      console.error(`Vite build for plugin ${relPlugin} failed:`, error);
 
       // Add more helpful error information
-      let errorMessage = `Vite build for plugin ${pluginId} failed: ${
+      let errorMessage = `Vite build for plugin ${relPlugin} failed: ${
         error?.message || error
       }`;
 
       // Check if index.html exists and has correct format
       try {
-        const indexHtmlContent = await fsPromises.readFile(
+        const indexHtmlContent = await fs.promises.readFile(
           indexHtmlPath,
           'utf8'
         );
@@ -568,15 +648,60 @@ body {
       throw new Error(errorMessage);
     }
 
-    console.log(`Plugin webview build for ${pluginId} completed successfully!`);
-    return webviewPluginDistDir;
+    console.log(
+      `Plugin webview build for ${relPlugin} completed successfully!`
+    );
+    return htmlOutputDir; // Return the html directory path
   } catch (error) {
     console.error(
       `Plugin webview build for ${
-        plugin.pathFromPluginsDir || 'unknown'
+        plugin.pathFromPluginsDir || plugin.name || 'unknown'
       } failed:`,
       error
     );
+    throw error;
+  }
+}
+/**
+ * Copy built webview files to the resource's html directory
+ * @param sourceBuildDir Source directory containing the Vite build output
+ * @param targetHtmlDir Target html directory within the resource
+ */
+async function copyBuildToResourceHtml(
+  sourceBuildDir: string,
+  targetHtmlDir: string
+): Promise<void> {
+  // Make sure target directory exists
+  await ensureDirectoryExists(targetHtmlDir);
+
+  // Read all files from the source build directory
+  const copyDir = async (src: string, dest: string) => {
+    // Read directory contents
+    const entries = await fs.promises.readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        // Create destination directory
+        await ensureDirectoryExists(destPath);
+        // Recursively copy subdirectory
+        await copyDir(srcPath, destPath);
+      } else {
+        // Copy file
+        await fs.promises.copyFile(srcPath, destPath);
+      }
+    }
+  };
+
+  try {
+    await copyDir(sourceBuildDir, targetHtmlDir);
+    console.log(
+      `Successfully copied webview files from ${sourceBuildDir} to ${targetHtmlDir}`
+    );
+  } catch (error) {
+    console.error(`Error copying webview files:`, error);
     throw error;
   }
 }

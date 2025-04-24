@@ -5,8 +5,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "pnpm tsx src/scripts/build.ts",
-    "dev": "pnpm tsx src/scripts/build.ts --watch --reload"
+    "build:old": "pnpm tsx src/scripts/build.ts",
+    "build": "pnpm tsx src/scripts/build-new.ts",
+    "dev:old": "pnpm tsx src/scripts/build.ts --watch --reload",
+    "dev": "pnpm tsx src/scripts/build-new.ts --watch --reload"
   },
   "keywords": [],
   "author": "",

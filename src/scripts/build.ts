@@ -14,6 +14,7 @@ import {
   getPluginsPaths,
   parseFilePathsIntoFiles,
   parsePluginPathsIntoPlugins,
+  Plugin,
   processFile,
   readPluginJson,
 } from './utils/file.js';
@@ -25,14 +26,6 @@ import { verifyOutputDir } from './utils/bundler.js';
 import { buildWebview } from './utils/webview.js';
 import { generatePluginHtmlFiles } from './utils/htmlGenerator.js';
 import { moveBuiltResources } from './utils/moveBuiltResources.js';
-
-// Define types to replace 'any'
-interface Plugin {
-  name: string;
-  fullPath?: string;
-  files?: any[]; // Using any[] since we don't know the exact File structure
-  hasHtml?: boolean;
-}
 
 interface ProcessedFile {
   originalPath: string;

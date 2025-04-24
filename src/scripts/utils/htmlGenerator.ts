@@ -23,16 +23,24 @@ export async function generatePluginHtmlFiles(
     try {
       await fsPromises.access(webviewAssetsDir);
     } catch (error) {
-      throw new Error(`Webview assets directory not found: ${webviewAssetsDir}`);
+      throw new Error(
+        `Webview assets directory not found: ${webviewAssetsDir}`
+      );
     }
 
     // Get the asset filenames
     const assetFiles = await fsPromises.readdir(webviewAssetsDir);
-    
+
     // Find the JS and CSS files
-    const indexJsFile = assetFiles.find(file => file.startsWith('index-') && file.endsWith('.js'));
-    const vendorJsFile = assetFiles.find(file => file.startsWith('vendor-') && file.endsWith('.js'));
-    const indexCssFile = assetFiles.find(file => file.startsWith('index-') && file.endsWith('.css'));
+    const indexJsFile = assetFiles.find(
+      (file) => file.startsWith('index-') && file.endsWith('.js')
+    );
+    const vendorJsFile = assetFiles.find(
+      (file) => file.startsWith('vendor-') && file.endsWith('.js')
+    );
+    const indexCssFile = assetFiles.find(
+      (file) => file.startsWith('index-') && file.endsWith('.css')
+    );
 
     if (!indexJsFile) {
       throw new Error('Could not find index JS file in webview assets');
@@ -43,7 +51,9 @@ export async function generatePluginHtmlFiles(
     }
 
     // Find plugins with webview pages
-    const webviewPlugins = plugins.filter(plugin => plugin.hasHtml && plugin.fullPath);
+    const webviewPlugins = plugins.filter(
+      (plugin) => plugin.hasHtml && plugin.fullPath
+    );
 
     console.log(`Found ${webviewPlugins.length} plugins with webview pages`);
 
@@ -57,7 +67,26 @@ export async function generatePluginHtmlFiles(
       if (!plugin.fullPath) continue;
 
       // Get the plugin's output directory
-      const pluginRelativePath = plugin.pathFromPluginsDir.replace(/^plugins\//, '');
+      // Check if the path starts with 'plugins/' and strip it if needed
+      const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
+      const pluginsPathNormalized = path.normalize('plugins');
+      const pathContainsPluginsPrefix =
+        normalizedPluginPath.startsWith(pluginsPathNormalized) ||
+        normalizedPluginPath.startsWith(pluginsPathNormalized + path.sep);
+
+      let pluginRelativePath;
+      if (pathContainsPluginsPrefix) {
+        // Strip the 'plugins/' prefix to place resources directly in dist
+        pluginRelativePath = path
+          .relative(pluginsPathNormalized, normalizedPluginPath)
+          .replace(/\\/g, '/');
+        console.log(
+          `HTML Generator: Stripped 'plugins/' prefix from path: ${normalizedPluginPath} -> ${pluginRelativePath}`
+        );
+      } else {
+        pluginRelativePath = plugin.pathFromPluginsDir;
+      }
+
       const outputDir = path.join(distDir, pluginRelativePath);
       const htmlDir = path.join(outputDir, 'html');
 
@@ -68,7 +97,10 @@ export async function generatePluginHtmlFiles(
       const pluginJsonPath = path.join(plugin.fullPath, 'plugin.json');
       let pluginManifest;
       try {
-        const pluginJsonContent = await fsPromises.readFile(pluginJsonPath, 'utf8');
+        const pluginJsonContent = await fsPromises.readFile(
+          pluginJsonPath,
+          'utf8'
+        );
         pluginManifest = JSON.parse(pluginJsonContent);
       } catch (error) {
         console.error(`Error reading plugin.json for ${plugin.name}:`, error);
@@ -94,11 +126,15 @@ export async function generatePluginHtmlFiles(
       crossorigin
       src="https://cfx-nui-webview/assets/${indexJsFile}"
     ></script>
-    ${vendorJsFile ? `<link
+    ${
+      vendorJsFile
+        ? `<link
       rel="modulepreload"
       crossorigin
       href="https://cfx-nui-webview/assets/${vendorJsFile}"
-    />` : ''}
+    />`
+        : ''
+    }
     <link
       rel="stylesheet"
       crossorigin
