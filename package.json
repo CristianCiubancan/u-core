@@ -6,9 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm tsx src/scripts/index.ts build",
-    "dev": "pnpm tsx src/scripts/index.ts dev",
-    "build:legacy": "pnpm tsx src/scripts.bak/build.ts",
-    "dev:legacy": "pnpm tsx src/scripts.bak/build.ts --watch --reload"
+    "dev": "pnpm tsx src/scripts/index.ts dev"
   },
   "keywords": [],
   "author": "",
