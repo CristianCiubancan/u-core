@@ -6,13 +6,8 @@ import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
 import { ConsoleLogger, LogLevel } from '../logger/ConsoleLogger.js';
 import { ResourceManager } from './ResourceManager.js';
-import {
-  findPluginPaths,
-  parsePluginPaths,
-  getProjectPaths,
-  generateManifest,
-  fileSystem,
-} from './index.js';
+import { PluginUtils } from './PluginUtils.js';
+import { getProjectPaths, generateManifest, fileSystem } from './index.js';
 import type { Logger, BuildContext } from '../../core/types.js';
 
 /**
@@ -155,21 +150,25 @@ async function rebuildWithFunctionPipeline(
     const { coreDir, distDir } = getProjectPaths();
 
     // Import the builder functions dynamically to avoid circular dependencies
-    const { buildAndGenerateManifests } = await import('../builder.js');
+    const { buildAndGenerateManifests } = await import('../builder/index.js');
 
     switch (componentType) {
       case 'plugin': {
         if (!pluginDir) throw new Error('Plugin directory is required');
-        const pluginPaths = findPluginPaths(path.dirname(pluginDir));
-        const plugins = parsePluginPaths(
+        const pluginUtils = new PluginUtils();
+        const pluginPaths = pluginUtils.findPluginPaths(
+          path.dirname(pluginDir)
+        );
+        const plugins = pluginUtils.parsePluginPaths(
           pluginPaths.filter((p: string) => p === pluginDir)
         );
         await buildAndGenerateManifests(plugins, distDir);
         break;
       }
       case 'core': {
-        const pluginPaths = findPluginPaths(coreDir);
-        const corePlugins = parsePluginPaths(pluginPaths);
+        const pluginUtils = new PluginUtils();
+        const pluginPaths = pluginUtils.findPluginPaths(coreDir);
+        const corePlugins = pluginUtils.parsePluginPaths(pluginPaths);
         await buildAndGenerateManifests(corePlugins, distDir);
         break;
       }
