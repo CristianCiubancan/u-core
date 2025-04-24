@@ -85,7 +85,8 @@ export class FileSystemImpl implements FileSystem {
     try {
       // Use glob directly
       const matches = await glob.glob(pattern, options);
-      return matches;
+      // Convert to string[] to satisfy the return type
+      return matches.map((match) => match.toString());
     } catch (error) {
       console.error(`Error in glob pattern ${pattern}:`, error);
       return [];

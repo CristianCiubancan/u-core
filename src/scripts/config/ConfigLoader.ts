@@ -60,7 +60,7 @@ export class ConfigLoader {
    */
   private static loadEnvVars(config: BuildConfig): void {
     // Load environment variables
-    config.env = { ...process.env };
+    config.env = { ...process.env } as Record<string, string>;
 
     // Update reloader configuration from environment variables
     if (process.env.RELOADER_ENABLED) {

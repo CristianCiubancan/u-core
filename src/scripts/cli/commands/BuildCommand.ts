@@ -67,6 +67,9 @@ export class BuildCommand implements Command {
       const config = ConfigLoader.load({
         reloader: {
           enabled: reload,
+          host: 'localhost',
+          port: 30120,
+          apiKey: '',
         },
       });
 
