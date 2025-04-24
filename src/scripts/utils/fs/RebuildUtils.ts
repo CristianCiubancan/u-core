@@ -15,6 +15,48 @@ import {
 } from './index.js';
 import type { Logger, BuildContext } from '../../core/types.js';
 
+/**
+ * Notify the reload server about a rebuilt component
+ * @param componentType The type of component that was rebuilt
+ * @param pluginDir The plugin directory (if applicable)
+ * @param resourceManager The resource manager instance
+ * @param logger The logger instance
+ */
+async function notifyReloadServer(
+  componentType: 'plugin' | 'core' | 'webview',
+  pluginDir: string | undefined,
+  resourceManager: ResourceManager,
+  logger: Logger
+): Promise<void> {
+  try {
+    // Get the resource name based on the component type and plugin directory
+    let resourceName: string | null = null;
+    if (componentType === 'plugin' && pluginDir) {
+      // Extract the plugin name from the directory path
+      resourceName = path.basename(pluginDir);
+    } else if (componentType === 'core') {
+      resourceName = 'core';
+    } else if (componentType === 'webview') {
+      resourceName = 'webview';
+    }
+
+    // Restart the resource if we have a valid resource name
+    if (resourceName) {
+      logger.info(
+        `Notifying reload server about rebuilt resource: ${resourceName}`
+      );
+      await resourceManager.restartResource(resourceName);
+    }
+  } catch (error) {
+    logger.error(
+      `Error notifying reload server: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    // Don't rethrow, let the process continue
+  }
+}
+
 // Global flag to track if a build is in progress
 declare global {
   var isBuilding: boolean;
@@ -168,33 +210,7 @@ async function rebuildWithFunctionPipeline(
     await resourceManager.deployResources(distDir);
 
     // Notify the reload server about the rebuilt component
-    try {
-      // Get the resource name based on the component type and plugin directory
-      let resourceName: string | null = null;
-      if (componentType === 'plugin' && pluginDir) {
-        // Extract the plugin name from the directory path
-        resourceName = path.basename(pluginDir);
-      } else if (componentType === 'core') {
-        resourceName = 'core';
-      } else if (componentType === 'webview') {
-        resourceName = 'webview';
-      }
-
-      // Restart the resource if we have a valid resource name
-      if (resourceName) {
-        logger.info(
-          `Notifying reload server about rebuilt resource: ${resourceName}`
-        );
-        await resourceManager.restartResource(resourceName);
-      }
-    } catch (error) {
-      logger.error(
-        `Error notifying reload server: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      // Don't rethrow, let the process continue
-    }
+    await notifyReloadServer(componentType, pluginDir, resourceManager, logger);
 
     logger.info(
       `Rebuild process for ${componentType}${
@@ -292,41 +308,14 @@ async function rebuildWithClassPipeline(
     await pipeline.run(rebuildContext);
 
     // Notify the reload server about the rebuilt component
-    try {
-      const { distDir } = getProjectPaths();
-      const resourceManager = new ResourceManager(fileSystem, logger, {
-        reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
-        reloaderHost: process.env.RELOADER_HOST || 'localhost',
-        reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
-        reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
-      });
+    const resourceManager = new ResourceManager(fileSystem, logger, {
+      reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+      reloaderHost: process.env.RELOADER_HOST || 'localhost',
+      reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+      reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+    });
 
-      // Get the resource name based on the component type and plugin directory
-      let resourceName: string | null = null;
-      if (componentType === 'plugin' && pluginDir) {
-        // Extract the plugin name from the directory path
-        resourceName = path.basename(pluginDir);
-      } else if (componentType === 'core') {
-        resourceName = 'core';
-      } else if (componentType === 'webview') {
-        resourceName = 'webview';
-      }
-
-      // Restart the resource if we have a valid resource name
-      if (resourceName) {
-        logger.info(
-          `Notifying reload server about rebuilt resource: ${resourceName}`
-        );
-        await resourceManager.restartResource(resourceName);
-      }
-    } catch (error) {
-      logger.error(
-        `Error notifying reload server: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      // Don't rethrow, let the process continue
-    }
+    await notifyReloadServer(componentType, pluginDir, resourceManager, logger);
 
     logger.info(
       `Rebuild process for ${componentType}${
