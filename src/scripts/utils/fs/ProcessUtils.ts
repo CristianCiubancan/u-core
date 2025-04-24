@@ -2,10 +2,10 @@
  * Process utility functions for working with child processes
  */
 import { spawn, ChildProcess, SpawnOptions } from 'child_process';
-import { createLogger } from './LogUtils.js';
+import { ConsoleLogger } from '../logger/ConsoleLogger.js';
 
 // Create a logger for process utilities
-const logger = createLogger('ProcessUtils');
+const logger = new ConsoleLogger({ minLevel: 0 });
 
 /**
  * Process execution result
@@ -30,16 +30,16 @@ export function executeCommand(
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     logger.info(`Executing command: ${command} ${args.join(' ')}`);
-    
+
     const process = spawn(command, args, {
       ...options,
       shell: true,
       stdio: 'pipe',
     });
-    
+
     let stdout = '';
     let stderr = '';
-    
+
     if (process.stdout) {
       process.stdout.on('data', (data) => {
         const chunk = data.toString();
@@ -47,7 +47,7 @@ export function executeCommand(
         logger.debug(`[stdout] ${chunk.trim()}`);
       });
     }
-    
+
     if (process.stderr) {
       process.stderr.on('data', (data) => {
         const chunk = data.toString();
@@ -55,7 +55,7 @@ export function executeCommand(
         logger.debug(`[stderr] ${chunk.trim()}`);
       });
     }
-    
+
     process.on('close', (code) => {
       if (code === 0) {
         logger.info(`Command completed successfully with exit code ${code}`);
@@ -65,7 +65,7 @@ export function executeCommand(
         resolve({ code, stdout, stderr });
       }
     });
-    
+
     process.on('error', (error) => {
       logger.error(`Command execution error: ${error.message}`);
       reject(error);
@@ -87,13 +87,13 @@ export function executeCommandWithOutput(
 ): Promise<number | null> {
   return new Promise((resolve, reject) => {
     logger.info(`Executing command with output: ${command} ${args.join(' ')}`);
-    
+
     const process = spawn(command, args, {
       ...options,
       shell: true,
       stdio: 'inherit',
     });
-    
+
     process.on('close', (code) => {
       if (code === 0) {
         logger.info(`Command completed successfully with exit code ${code}`);
@@ -103,7 +103,7 @@ export function executeCommandWithOutput(
         resolve(code);
       }
     });
-    
+
     process.on('error', (error) => {
       logger.error(`Command execution error: ${error.message}`);
       reject(error);
@@ -124,35 +124,35 @@ export function startProcess(
   options: SpawnOptions = {}
 ): ChildProcess {
   logger.info(`Starting process: ${command} ${args.join(' ')}`);
-  
+
   const process = spawn(command, args, {
     ...options,
     shell: true,
     stdio: 'pipe',
   });
-  
+
   if (process.stdout) {
     process.stdout.on('data', (data) => {
       const chunk = data.toString();
       logger.debug(`[stdout] ${chunk.trim()}`);
     });
   }
-  
+
   if (process.stderr) {
     process.stderr.on('data', (data) => {
       const chunk = data.toString();
       logger.debug(`[stderr] ${chunk.trim()}`);
     });
   }
-  
+
   process.on('close', (code) => {
     logger.info(`Process exited with code ${code}`);
   });
-  
+
   process.on('error', (error) => {
     logger.error(`Process error: ${error.message}`);
   });
-  
+
   return process;
 }
 
@@ -161,7 +161,10 @@ export function startProcess(
  * @param process Child process to kill
  * @param signal Signal to send
  */
-export function killProcess(process: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): void {
+export function killProcess(
+  process: ChildProcess,
+  signal: NodeJS.Signals = 'SIGTERM'
+): void {
   if (process && !process.killed) {
     logger.info(`Killing process with signal ${signal}`);
     process.kill(signal);

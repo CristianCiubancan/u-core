@@ -4,7 +4,8 @@
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { Plugin } from '../../core/types.js';
-import { fileSystem, generateSimpleHtmlContent } from '../fs/index.js';
+import { fileSystem } from '../fs/index.js';
+import { generateSimpleHtmlContent } from '../fs/HtmlUtils.js';
 import { Logger } from '../../core/types.js';
 import { ConsoleLogger } from '../logger/ConsoleLogger.js';
 
@@ -86,7 +87,9 @@ export class WebviewBuilder {
       );
 
       if (validWebviewPlugins.length === 0) {
-        this.logger.info('No webview plugins found, skipping App.tsx generation');
+        this.logger.info(
+          'No webview plugins found, skipping App.tsx generation'
+        );
         return webviewDistDir;
       }
 
@@ -95,7 +98,10 @@ export class WebviewBuilder {
       await fileSystem.ensureDir(srcDir);
 
       // Generate App.tsx content
-      const appContent = this.generateAppTsxContent(validWebviewPlugins, srcDir);
+      const appContent = this.generateAppTsxContent(
+        validWebviewPlugins,
+        srcDir
+      );
 
       // Write generated content to App.tsx
       const appFilePath = path.join(srcDir, 'App.tsx');
@@ -154,8 +160,12 @@ export class WebviewBuilder {
     const webviewDir = path.join(process.cwd(), 'src/webview');
 
     // Determine the plugin's resource path in the dist directory
-    const { resourcePath, pluginRelativePath, htmlOutputDir, webviewPluginDistDir } = 
-      this.calculatePluginPaths(plugin, distDir);
+    const {
+      resourcePath,
+      pluginRelativePath,
+      htmlOutputDir,
+      webviewPluginDistDir,
+    } = this.calculatePluginPaths(plugin, distDir);
 
     try {
       // Verify webview source directory exists
@@ -180,7 +190,9 @@ export class WebviewBuilder {
       const pageFile = path.join(plugin.fullPath, 'html', 'Page.tsx');
 
       if (!(await fileSystem.exists(pageFile))) {
-        this.logger.info('Plugin does not have a Page.tsx file, skipping build');
+        this.logger.info(
+          'Plugin does not have a Page.tsx file, skipping build'
+        );
         return {
           htmlDir: webviewPluginDistDir,
           hasIndexHtml: false,
@@ -196,7 +208,11 @@ export class WebviewBuilder {
       await fileSystem.ensureDir(srcDir);
 
       // Generate App.tsx content for this single plugin
-      const appContent = this.generateSinglePluginAppTsxContent(plugin, srcDir, pageFile);
+      const appContent = this.generateSinglePluginAppTsxContent(
+        plugin,
+        srcDir,
+        pageFile
+      );
 
       // Write generated content to App.tsx
       const appFilePath = path.join(srcDir, 'App.tsx');
@@ -217,7 +233,9 @@ export class WebviewBuilder {
       await this.ensureIndexCss(srcDir);
 
       // Run Vite build directly to the plugin's directory
-      this.logger.info(`Running Vite build for plugin: ${pluginRelativePath}...`);
+      this.logger.info(
+        `Running Vite build for plugin: ${pluginRelativePath}...`
+      );
       try {
         // Build directly to the plugin's html directory
         const buildCommand = `npx vite build --outDir=${htmlOutputDir}`;
@@ -263,7 +281,9 @@ export class WebviewBuilder {
         }
 
         if (!hasAssets) {
-          this.logger.warn(`Warning: No assets directory found in ${htmlOutputDir}`);
+          this.logger.warn(
+            `Warning: No assets directory found in ${htmlOutputDir}`
+          );
         }
 
         this.logger.info(`--- End verification of ${webviewPluginDistDir} ---`);
@@ -276,7 +296,10 @@ export class WebviewBuilder {
           success: hasIndexHtml, // Consider the build successful if at least index.html exists
         };
       } catch (error: any) {
-        this.logger.error(`Vite build for plugin ${pluginRelativePath} failed:`, error);
+        this.logger.error(
+          `Vite build for plugin ${pluginRelativePath} failed:`,
+          error
+        );
 
         // Add more helpful error information
         let errorMessage = `Vite build for plugin ${pluginRelativePath} failed: ${
@@ -430,7 +453,10 @@ export class WebviewBuilder {
       ? pluginRelativePath.split('/')
       : [plugin.name];
 
-    this.logger.info('Plugin path parts for webview build:', pluginDistPathParts);
+    this.logger.info(
+      'Plugin path parts for webview build:',
+      pluginDistPathParts
+    );
 
     // This is where Vite will directly output the build
     const webviewPluginDistDir = path.join(distDir, ...pluginDistPathParts);
@@ -440,7 +466,7 @@ export class WebviewBuilder {
       resourcePath,
       pluginRelativePath,
       htmlOutputDir,
-      webviewPluginDistDir
+      webviewPluginDistDir,
     };
   }
 
@@ -617,10 +643,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     const indexHtmlExists = await fileSystem.exists(indexHtmlPath);
 
     if (!indexHtmlExists) {
-      const indexHtmlContent = generateSimpleHtmlContent(
-        title,
-        './main.tsx'
-      );
+      const indexHtmlContent = generateSimpleHtmlContent(title, './main.tsx');
       await fileSystem.writeFile(indexHtmlPath, indexHtmlContent);
       this.logger.info(`Generated ${indexHtmlPath}`);
     } else {
@@ -701,7 +724,10 @@ body {
       let errorMessage = `Vite build failed: ${error?.message || error}`;
 
       // Check if index.html exists and has correct format
-      const indexHtmlPath = path.join(process.cwd(), 'src/webview/src/index.html');
+      const indexHtmlPath = path.join(
+        process.cwd(),
+        'src/webview/src/index.html'
+      );
       if (await fileSystem.exists(indexHtmlPath)) {
         try {
           const indexHtmlContent = await fileSystem.readFile(
@@ -734,5 +760,7 @@ export const webviewBuilder = new WebviewBuilder();
 
 // Export individual functions for backward compatibility
 export const buildWebview = webviewBuilder.buildWebview.bind(webviewBuilder);
-export const buildPluginWebview = webviewBuilder.buildPluginWebview.bind(webviewBuilder);
-export const copyBuildToResourceHtml = webviewBuilder.copyBuildToResourceHtml.bind(webviewBuilder);
+export const buildPluginWebview =
+  webviewBuilder.buildPluginWebview.bind(webviewBuilder);
+export const copyBuildToResourceHtml =
+  webviewBuilder.copyBuildToResourceHtml.bind(webviewBuilder);

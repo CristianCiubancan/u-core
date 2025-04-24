@@ -12,16 +12,13 @@ export * from './PathUtils.js';
 // Export plugin utilities
 export * from './PluginUtils.js';
 
-// Export script utilities
-export * from './ScriptUtils.js';
-// Export ScriptProcessor class explicitly to avoid conflicts
+// Export ScriptProcessor class
 export { ScriptProcessor, scriptProcessor } from './ScriptProcessor.js';
 
 // Export configuration utilities
 export * from './ConfigUtils.js';
 
-// Export logging utilities
-export * from './LogUtils.js';
+// Logging utilities are now provided by ConsoleLogger in utils/logger/ConsoleLogger.js
 
 // Export process utilities
 export * from './ProcessUtils.js';
