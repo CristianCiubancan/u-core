@@ -1,4 +1,5 @@
 import { PluginManifest } from './Manifest.js';
+import { File } from '../types/File.js';
 
 export interface Plugin {
   pluginName: string;
