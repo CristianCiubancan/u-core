@@ -127,7 +127,18 @@ export class WebviewBuilderImpl implements WebviewBuilder {
       if (await this.fs.exists(webviewDir)) {
         this.logger.info('Generating webview manifest...');
 
-        // Create manifest content
+        // Get all files in the webview directory
+        const webviewFiles = await this.getFilesInDirectory(webviewDir);
+
+        // Format files for manifest
+        const formattedFiles = webviewFiles.map((file) => {
+          // Get the relative path from webviewDir
+          const relativePath = path.relative(webviewDir, file);
+          // Format for Lua string
+          return `  '${relativePath.replace(/\\/g, '/')}'`;
+        });
+
+        // Create manifest content with specific files
         const manifestContent = `
 -- Generated webview manifest
 fx_version 'cerulean'
@@ -140,8 +151,7 @@ author 'Baloony Gaze'
 description 'Shared webview assets'
 
 files {
-  'index.html',
-  'assets/**/*'
+${formattedFiles.join(',\n')}
 }
 `;
 
@@ -158,6 +168,16 @@ files {
       this.logger.error('Error building webview:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get all files recursively in a directory
+   * @param directory Directory to scan
+   * @returns Array of file paths
+   */
+  private getFilesInDirectory(directory: string): string[] {
+    // Use the built-in getFilePaths method which already recursively gets all files
+    return this.fs.getFilePaths(directory);
   }
 
   /**
@@ -196,56 +216,55 @@ files {
       // Read the manifest file
       let manifestContent = await this.fs.readFile(manifestPath, 'utf-8');
 
-      // Check if the manifest already includes the webview assets
-      if (
-        manifestContent.includes('html/**/*') &&
-        manifestContent.includes('ui_page')
-      ) {
-        this.logger.info(
-          `Manifest for plugin ${plugin.name} already includes webview assets`
-        );
+      // Get all files in the html directory
+      const htmlFiles = this.getFilesInDirectory(htmlDir);
+
+      // Create file entries for manifest
+      const fileEntries = htmlFiles.map((file) => {
+        // Get the relative path from resourcePath
+        const relativePath = path.relative(resourcePath, file);
+        // Format for Lua string
+        return `    '${relativePath.replace(/\\/g, '/')}'`;
+      });
+
+      // Add the ui_page entry if it doesn't exist
+      const uiPageEntry = `ui_page 'html/index.html'`;
+      const hasUiPage = manifestContent.includes('ui_page');
+
+      // Check if the manifest already includes some file entries
+      if (fileEntries.length === 0) {
+        this.logger.warn(`No HTML files found for plugin ${plugin.name}`);
         return;
       }
 
-      // Add the webview assets to the manifest
+      // Build new files section
+      const filesSection = `files {\n${fileEntries.join(',\n')}\n}`;
+
+      // Update the manifest
       let updatedContent = manifestContent;
 
-      // Add the files entry
+      // Replace or add the files section
       if (manifestContent.includes('files {')) {
-        // If files section exists, add the html/**/* entry
-        if (!manifestContent.includes('html/**/*')) {
-          // Check if the files section is empty
-          if (manifestContent.match(/files\s*{\s*}/s)) {
-            // If the files section is empty, replace it with a section containing html/**/*
-            updatedContent = updatedContent.replace(
-              /files\s*{\s*}/s,
-              `files {\n    'html/**/*',\n}`
-            );
-          } else {
-            // If the files section is not empty, add html/**/* to it
-            updatedContent = updatedContent.replace(
-              /files\s*{([^}]*)}/s,
-              (_match, filesContent) => {
-                return `files {${filesContent}    'html/**/*',\n}`;
-              }
-            );
-          }
-        }
+        // Replace existing files section
+        updatedContent = updatedContent.replace(
+          /files\s*{[^}]*}/s,
+          filesSection
+        );
       } else {
-        // If files section doesn't exist, add it
-        updatedContent += `\nfiles {\n    'html/**/*',\n}\n`;
+        // Add new files section
+        updatedContent += `\n${filesSection}\n`;
       }
 
-      // Add the ui_page entry
-      if (!manifestContent.includes('ui_page')) {
-        updatedContent += `\nui_page 'html/index.html'\n`;
+      // Add ui_page if it doesn't exist
+      if (!hasUiPage) {
+        updatedContent += `\n${uiPageEntry}\n`;
       }
 
       // Write the updated manifest file
       await this.fs.writeFile(manifestPath, updatedContent);
 
       this.logger.info(
-        `Updated manifest for plugin ${plugin.name} to include webview assets`
+        `Updated manifest for plugin ${plugin.name} with ${fileEntries.length} specific webview files`
       );
     } catch (error) {
       this.logger.error(

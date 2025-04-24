@@ -400,11 +400,22 @@ export class WatcherManager implements Watcher {
 
             // Start from the end and work backwards to find the resource name
             for (let i = pathParts.length - 3; i >= 0; i--) {
-              if (
-                !commonSubdirs.includes(pathParts[i]) &&
-                !pathParts[i].startsWith('[') &&
-                !pathParts[i].endsWith(']')
-              ) {
+              // Skip pure container directories (like '[misc]') but allow plugin directories inside them (like '[misc]/example')
+              if (!commonSubdirs.includes(pathParts[i])) {
+                // If this is a bracketed directory, check if it contains actual plugins
+                if (
+                  pathParts[i].startsWith('[') &&
+                  pathParts[i].endsWith(']')
+                ) {
+                  // Only skip if this is the last part of the path (pure container)
+                  if (i === pathParts.length - 1) {
+                    this.logger.debug(
+                      `Skipping restart for '${pathParts[i]}' as it appears to be a directory container, not a resource`
+                    );
+                    continue;
+                  }
+                }
+
                 resourceName = pathParts[i];
                 foundResource = true;
                 this.logger.debug(
@@ -660,6 +671,35 @@ export class WatcherManager implements Watcher {
       normalizedPluginsDir,
       normalizedFilePath
     );
+
+    // Split the relative path into parts
+    const pathParts = relativePath.split(path.sep);
+
+    // Skip if this is in a pure container directory (like '[misc]')
+    if (
+      pathParts.length > 0 &&
+      pathParts[0].startsWith('[') &&
+      pathParts[0].endsWith(']') &&
+      pathParts.length === 1
+    ) {
+      this.logger.debug(
+        `Skipping restart for '${pathParts[0]}' as it appears to be a directory container, not a resource`
+      );
+      return null;
+    }
+
+    // Find the actual plugin directory (first non-container directory)
+    let pluginDir = normalizedPluginsDir;
+    for (const part of pathParts) {
+      pluginDir = path.join(pluginDir, part);
+
+      // Stop at the first directory that contains actual plugin files
+      if (!part.startsWith('[') || !part.endsWith(']')) {
+        break;
+      }
+    }
+
+    return pluginDir;
 
     // Get the first directory in the relative path
     const parts = relativePath.split(path.sep);
