@@ -5,6 +5,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
+import 'dotenv/config';
 import { DebouncedTaskManager } from './DebouncedTaskManager.js';
 import { ResourceManager } from './ResourceManager.js';
 import { findPluginPaths, rebuildComponent } from './index.js';
@@ -474,6 +475,19 @@ export class WatcherManager implements Watcher {
       `Setting up watcher for generated resources: ${generatedDir}`
     );
 
+    this.logger.info(
+      `Resource manager reloader enabled: ${this.resourceManager.isReloaderEnabled()}`
+    );
+    this.logger.info(
+      `Resource manager reloader host: ${this.resourceManager.getReloaderHost()}`
+    );
+    this.logger.info(
+      `Resource manager reloader port: ${this.resourceManager.getReloaderPort()}`
+    );
+    this.logger.info(
+      `Resource manager reloader API key set: ${this.resourceManager.hasReloaderApiKey()}`
+    );
+
     this.setupDirectoryWatcher(
       generatedDir,
       'generated resources',
@@ -563,6 +577,8 @@ export class WatcherManager implements Watcher {
             this.logger.info(
               `Resource change detected in generated folder for '${resourceName}' (will restart after debounce)`
             );
+            this.logger.info(`File that triggered change: ${filePath}`);
+
             // Use the resource debounce time for generated resources to prevent rapid restarts
             this.debouncedTaskManager.execute(
               `generated-resource-${resourceName}`,
@@ -570,7 +586,20 @@ export class WatcherManager implements Watcher {
                 this.logger.info(
                   `Debounced restart for generated resource: ${resourceName}`
                 );
-                await this.resourceManager.restartResource(resourceName);
+                this.logger.info(
+                  `Calling restartResource for: ${resourceName}`
+                );
+                try {
+                  await this.resourceManager.restartResource(resourceName);
+                  this.logger.info(
+                    `Successfully called restartResource for: ${resourceName}`
+                  );
+                } catch (error) {
+                  this.logger.error(
+                    `Error restarting resource ${resourceName}:`,
+                    error
+                  );
+                }
               }
             );
           }

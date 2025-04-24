@@ -166,6 +166,41 @@ async function rebuildWithFunctionPipeline(
       reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
     });
     await resourceManager.deployResources(distDir);
+
+    // Notify the reload server about the rebuilt component
+    try {
+      // Get the resource name based on the component type and plugin directory
+      let resourceName: string | null = null;
+      if (componentType === 'plugin' && pluginDir) {
+        // Extract the plugin name from the directory path
+        resourceName = path.basename(pluginDir);
+      } else if (componentType === 'core') {
+        resourceName = 'core';
+      } else if (componentType === 'webview') {
+        resourceName = 'webview';
+      }
+
+      // Restart the resource if we have a valid resource name
+      if (resourceName) {
+        logger.info(
+          `Notifying reload server about rebuilt resource: ${resourceName}`
+        );
+        await resourceManager.restartResource(resourceName);
+      }
+    } catch (error) {
+      logger.error(
+        `Error notifying reload server: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Don't rethrow, let the process continue
+    }
+
+    logger.info(
+      `Rebuild process for ${componentType}${
+        pluginDir ? `: ${pluginDir}` : ''
+      } completed`
+    );
   } catch (error) {
     logger.error(`Error rebuilding ${componentType}:`, error);
     throw error;
@@ -255,6 +290,43 @@ async function rebuildWithClassPipeline(
 
     // Run the pipeline
     await pipeline.run(rebuildContext);
+
+    // Notify the reload server about the rebuilt component
+    try {
+      const { distDir } = getProjectPaths();
+      const resourceManager = new ResourceManager(fileSystem, logger, {
+        reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+        reloaderHost: process.env.RELOADER_HOST || 'localhost',
+        reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+        reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+      });
+
+      // Get the resource name based on the component type and plugin directory
+      let resourceName: string | null = null;
+      if (componentType === 'plugin' && pluginDir) {
+        // Extract the plugin name from the directory path
+        resourceName = path.basename(pluginDir);
+      } else if (componentType === 'core') {
+        resourceName = 'core';
+      } else if (componentType === 'webview') {
+        resourceName = 'webview';
+      }
+
+      // Restart the resource if we have a valid resource name
+      if (resourceName) {
+        logger.info(
+          `Notifying reload server about rebuilt resource: ${resourceName}`
+        );
+        await resourceManager.restartResource(resourceName);
+      }
+    } catch (error) {
+      logger.error(
+        `Error notifying reload server: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Don't rethrow, let the process continue
+    }
 
     logger.info(
       `Rebuild process for ${componentType}${

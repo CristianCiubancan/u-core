@@ -28,6 +28,8 @@ export async function deployResourcesStage(
     await resourceManager.deployResources(distDir);
 
     logger.info('Resources deployed successfully');
+
+    // Note: Resource reloading is now handled in RebuildUtils.ts before the "Rebuild process completed" log
   } catch (error) {
     logger.error('Error deploying resources:', error);
     throw error;

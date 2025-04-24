@@ -61,7 +61,6 @@ function restartResource(resourceName: string): boolean {
       );
       return false;
     }
-
     try {
       console.log(`[resource-manager] Stopping core resource: ${cleanName}`);
       StopResource(cleanName);
