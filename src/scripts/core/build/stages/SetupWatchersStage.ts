@@ -79,7 +79,7 @@ export async function setupWatchersStage(context: BuildContext): Promise<void> {
 }
 
 /**
- * Rebuild a component
+ * Rebuild a component using the build pipeline
  * @param componentType Component type
  * @param pluginDir Plugin directory
  * @param context Build context
@@ -89,49 +89,79 @@ async function rebuildComponent(
   pluginDir: string | undefined,
   context: BuildContext
 ): Promise<void> {
-  const { logger } = context;
+  const { logger, distDir } = context;
 
   logger.info(
     `Rebuilding ${componentType}${pluginDir ? `: ${pluginDir}` : ''}`
   );
 
   try {
+    // Import the BuildPipelineImpl to create a new pipeline
+    const { BuildPipelineImpl } = await import('../BuildPipelineImpl.js');
+
+    // Create a new pipeline for the rebuild
+    const pipeline = new BuildPipelineImpl();
+
+    // Create a new context for the rebuild
+    const rebuildContext = { ...context };
+
+    // Import all the stages
+    const { cleanStage } = await import('./CleanStage.js');
+    const { buildCorePluginsStage } = await import(
+      './BuildCorePluginsStage.js'
+    );
+    const { buildPluginsStage } = await import('./BuildPluginsStage.js');
+    const { buildWebviewStage } = await import('./BuildWebviewStage.js');
+    const { fixNestedPluginsStage } = await import(
+      './FixNestedPluginsStage.js'
+    );
+    const { deployResourcesStage } = await import('./DeployResourcesStage.js');
+
+    // Skip the clean stage for incremental builds
+    // pipeline.addStage('clean', cleanStage);
+
     switch (componentType) {
       case 'plugin':
-        // Rebuild plugin
-        if (pluginDir) {
-          await rebuildPlugin(pluginDir, context);
-        } else {
+        if (!pluginDir) {
           logger.error('Cannot rebuild plugin: pluginDir is undefined');
+          return;
         }
+
+        // Override the plugins directory to only build the changed plugin
+        rebuildContext.pluginsDir = path.dirname(pluginDir);
+
+        // Add the buildPlugins stage
+        pipeline.addStage('buildPlugins', buildPluginsStage);
+
+        // Check if this plugin has webview content
+        const hasWebviewContent = await checkForWebviewContent(pluginDir);
+        if (hasWebviewContent) {
+          // Add the buildWebview stage if the plugin has webview content
+          pipeline.addStage('buildWebview', buildWebviewStage);
+        }
+
         break;
 
       case 'core':
-        // Rebuild core
-        try {
-          await rebuildCore(context);
-        } catch (coreError: any) {
-          logger.error(
-            `Error rebuilding core: ${coreError.message || String(coreError)}`
-          );
-          // Don't rethrow, let the process continue
-        }
+        // Add the buildCorePlugins stage
+        pipeline.addStage('buildCorePlugins', buildCorePluginsStage);
         break;
 
       case 'webview':
-        // Rebuild webview
-        try {
-          await rebuildWebview(context);
-        } catch (webviewError: any) {
-          logger.error(
-            `Error rebuilding webview: ${
-              webviewError.message || String(webviewError)
-            }`
-          );
-          // Don't rethrow, let the process continue
-        }
+        // For webview changes, we need to rebuild all plugins first to ensure
+        // we have the latest plugin information
+        pipeline.addStage('buildCorePlugins', buildCorePluginsStage);
+        pipeline.addStage('buildPlugins', buildPluginsStage);
+        pipeline.addStage('buildWebview', buildWebviewStage);
         break;
     }
+
+    // Always add these final stages
+    pipeline.addStage('fixNestedPlugins', fixNestedPluginsStage);
+    pipeline.addStage('deployResources', deployResourcesStage);
+
+    // Run the pipeline
+    await pipeline.run(rebuildContext);
 
     logger.info(
       `Rebuild process for ${componentType}${
@@ -145,174 +175,6 @@ async function rebuildComponent(
       }`
     );
     // Don't rethrow, let the process continue
-  }
-}
-
-/**
- * Rebuild a plugin
- * @param pluginDir Plugin directory
- * @param context Build context
- */
-async function rebuildPlugin(
-  pluginDir: string,
-  context: BuildContext
-): Promise<void> {
-  const { logger } = context;
-
-  logger.info(`Rebuilding plugin: ${pluginDir}`);
-
-  try {
-    // Import the build plugins stage
-    const { buildPluginsStage } = await import('./BuildPluginsStage.js');
-
-    // Create a new context for the rebuild
-    const rebuildContext = { ...context };
-
-    // Override the plugins directory
-    rebuildContext.pluginsDir = pluginDir;
-
-    try {
-      // Run the build plugins stage
-      await buildPluginsStage(rebuildContext);
-    } catch (buildError: any) {
-      logger.error(
-        `Error in build plugins stage for ${pluginDir}: ${
-          buildError.message || String(buildError)
-        }`
-      );
-      // Continue with the rest of the process even if this step fails
-    }
-
-    // Check if this plugin has a Page.tsx file (webview content)
-    let hasWebviewContent = false;
-    try {
-      hasWebviewContent = await checkForWebviewContent(pluginDir);
-    } catch (checkError: any) {
-      logger.error(
-        `Error checking for webview content in ${pluginDir}: ${
-          checkError.message || String(checkError)
-        }`
-      );
-      // Assume it might have webview content if we can't check
-      hasWebviewContent = true;
-    }
-
-    // If the plugin has webview content, also rebuild the webview
-    if (hasWebviewContent) {
-      logger.info(`Plugin has webview content, rebuilding webview...`);
-      try {
-        // Use the rebuildWebview function to ensure all webviews are rebuilt properly
-        await rebuildWebview(context);
-      } catch (webviewError: any) {
-        logger.error(
-          `Error rebuilding webview for ${pluginDir}: ${
-            webviewError.message || String(webviewError)
-          }`
-        );
-        // Continue with the rest of the process even if this step fails
-      }
-    }
-
-    try {
-      // Run the fix nested plugins stage
-      const { fixNestedPluginsStage } = await import(
-        './FixNestedPluginsStage.js'
-      );
-      await fixNestedPluginsStage(context);
-    } catch (fixError: any) {
-      logger.error(
-        `Error fixing nested plugins for ${pluginDir}: ${
-          fixError.message || String(fixError)
-        }`
-      );
-      // Continue with the rest of the process even if this step fails
-    }
-
-    try {
-      // Run the deploy resources stage
-      const { deployResourcesStage } = await import(
-        './DeployResourcesStage.js'
-      );
-      await deployResourcesStage(context);
-    } catch (deployError: any) {
-      logger.error(
-        `Error deploying resources for ${pluginDir}: ${
-          deployError.message || String(deployError)
-        }`
-      );
-      // This is the last step, so we don't need to continue
-    }
-
-    logger.info(`Plugin ${pluginDir} rebuild process completed`);
-  } catch (error: any) {
-    logger.error(
-      `Error rebuilding plugin ${pluginDir}: ${error.message || String(error)}`
-    );
-    // Don't throw the error, let the process continue
-  }
-}
-
-/**
- * Rebuild core
- * @param context Build context
- */
-async function rebuildCore(context: BuildContext): Promise<void> {
-  const { logger } = context;
-
-  logger.info('Rebuilding core');
-
-  try {
-    // Import the build core plugins stage
-    const { buildCorePluginsStage } = await import(
-      './BuildCorePluginsStage.js'
-    );
-
-    try {
-      // Run the build core plugins stage
-      await buildCorePluginsStage(context);
-    } catch (buildError: any) {
-      logger.error(
-        `Error in build core plugins stage: ${
-          buildError.message || String(buildError)
-        }`
-      );
-      // Continue with the rest of the process even if this step fails
-    }
-
-    try {
-      // Run the fix nested plugins stage
-      const { fixNestedPluginsStage } = await import(
-        './FixNestedPluginsStage.js'
-      );
-      await fixNestedPluginsStage(context);
-    } catch (fixError: any) {
-      logger.error(
-        `Error fixing nested plugins for core: ${
-          fixError.message || String(fixError)
-        }`
-      );
-      // Continue with the rest of the process even if this step fails
-    }
-
-    try {
-      // Run the deploy resources stage
-      const { deployResourcesStage } = await import(
-        './DeployResourcesStage.js'
-      );
-      await deployResourcesStage(context);
-    } catch (deployError: any) {
-      logger.error(
-        `Error deploying resources for core: ${
-          deployError.message || String(deployError)
-        }`
-      );
-      // This is the last step, so we don't need to continue
-    }
-
-    logger.info('Core rebuild process completed');
-  } catch (error: any) {
-    logger.error(`Error rebuilding core: ${error.message || String(error)}`);
-    // Don't throw the error, let the process continue
   }
 }
 
@@ -346,125 +208,5 @@ async function checkForWebviewContent(pluginDir: string): Promise<boolean> {
   } catch (error) {
     console.error(`Error checking for webview content in ${pluginDir}:`, error);
     return false;
-  }
-}
-
-/**
- * Rebuild webview
- * @param context Build context
- */
-async function rebuildWebview(context: BuildContext): Promise<void> {
-  const { logger } = context;
-
-  logger.info('Rebuilding webview - starting process');
-
-  try {
-    // Import the build webview stage
-    const { buildWebviewStage } = await import('./BuildWebviewStage.js');
-
-    // Make sure we have the latest plugin information
-    // Import the build plugins stage to get the latest plugin information
-    const { buildPluginsStage } = await import('./BuildPluginsStage.js');
-    const { buildCorePluginsStage } = await import(
-      './BuildCorePluginsStage.js'
-    );
-
-    logger.info('Updating plugin information before rebuilding webview');
-
-    // Run the build plugins stages to ensure we have the latest plugin information
-    // This won't rebuild the plugins, but will update the context with the latest plugin information
-    try {
-      logger.info('Updating core plugin information');
-      await buildCorePluginsStage(context);
-    } catch (coreError: any) {
-      logger.error(
-        `Error updating core plugin information: ${
-          coreError.message || String(coreError)
-        }`
-      );
-      // Continue with the process even if this step fails
-    }
-
-    try {
-      logger.info('Updating regular plugin information');
-      await buildPluginsStage(context);
-    } catch (pluginsError: any) {
-      logger.error(
-        `Error updating regular plugin information: ${
-          pluginsError.message || String(pluginsError)
-        }`
-      );
-      // Continue with the process even if this step fails
-    }
-
-    // Log the plugins that will be used for the webview build
-    const plugins = [
-      ...((context as any).plugins || []),
-      ...((context as any).corePlugins || []),
-    ];
-
-    logger.info(`Found ${plugins.length} total plugins for webview build`);
-
-    // Log plugins with webview content
-    const webviewPlugins = plugins.filter((p) => p.hasHtml);
-    logger.info(
-      `Found ${
-        webviewPlugins.length
-      } plugins with webview content: ${webviewPlugins
-        .map((p) => p.name || p.pathFromPluginsDir)
-        .join(', ')}`
-    );
-
-    try {
-      // Now run the build webview stage with the updated context
-      logger.info('Running webview build with Vite');
-      await buildWebviewStage(context);
-    } catch (webviewError: any) {
-      logger.error(
-        `Error building webview with Vite: ${
-          webviewError.message || String(webviewError)
-        }`
-      );
-      // Continue with the process even if this step fails
-    }
-
-    try {
-      // Run the fix nested plugins stage
-      logger.info('Fixing nested plugins after webview build');
-      const { fixNestedPluginsStage } = await import(
-        './FixNestedPluginsStage.js'
-      );
-      await fixNestedPluginsStage(context);
-    } catch (fixError: any) {
-      logger.error(
-        `Error fixing nested plugins after webview build: ${
-          fixError.message || String(fixError)
-        }`
-      );
-      // Continue with the process even if this step fails
-    }
-
-    try {
-      // Run the deploy resources stage
-      logger.info('Deploying resources after webview build');
-      const { deployResourcesStage } = await import(
-        './DeployResourcesStage.js'
-      );
-      await deployResourcesStage(context);
-    } catch (deployError: any) {
-      logger.error(
-        `Error deploying resources after webview build: ${
-          deployError.message || String(deployError)
-        }`
-      );
-      // This is the last step, so we don't need to continue
-    }
-
-    logger.info('Webview rebuild process completed');
-  } catch (error: any) {
-    logger.error(
-      `Error in webview rebuild process: ${error.message || String(error)}`
-    );
-    // Don't throw the error, let the process continue
   }
 }
