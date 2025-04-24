@@ -14,6 +14,8 @@ export * from './PluginUtils.js';
 
 // Export script utilities
 export * from './ScriptUtils.js';
+// Export ScriptProcessor class explicitly to avoid conflicts
+export { ScriptProcessor, scriptProcessor } from './ScriptProcessor.js';
 
 // Export configuration utilities
 export * from './ConfigUtils.js';

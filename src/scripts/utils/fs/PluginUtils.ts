@@ -1,191 +1,199 @@
 /**
- * Plugin utility functions for working with plugins and their files
+ * Plugin utility class for working with plugins and their files
  */
 import { FileSystemImpl } from './FileSystemImpl.js';
 import { joinPath, normalizePath, getFileCategory } from './PathUtils.js';
 import { Plugin, PluginFile } from '../../core/types.js';
 
-// Create a file system instance for use in this module
-const fs = new FileSystemImpl();
-
 /**
- * Find all plugin paths within the specified directory
- * @param dirPath The root directory to search for plugins
- * @returns Array of plugin paths
+ * Class to manage plugin-related operations
  */
-export function findPluginPaths(dirPath: string): string[] {
-  return fs.findPathsWithFile(dirPath, 'plugin.json');
-}
+export class PluginUtils {
+  private fs: FileSystemImpl;
 
-/**
- * Parse plugin paths into Plugin objects
- * @param pluginPaths Array of plugin directory paths
- * @returns Array of Plugin objects
- */
-export function parsePluginPaths(pluginPaths: string[]): Plugin[] {
-  const plugins: Plugin[] = [];
+  constructor() {
+    this.fs = new FileSystemImpl();
+  }
 
-  if (pluginPaths.length === 0) {
-    console.warn('No plugin paths provided to parsePluginPaths');
+  /**
+   * Find all plugin paths within the specified directory
+   * @param dirPath The root directory to search for plugins
+   * @returns Array of plugin paths
+   */
+  findPluginPaths(dirPath: string): string[] {
+    return this.fs.findPathsWithFile(dirPath, 'plugin.json');
+  }
+
+  /**
+   * Parse plugin paths into Plugin objects
+   * @param pluginPaths Array of plugin directory paths
+   * @returns Array of Plugin objects
+   */
+  parsePluginPaths(pluginPaths: string[]): Plugin[] {
+    const plugins: Plugin[] = [];
+
+    if (pluginPaths.length === 0) {
+      console.warn('No plugin paths provided to parsePluginPaths');
+      return plugins;
+    }
+
+    // We need a consistent base plugins directory to calculate relative paths
+    const pluginsDir = normalizePath(joinPath(pluginPaths[0], '..', '..'));
+
+    for (const pluginPath of pluginPaths) {
+      const pluginJsonPath = joinPath(pluginPath, 'plugin.json');
+
+      try {
+        // Check if the file exists first
+        if (!this.fs.existsSync(pluginJsonPath)) {
+          console.warn(`Plugin.json file not found at path: ${pluginJsonPath}`);
+          continue;
+        }
+
+        const pluginJson = JSON.parse(
+          this.fs.readFileSync(pluginJsonPath, 'utf8')
+        );
+        const normalizedPluginPath = normalizePath(pluginPath);
+
+        // Calculate the correct path relative to the plugins directory
+        const relativePath = normalizePath(
+          joinPath(normalizedPluginPath).substring(pluginsDir.length + 1)
+        );
+
+        const plugin: Plugin = {
+          name: pluginJson.name,
+          pathFromPluginsDir: relativePath,
+          hasHtml: this.fs.existsSync(joinPath(pluginPath, 'html', 'Page.tsx')),
+          fullPath: normalizedPluginPath,
+          files: [], // Initialize empty files array
+        };
+        plugins.push(plugin);
+      } catch (error) {
+        console.error(`Error parsing plugin.json at ${pluginJsonPath}:`, error);
+      }
+    }
+
     return plugins;
   }
 
-  // We need a consistent base plugins directory to calculate relative paths
-  const pluginsDir = normalizePath(
-    joinPath(pluginPaths[0], '..', '..')
-  );
+  /**
+   * Parse files within a plugin directory into File objects
+   * @param pluginDirPath Plugin directory path
+   * @returns Array of File objects
+   */
+  parsePluginFiles(pluginDirPath: string): PluginFile[] {
+    const files: string[] = this.fs.getFilePaths(pluginDirPath);
+    const pluginDirNormalized = normalizePath(pluginDirPath);
+    const result: PluginFile[] = [];
 
-  for (const pluginPath of pluginPaths) {
-    const pluginJsonPath = joinPath(pluginPath, 'plugin.json');
+    for (const filePath of files) {
+      const normalizedFilePath = normalizePath(filePath);
+      const fileName = normalizedFilePath.split('/').pop() || '';
+      const isPluginJsonFile = fileName === 'plugin.json';
 
-    try {
-      // Check if the file exists first
-      if (!fs.existsSync(pluginJsonPath)) {
-        console.warn(`Plugin.json file not found at path: ${pluginJsonPath}`);
-        continue;
+      // Calculate the path relative to the plugin directory
+      let pathFromPluginDir = '';
+      if (normalizedFilePath.startsWith(pluginDirNormalized)) {
+        pathFromPluginDir = normalizedFilePath.substring(
+          pluginDirNormalized.length + 1
+        );
       }
 
-      const pluginJson = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf8'));
-      const normalizedPluginPath = normalizePath(pluginPath);
-
-      // Calculate the correct path relative to the plugins directory
-      const relativePath = normalizePath(
-        joinPath(normalizedPluginPath).substring(pluginsDir.length + 1)
-      );
-
-      const plugin: Plugin = {
-        name: pluginJson.name,
-        pathFromPluginsDir: relativePath,
-        hasHtml: fs.existsSync(joinPath(pluginPath, 'html', 'Page.tsx')),
-        fullPath: normalizedPluginPath,
-        files: [], // Initialize empty files array
+      const file: PluginFile = {
+        name: fileName,
+        pathFromPluginDir: normalizePath(pathFromPluginDir),
+        isPluginJsonFile,
+        fullPath: normalizedFilePath,
       };
-      plugins.push(plugin);
-    } catch (error) {
-      console.error(`Error parsing plugin.json at ${pluginJsonPath}:`, error);
-    }
-  }
 
-  return plugins;
-}
-
-/**
- * Parse files within a plugin directory into File objects
- * @param pluginDirPath Plugin directory path
- * @returns Array of File objects
- */
-export function parsePluginFiles(pluginDirPath: string): PluginFile[] {
-  const files: string[] = fs.getFilePaths(pluginDirPath);
-  const pluginDirNormalized = normalizePath(pluginDirPath);
-  const result: PluginFile[] = [];
-
-  for (const filePath of files) {
-    const normalizedFilePath = normalizePath(filePath);
-    const fileName = normalizedFilePath.split('/').pop() || '';
-    const isPluginJsonFile = fileName === 'plugin.json';
-
-    // Calculate the path relative to the plugin directory
-    let pathFromPluginDir = '';
-    if (normalizedFilePath.startsWith(pluginDirNormalized)) {
-      pathFromPluginDir = normalizedFilePath.substring(
-        pluginDirNormalized.length + 1
-      );
+      result.push(file);
     }
 
-    const file: PluginFile = {
-      name: fileName,
-      pathFromPluginDir: normalizePath(pathFromPluginDir),
-      isPluginJsonFile,
-      fullPath: normalizedFilePath,
-    };
-
-    result.push(file);
+    return result;
   }
 
-  return result;
-}
+  /**
+   * Read and parse plugin JSON file
+   * @param jsonPath Path to the plugin.json file
+   * @returns Parsed plugin JSON data or null if not found
+   */
+  readPluginJson(jsonPath: string): any {
+    try {
+      // Check if the file exists first
+      if (!this.fs.existsSync(jsonPath)) {
+        console.warn(`Plugin.json file not found at path: ${jsonPath}`);
+        return null;
+      }
 
-/**
- * Read and parse plugin JSON file
- * @param jsonPath Path to the plugin.json file
- * @returns Parsed plugin JSON data or null if not found
- */
-export function readPluginJson(jsonPath: string): any {
-  try {
-    // Check if the file exists first
-    if (!fs.existsSync(jsonPath)) {
-      console.warn(`Plugin.json file not found at path: ${jsonPath}`);
+      const pluginJsonContent = this.fs.readFileSync(jsonPath, 'utf8');
+      return JSON.parse(pluginJsonContent);
+    } catch (err) {
+      console.error(`Error reading plugin.json at ${jsonPath}:`, err);
       return null;
     }
-
-    const pluginJsonContent = fs.readFileSync(jsonPath, 'utf8');
-    return JSON.parse(pluginJsonContent);
-  } catch (err) {
-    console.error(`Error reading plugin.json at ${jsonPath}:`, err);
-    return null;
-  }
-}
-
-/**
- * Calculate output paths and directories for a plugin
- * @param plugin Plugin object
- * @param distDir Distribution directory
- * @returns Object with output paths
- */
-export function getPluginOutputInfo(plugin: Plugin, distDir: string) {
-  const normalizedPluginPath = normalizePath(plugin.pathFromPluginsDir);
-  const pluginsPathNormalized = normalizePath('plugins');
-  const pathContainsPluginsPrefix =
-    normalizedPluginPath.startsWith(pluginsPathNormalized) ||
-    normalizedPluginPath.startsWith(pluginsPathNormalized + '/');
-
-  // Calculate relative path consistently
-  let pluginRelativePath = normalizedPluginPath;
-  if (pathContainsPluginsPrefix) {
-    // Strip the 'plugins/' prefix to place resources directly in dist
-    pluginRelativePath = normalizedPluginPath.substring(
-      pluginsPathNormalized.length + 1
-    );
-  } else if (plugin.name === 'core') {
-    // Special case for the core plugin
-    pluginRelativePath = 'core';
   }
 
-  // Final output directory
-  const outputDir = joinPath(distDir, pluginRelativePath);
+  /**
+   * Calculate output paths and directories for a plugin
+   * @param plugin Plugin object
+   * @param distDir Distribution directory
+   * @returns Object with output paths
+   */
+  getPluginOutputInfo(plugin: Plugin, distDir: string) {
+    const normalizedPluginPath = normalizePath(plugin.pathFromPluginsDir);
+    const pluginsPathNormalized = normalizePath('plugins');
+    const pathContainsPluginsPrefix =
+      normalizedPluginPath.startsWith(pluginsPathNormalized) ||
+      normalizedPluginPath.startsWith(pluginsPathNormalized + '/');
 
-  return {
-    pluginRelativePath,
-    outputDir,
-    manifestPath: joinPath(distDir, pluginRelativePath, 'fxmanifest.lua'),
-  };
-}
-
-/**
- * Categorize processed files by their type (client, server, shared, translations)
- * @param processedFiles Array of processed files
- * @returns Object with categorized files
- */
-export function categorizeFiles(processedFiles: any[]) {
-  const categorized: {
-    client: string[];
-    server: string[];
-    shared: string[];
-    translations: string[];
-  } = {
-    client: [],
-    server: [],
-    shared: [],
-    translations: [],
-  };
-
-  processedFiles
-    .filter((file) => file && file.category)
-    .forEach((file) => {
-      categorized[file.category as keyof typeof categorized].push(
-        file.outputPath
+    // Calculate relative path consistently
+    let pluginRelativePath = normalizedPluginPath;
+    if (pathContainsPluginsPrefix) {
+      // Strip the 'plugins/' prefix to place resources directly in dist
+      pluginRelativePath = normalizedPluginPath.substring(
+        pluginsPathNormalized.length + 1
       );
-    });
+    } else if (plugin.name === 'core') {
+      // Special case for the core plugin
+      pluginRelativePath = 'core';
+    }
 
-  return categorized;
+    // Final output directory
+    const outputDir = joinPath(distDir, pluginRelativePath);
+
+    return {
+      pluginRelativePath,
+      outputDir,
+      manifestPath: joinPath(distDir, pluginRelativePath, 'fxmanifest.lua'),
+    };
+  }
+
+  /**
+   * Categorize processed files by their type (client, server, shared, translations)
+   * @param processedFiles Array of processed files
+   * @returns Object with categorized files
+   */
+  categorizeFiles(processedFiles: any[]) {
+    const categorized: {
+      client: string[];
+      server: string[];
+      shared: string[];
+      translations: string[];
+    } = {
+      client: [],
+      server: [],
+      shared: [],
+      translations: [],
+    };
+
+    processedFiles
+      .filter((file) => file && file.category)
+      .forEach((file) => {
+        categorized[file.category as keyof typeof categorized].push(
+          file.outputPath
+        );
+      });
+
+    return categorized;
+  }
 }

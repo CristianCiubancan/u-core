@@ -8,7 +8,7 @@ import * as chokidar from 'chokidar';
 import 'dotenv/config';
 import { DebouncedTaskManager } from './DebouncedTaskManager.js';
 import { ResourceManager } from './ResourceManager.js';
-import { findPluginPaths, rebuildComponent } from './index.js';
+import { rebuildComponent } from './RebuildUtils.js';
 import { Logger, Watcher } from '../../core/types.js';
 import { ConsoleLogger, LogLevel } from '../logger/ConsoleLogger.js';
 
@@ -288,7 +288,6 @@ export class WatcherManager implements Watcher {
 
     try {
       // Watch for Page.tsx files in the plugins directory
-      const pageTsxPattern = path.join(pluginsDir, '**', 'html', 'Page.tsx');
 
       this.setupDirectoryWatcher(
         pluginsDir,
@@ -700,15 +699,5 @@ export class WatcherManager implements Watcher {
     }
 
     return pluginDir;
-
-    // Get the first directory in the relative path
-    const parts = relativePath.split(path.sep);
-
-    if (parts.length === 0) {
-      return null;
-    }
-
-    // Return the plugin directory
-    return path.join(normalizedPluginsDir, parts[0]);
   }
 }
