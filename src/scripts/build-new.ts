@@ -106,7 +106,13 @@ class ResourceManager {
   private resourceRestartTimestamps = new Map<string, number>();
   private readonly RESTART_COOLDOWN_MS = 2000; // 2 seconds cooldown
 
-  constructor(private readonly generatedDir?: string) {}
+  constructor(private readonly generatedDir?: string) {
+    if (generatedDir) {
+      console.log(
+        `ResourceManager initialized with generatedDir: ${generatedDir}`
+      );
+    }
+  }
 
   /**
    * Get the number of mapped resources
@@ -467,7 +473,18 @@ class WatcherManager {
   constructor(
     private readonly debouncedTaskManager: DebouncedTaskManager,
     private readonly resourceManager: ResourceManager
-  ) {}
+  ) {
+    // Initialize the ResourceManager with the generated directory
+    const generatedDir = this.getGeneratedDir();
+    if (generatedDir) {
+      // We're using the same ResourceManager instance, but we want to make sure
+      // it has the generatedDir property set correctly
+      Object.defineProperty(this.resourceManager, 'generatedDir', {
+        value: generatedDir,
+        writable: false,
+      });
+    }
+  }
 
   /**
    * Set up watcher for a directory with consistent options
@@ -560,7 +577,7 @@ class WatcherManager {
   }
 
   /**
-   * Set up watcher for dist directory to restart resources
+   * Set up watcher for dist directory to track changes but not restart resources
    */
   setupDistWatcher(distDir: string): void {
     this.setupDirectoryWatcher(
@@ -677,12 +694,11 @@ class WatcherManager {
           }
         }
 
-        // If we found a resource name, restart it
+        // Log the detected resource but don't restart it
+        // Resource reloading is handled by the generated folder watcher
         if (resourceName && resourceName !== 'scripts') {
-          console.log(`Resource change detected: ${resourceName}`);
-          this.debouncedTaskManager.execute(
-            `resource-${resourceName}`,
-            async () => await this.resourceManager.restartResource(resourceName)
+          console.log(
+            `Resource change detected in dist: ${resourceName} (not restarting)`
           );
         }
       }
@@ -690,14 +706,14 @@ class WatcherManager {
   }
 
   /**
-   * Set up watcher for generated resources folder
+   * Get the path to the generated resources directory
    */
-  setupGeneratedFolderWatcher(): void {
+  private getGeneratedDir(): string | null {
     if (!process.env.SERVER_NAME) {
       console.error(
-        'SERVER_NAME environment variable is not set. Skipping generated folder watcher.'
+        'SERVER_NAME environment variable is not set. Cannot determine generated directory.'
       );
-      return;
+      return null;
     }
 
     const generatedDirName = '[GENERATED]';
@@ -706,7 +722,18 @@ class WatcherManager {
       process.env.SERVER_NAME,
       'resources'
     );
-    const generatedDir = path.join(destinationBase, generatedDirName);
+    return path.join(destinationBase, generatedDirName);
+  }
+
+  /**
+   * Set up watcher for generated resources folder
+   * This is the ONLY place that should trigger resource reloads
+   */
+  setupGeneratedFolderWatcher(): void {
+    const generatedDir = this.getGeneratedDir();
+    if (!generatedDir) {
+      return;
+    }
 
     console.log(`Setting up watcher for generated resources: ${generatedDir}`);
 
@@ -727,18 +754,108 @@ class WatcherManager {
         }
 
         try {
-          // Determine the actual resource name
-          const resourceName = this.resourceManager.getResourceName(filePath);
+          // Find the actual resource by looking for the manifest file
+          let currentDir = path.dirname(filePath);
+          let resourceName = null;
+          let manifestFound = false;
 
+          // Common subdirectories that aren't resources
+          const commonSubdirs = [
+            'client',
+            'server',
+            'shared',
+            'html',
+            'translations',
+            'assets',
+          ];
+
+          // Check if the current directory is a common subdirectory
+          const dirName = path.basename(currentDir);
+          if (commonSubdirs.includes(dirName)) {
+            // Move up one level if we're in a common subdirectory
+            currentDir = path.dirname(currentDir);
+          }
+
+          // Check for manifest file
+          const manifestPath = path.join(currentDir, 'fxmanifest.lua');
+          if (fs.existsSync(manifestPath)) {
+            resourceName = path.basename(currentDir);
+            manifestFound = true;
+          }
+
+          // If we didn't find a manifest, walk up the directory tree
+          if (!manifestFound) {
+            // Get the relative path from the generated directory
+            const relativePath = path.relative(generatedDir, filePath);
+            const pathParts = relativePath.split(path.sep);
+
+            // First, try to find a manifest file by walking up the directory tree
+            let resourcePath = '';
+            for (let i = 0; i < pathParts.length - 1; i++) {
+              // Build the path incrementally
+              resourcePath = path.join(resourcePath, pathParts[i]);
+              const fullResourcePath = path.join(generatedDir, resourcePath);
+              const manifestPath = path.join(
+                fullResourcePath,
+                'fxmanifest.lua'
+              );
+
+              if (fs.existsSync(manifestPath)) {
+                // Found a manifest, this is a resource
+                resourceName = path.basename(resourcePath);
+                manifestFound = true;
+                break;
+              }
+            }
+
+            // If we still didn't find a manifest, try to determine the resource name from the path
+            if (!manifestFound) {
+              // Try to use the resourceManager to get the resource name
+              resourceName = this.resourceManager.getResourceName(filePath);
+
+              // If that fails, try to determine it from the path
+              if (!resourceName) {
+                // Check if the file is in a common subdirectory
+                if (
+                  pathParts.length >= 2 &&
+                  commonSubdirs.includes(pathParts[pathParts.length - 2])
+                ) {
+                  // Find the last directory that's not a common subdirectory and not in brackets
+                  for (let i = pathParts.length - 3; i >= 0; i--) {
+                    if (
+                      !commonSubdirs.includes(pathParts[i]) &&
+                      !pathParts[i].startsWith('[') &&
+                      !pathParts[i].endsWith(']')
+                    ) {
+                      resourceName = pathParts[i];
+                      break;
+                    }
+                  }
+
+                  // If we couldn't find a non-bracketed directory, use the first directory
+                  if (!resourceName && pathParts.length > 0) {
+                    resourceName = pathParts[0];
+                  }
+                } else if (pathParts.length > 0) {
+                  // If not in a common subdirectory, use the first directory
+                  resourceName = pathParts[0];
+                }
+              }
+            }
+          }
+
+          // Skip bracketed directory names as they're not actual resources
           if (
             resourceName &&
             resourceName !== 'webview' &&
-            resourceName !== 'scripts'
+            resourceName !== 'scripts' &&
+            !resourceName.startsWith('[') &&
+            !resourceName.endsWith(']')
           ) {
             console.log(
-              `Resource change detected, restarting: ${resourceName}`
+              `Resource change detected in generated folder for '${resourceName}' (will restart after 3s debounce)`
             );
-            // Use a longer debounce time for generated resources to prevent rapid restarts
+            // Use a longer debounce time (3 seconds) for generated resources to prevent rapid restarts
             this.debouncedTaskManager.execute(
               `generated-resource-${resourceName}`,
               async () => {
@@ -747,7 +864,7 @@ class WatcherManager {
                 );
                 await this.resourceManager.restartResource(resourceName);
               },
-              1000 // Use a longer debounce time (1 second)
+              3000 // Use a longer debounce time (3 seconds)
             );
           }
         } catch (error) {
