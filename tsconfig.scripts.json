@@ -6,6 +6,7 @@
     "moduleResolution": "NodeNext",
     "allowJs": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "outDir": "dist/scripts",
     "rootDir": "src/scripts",
     "strict": true,

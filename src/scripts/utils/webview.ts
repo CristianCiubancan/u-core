@@ -155,7 +155,7 @@ export default App;\n`;
     console.log(`Generated ${appFilePath}`);
 
     // Create main.tsx file
-    const mainTsxContent = `import React from 'react';
+    const mainTsxContent = `
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -489,7 +489,7 @@ export default App;\n`;
     console.log(`Generated ${appFilePath}`);
 
     // Create main.tsx file (same as in buildWebview)
-    const mainTsxContent = `import React from 'react';
+    const mainTsxContent = `
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
