@@ -40,7 +40,7 @@ export class ResourceManager {
   private resourceMap = new Map<string, string>(); // Maps path -> resource name
   private resourceRestartTimestamps = new Map<string, number>();
   private readonly RESTART_COOLDOWN_MS = 2000; // 2 seconds cooldown
-  
+
   // Options
   private reloaderEnabled: boolean;
   private reloaderHost: string;
@@ -61,18 +61,20 @@ export class ResourceManager {
   ) {
     this.fs = fs;
     this.logger = logger;
-    
+
     // Merge default options with provided options
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-    
+
     this.reloaderEnabled = mergedOptions.reloaderEnabled;
     this.reloaderHost = mergedOptions.reloaderHost;
     this.reloaderPort = mergedOptions.reloaderPort;
     this.reloaderApiKey = mergedOptions.reloaderApiKey;
     this.generatedDir = mergedOptions.generatedDir;
-    
+
     if (this.generatedDir) {
-      this.logger.debug(`ResourceManager initialized with generatedDir: ${this.generatedDir}`);
+      this.logger.debug(
+        `ResourceManager initialized with generatedDir: ${this.generatedDir}`
+      );
     }
   }
 
@@ -377,6 +379,14 @@ export class ResourceManager {
     // Update the timestamp for this resource
     this.resourceRestartTimestamps.set(resourceName, now);
 
+    this.logger.info(`Attempting to reload resource: ${resourceName}`);
+    this.logger.info(`Reloader enabled: ${this.reloaderEnabled}`);
+    this.logger.info(`Reloader host: ${this.reloaderHost}`);
+    this.logger.info(`Reloader port: ${this.reloaderPort}`);
+    this.logger.info(
+      `Reloader API key: ${this.reloaderApiKey ? 'Set' : 'Not set'}`
+    );
+
     if (!this.reloaderEnabled) {
       this.logger.debug(
         `Resource reloader is disabled. Skipping reload of ${resourceName}.`
@@ -385,11 +395,11 @@ export class ResourceManager {
     }
 
     try {
-      // Construct the URL for the reload request
-      const url = `http://${this.reloaderHost}:${this.reloaderPort}/reload/${resourceName}`;
+      // Construct the URL for the reload request - use the correct endpoint format
+      const url = `http://${this.reloaderHost}:${this.reloaderPort}/restart?resource=${resourceName}`;
 
       // Send the request
-      await this.sendReloadRequest(url);
+      await this.sendReloadRequest(url, resourceName);
 
       this.logger.info(`Resource ${resourceName} reloaded successfully.`);
     } catch (error) {
@@ -400,16 +410,31 @@ export class ResourceManager {
   /**
    * Send a reload request
    * @param url URL to send the request to
+   * @param resourceName Name of the resource being reloaded (for logging)
    */
-  private sendReloadRequest(url: string): Promise<void> {
+  private sendReloadRequest(url: string, resourceName: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.logger.debug(
+        `Sending POST request to ${url} to reload resource ${resourceName}`
+      );
+
+      // Parse the URL to get host, port, and path
+      const urlParts = new URL(url);
+
       const options = {
+        hostname: urlParts.hostname,
+        port: urlParts.port,
+        path: urlParts.pathname + urlParts.search,
+        method: 'POST',
         headers: {
-          'X-API-Key': this.reloaderApiKey,
+          'Authorization': `Bearer ${this.reloaderApiKey}`,
+          'Content-Type': 'application/json',
         },
       };
 
-      const req = http.get(url, options, (res) => {
+      this.logger.debug(`Request options: ${JSON.stringify(options)}`);
+
+      const req = http.request(options, (res) => {
         let data = '';
 
         res.on('data', (chunk) => {
@@ -417,28 +442,67 @@ export class ResourceManager {
         });
 
         res.on('end', () => {
+          this.logger.debug(`Received response: ${res.statusCode} ${data}`);
+
           if (res.statusCode === 200) {
             resolve();
           } else {
             reject(
-              new Error(`Failed to reload resource: ${res.statusCode} ${data}`)
+              new Error(
+                `Failed to reload resource ${resourceName}: ${res.statusCode} ${data}`
+              )
             );
           }
         });
       });
 
       req.on('error', (error) => {
+        this.logger.error(`HTTP request error for ${resourceName}:`, error);
         reject(error);
       });
 
       // Set a timeout for the request
       req.setTimeout(5000, () => {
-        this.logger.error(`Request timeout for resource reload`);
+        this.logger.error(
+          `Request timeout for resource ${resourceName} reload`
+        );
         req.destroy();
-        reject(new Error('Request timeout'));
+        reject(new Error(`Request timeout for resource ${resourceName}`));
       });
 
       req.end();
     });
+  }
+
+  /**
+   * Check if the reloader is enabled
+   * @returns Whether the reloader is enabled
+   */
+  isReloaderEnabled(): boolean {
+    return this.reloaderEnabled;
+  }
+
+  /**
+   * Get the reloader host
+   * @returns The reloader host
+   */
+  getReloaderHost(): string {
+    return this.reloaderHost;
+  }
+
+  /**
+   * Get the reloader port
+   * @returns The reloader port
+   */
+  getReloaderPort(): number {
+    return this.reloaderPort;
+  }
+
+  /**
+   * Check if the reloader API key is set
+   * @returns Whether the reloader API key is set
+   */
+  hasReloaderApiKey(): boolean {
+    return !!this.reloaderApiKey;
   }
 }
