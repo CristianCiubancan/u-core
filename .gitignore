@@ -43,7 +43,6 @@ node_modules/
 dist/
 dist-ssr/
 .vite/
-build/
 
 # Environment files
 .env

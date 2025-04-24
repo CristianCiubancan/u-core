@@ -96,6 +96,32 @@ export interface PluginFile {
 }
 
 /**
+ * Script patterns in plugin.json
+ */
+export interface ScriptPatterns {
+  /** Client scripts */
+  client_scripts?: string[];
+  /** Server scripts */
+  server_scripts?: string[];
+  /** Shared scripts */
+  shared_scripts?: string[];
+  /** Other properties */
+  [key: string]: any;
+}
+
+/**
+ * Script files by category
+ */
+export interface ScriptFiles {
+  /** Client scripts */
+  client: string[];
+  /** Server scripts */
+  server: string[];
+  /** Shared scripts */
+  shared: string[];
+}
+
+/**
  * File category
  */
 export enum FileCategory {
@@ -152,21 +178,37 @@ export interface Bundler {
 }
 
 /**
- * File system interface
+ * Enhanced file system interface
  */
 export interface FileSystem {
-  /** Read a file */
+  /** Read a file asynchronously */
   readFile(path: string, encoding?: string): Promise<string>;
-  /** Write a file */
+  /** Read a file synchronously */
+  readFileSync(path: string, encoding?: string): string;
+  /** Write a file asynchronously */
   writeFile(path: string, content: string): Promise<void>;
+  /** Write a file synchronously */
+  writeFileSync(path: string, content: string): void;
   /** Copy a file */
   copyFile(source: string, destination: string): Promise<void>;
-  /** Ensure a directory exists */
+  /** Ensure a directory exists asynchronously */
   ensureDir(path: string): Promise<void>;
-  /** Check if a file exists */
+  /** Ensure a directory exists synchronously */
+  ensureDirSync(path: string): void;
+  /** Check if a file exists asynchronously */
   exists(path: string): Promise<boolean>;
-  /** Get files matching a pattern */
+  /** Check if a file exists synchronously */
+  existsSync(path: string): boolean;
+  /** Get files matching a pattern asynchronously */
   glob(pattern: string, options?: any): Promise<string[]>;
+  /** Get files matching a pattern synchronously */
+  globSync(pattern: string, options?: any): string[];
+  /** Get all file paths within a directory recursively */
+  getFilePaths(dirPath: string): string[];
+  /** Find all paths containing a specific file */
+  findPathsWithFile(dirPath: string, targetFileName: string): string[];
+  /** Normalize a path for cross-platform consistency */
+  normalizePath(filePath: string): string;
 }
 
 /**
@@ -194,7 +236,10 @@ export interface Watcher {
  */
 export interface BuildPipeline {
   /** Add a stage to the pipeline */
-  addStage(name: string, handler: (context: BuildContext) => Promise<void>): BuildPipeline;
+  addStage(
+    name: string,
+    handler: (context: BuildContext) => Promise<void>
+  ): BuildPipeline;
   /** Run the pipeline */
   run(context: BuildContext): Promise<void>;
 }

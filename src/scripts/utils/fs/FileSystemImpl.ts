@@ -1,13 +1,14 @@
 /**
- * File system implementation
+ * Enhanced file system implementation with additional utility methods
  */
-import * as fs from 'fs/promises';
+import * as fsPromises from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'glob';
 import { FileSystem } from '../../core/types.js';
 
 /**
- * File system implementation
+ * File system implementation with enhanced functionality
  */
 export class FileSystemImpl implements FileSystem {
   /**
@@ -20,7 +21,17 @@ export class FileSystemImpl implements FileSystem {
     filePath: string,
     encoding: BufferEncoding = 'utf8'
   ): Promise<string> {
-    return fs.readFile(filePath, { encoding });
+    return fsPromises.readFile(filePath, { encoding });
+  }
+
+  /**
+   * Read a file synchronously
+   * @param filePath Path to the file
+   * @param encoding File encoding
+   * @returns File content
+   */
+  readFileSync(filePath: string, encoding: BufferEncoding = 'utf8'): string {
+    return fs.readFileSync(filePath, { encoding });
   }
 
   /**
@@ -31,7 +42,18 @@ export class FileSystemImpl implements FileSystem {
   async writeFile(filePath: string, content: string): Promise<void> {
     // Ensure the directory exists
     await this.ensureDir(path.dirname(filePath));
-    return fs.writeFile(filePath, content);
+    return fsPromises.writeFile(filePath, content);
+  }
+
+  /**
+   * Write a file synchronously
+   * @param filePath Path to the file
+   * @param content File content
+   */
+  writeFileSync(filePath: string, content: string): void {
+    // Ensure the directory exists
+    this.ensureDirSync(path.dirname(filePath));
+    fs.writeFileSync(filePath, content);
   }
 
   /**
@@ -42,7 +64,7 @@ export class FileSystemImpl implements FileSystem {
   async copyFile(source: string, destination: string): Promise<void> {
     // Ensure the directory exists
     await this.ensureDir(path.dirname(destination));
-    return fs.copyFile(source, destination);
+    return fsPromises.copyFile(source, destination);
   }
 
   /**
@@ -51,10 +73,23 @@ export class FileSystemImpl implements FileSystem {
    */
   async ensureDir(dirPath: string): Promise<void> {
     try {
-      await fs.access(dirPath);
+      await fsPromises.access(dirPath);
     } catch (error) {
       // Directory doesn't exist, create it
-      await fs.mkdir(dirPath, { recursive: true });
+      await fsPromises.mkdir(dirPath, { recursive: true });
+    }
+  }
+
+  /**
+   * Ensure a directory exists (synchronous version)
+   * @param dirPath Directory path
+   */
+  ensureDirSync(dirPath: string): void {
+    try {
+      fs.accessSync(dirPath);
+    } catch (error) {
+      // Directory doesn't exist, create it
+      fs.mkdirSync(dirPath, { recursive: true });
     }
   }
 
@@ -65,11 +100,20 @@ export class FileSystemImpl implements FileSystem {
    */
   async exists(filePath: string): Promise<boolean> {
     try {
-      await fs.access(filePath);
+      await fsPromises.access(filePath);
       return true;
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Check if a file exists (synchronous version)
+   * @param filePath File path
+   * @returns Whether the file exists
+   */
+  existsSync(filePath: string): boolean {
+    return fs.existsSync(filePath);
   }
 
   /**
@@ -91,5 +135,102 @@ export class FileSystemImpl implements FileSystem {
       console.error(`Error in glob pattern ${pattern}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Get files matching a pattern (synchronous version)
+   * @param pattern Glob pattern
+   * @param options Glob options
+   * @returns Matching file paths
+   */
+  globSync(pattern: string, options: glob.GlobOptions = {}): string[] {
+    try {
+      const matches = glob.sync(pattern, options);
+      // Convert to string[] to satisfy the return type
+      return matches.map((match) => match.toString());
+    } catch (error) {
+      console.error(`Error in glob pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all file paths within a directory recursively
+   * @param dirPath Directory to scan for files
+   * @returns Array of file paths
+   */
+  getFilePaths(dirPath: string): string[] {
+    const filePaths: string[] = [];
+
+    // Helper function to recursively scan directories
+    const scanDirectory = (directory: string) => {
+      try {
+        const items = fs.readdirSync(directory);
+
+        for (const item of items) {
+          const itemPath = path.join(directory, item);
+          const stats = fs.statSync(itemPath);
+
+          if (stats.isDirectory()) {
+            scanDirectory(itemPath); // Recursively scan subdirectories
+          } else if (stats.isFile()) {
+            filePaths.push(itemPath); // Add file path to the result
+          }
+        }
+      } catch (error) {
+        console.error(`Error scanning directory: ${directory}`, error);
+      }
+    };
+
+    // Start scanning from the provided directory path
+    scanDirectory(dirPath);
+    return filePaths;
+  }
+
+  /**
+   * Find all paths containing a specific file (e.g., plugin.json)
+   * @param dirPath The root directory to search
+   * @param targetFileName The filename to search for
+   * @returns Array of directory paths containing the target file
+   */
+  findPathsWithFile(dirPath: string, targetFileName: string): string[] {
+    const foundPaths: string[] = [];
+
+    // Helper function to recursively scan directories
+    const scanDirectory = (directory: string) => {
+      try {
+        const items = fs.readdirSync(directory);
+
+        for (const item of items) {
+          const itemPath = path.join(directory, item);
+          const stats = fs.statSync(itemPath);
+
+          if (stats.isDirectory()) {
+            scanDirectory(itemPath); // Recursively scan subdirectories
+          } else if (stats.isFile() && item === targetFileName) {
+            // When we find the target file, add its parent directory to foundPaths
+            const parentDir = path.dirname(itemPath);
+            if (!foundPaths.includes(parentDir)) {
+              foundPaths.push(parentDir);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error scanning directory: ${directory}`, error);
+      }
+    };
+
+    // Start scanning from the provided directory path
+    scanDirectory(dirPath);
+    return foundPaths;
+  }
+
+  /**
+   * Normalize a path for cross-platform consistency
+   * @param filePath Path to normalize
+   * @returns Normalized path with forward slashes
+   */
+  normalizePath(filePath: string): string {
+    return path.normalize(filePath).replace(/\\/g, '/');
   }
 }
