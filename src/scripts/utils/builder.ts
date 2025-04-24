@@ -3,24 +3,27 @@
  */
 import * as path from 'path';
 import * as fs from 'fs';
-import { Plugin } from './file.js';
+import { Plugin } from '../core/types.js';
 import {
-  categorizeGeneratedFiles,
-  ensureDirectoryExists,
+  fileSystem,
+  categorizeFiles as categorizeGeneratedFiles,
   getPluginOutputInfo,
   getPluginScripts,
-  getPluginsPaths,
-  parseFilePathsIntoFiles,
-  parsePluginPathsIntoPlugins,
+  findPluginPaths,
+  parsePluginFiles as parseFilePathsIntoFiles,
+  parsePluginPaths as parsePluginPathsIntoPlugins,
   processFile,
   readPluginJson,
-} from './file.js';
-import { generateManifest, preparePluginManifestData } from './manifest.js';
+} from './fs/index.js';
+import {
+  generateManifest,
+  preparePluginManifestData,
+} from './fs/ConfigUtils.js';
 import { verifyOutputDir } from './bundler.js';
 import { buildPluginWebview } from './webview.js';
 import { ResourceManagerImpl } from '../core/resources/ResourceManager.js';
 import { ConsoleLogger } from './logger/ConsoleLogger.js';
-import { getProjectPaths } from './paths.js';
+import { getProjectPaths } from './fs/PathUtils.js';
 
 /**
  * Plugin build result
@@ -75,7 +78,7 @@ export async function buildPlugin(
     const { outputDir, manifestPath } = getPluginOutputInfo(plugin, distDir);
 
     // Ensure output directory exists
-    await ensureDirectoryExists(outputDir);
+    await fileSystem.ensureDir(outputDir);
 
     // Read plugin.json
     const jsonPath = path.join(plugin.fullPath, 'plugin.json');
@@ -203,11 +206,11 @@ export async function build() {
   const { pluginsDir, coreDir, distDir } = getProjectPaths();
 
   try {
-    await ensureDirectoryExists(distDir);
-    await ensureDirectoryExists(coreDir);
+    await fileSystem.ensureDir(distDir);
+    await fileSystem.ensureDir(coreDir);
 
-    const { pluginPaths } = getPluginsPaths(pluginsDir);
-    const { pluginPaths: corePluginPaths } = getPluginsPaths(coreDir);
+    const pluginPaths = findPluginPaths(pluginsDir);
+    const corePluginPaths = findPluginPaths(coreDir);
 
     const plugins = parsePluginPathsIntoPlugins(pluginPaths);
     const corePlugins = parsePluginPathsIntoPlugins(corePluginPaths);
@@ -280,15 +283,15 @@ export async function rebuildComponent(
     switch (componentType) {
       case 'plugin': {
         if (!pluginDir) throw new Error('Plugin directory is required');
-        const { pluginPaths } = getPluginsPaths(path.dirname(pluginDir));
+        const pluginPaths = findPluginPaths(path.dirname(pluginDir));
         const plugins = parsePluginPathsIntoPlugins(
-          pluginPaths.filter((p) => p === pluginDir)
+          pluginPaths.filter((p: string) => p === pluginDir)
         );
         await buildAndGenerateManifests(plugins, distDir);
         break;
       }
       case 'core': {
-        const { pluginPaths } = getPluginsPaths(coreDir);
+        const pluginPaths = findPluginPaths(coreDir);
         const corePlugins = parsePluginPathsIntoPlugins(pluginPaths);
         await buildAndGenerateManifests(corePlugins, distDir);
         break;
