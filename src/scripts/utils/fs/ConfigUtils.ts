@@ -404,7 +404,16 @@ export function preparePluginManifestData(
 
   // Helper function to replace .ts with .js in file paths
   const replaceExtension = (files: string[]): string[] => {
-    return files.map((file) => file.replace(/\.ts$/, '.js'));
+    if (!files) return [];
+
+    return files.map((file) => {
+      // Handle wildcard patterns like 'server/*.ts'
+      if (file.includes('*.ts')) {
+        return file.replace('*.ts', '*.js');
+      }
+      // Handle regular file paths
+      return file.replace(/\.ts$/, '.js');
+    });
   };
 
   // Replace extensions in generated files

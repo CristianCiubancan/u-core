@@ -6,8 +6,8 @@
   "description": "Example 3",
   "games": ["gta5", "rdr3"],
   "main": "index.js",
-  "client_scripts": ["client/*.ts", "client/*.js", "client/*.lua"],
-  "server_scripts": ["server/*.ts", "server/*.lua"],
-  "shared_scripts": ["shared/*.ts"],
-  "files": ["translations/*.json", "translations/*.lua", "translations/*.ts"]
+  "client_scripts": ["client/*.js", "client/*.lua"],
+  "server_scripts": ["server/*.js", "server/*.lua"],
+  "shared_scripts": ["shared/*.js"],
+  "files": ["translations/*.json", "translations/*.lua", "translations/*.js"]
 }

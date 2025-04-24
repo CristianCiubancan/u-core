@@ -6,7 +6,7 @@
   "description": "Example 3",
   "games": ["gta5", "rdr3"],
   "main": "index.js",
-  "client_scripts": ["client/*.ts"],
-  "server_scripts": ["server/*.ts"],
-  "files": ["translations/*.json", "translations/*.lua", "translations/*.ts"]
+  "client_scripts": ["client/*.js"],
+  "server_scripts": ["server/*.js"],
+  "files": ["translations/*.json", "translations/*.lua", "translations/*.js"]
 }

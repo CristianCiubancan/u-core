@@ -5,6 +5,6 @@
   "author": "Baloony Gaze",
   "description": "Example 3",
   "games": ["gta5", "rdr3"],
-  "client_scripts": ["client/*.ts"],
-  "server_scripts": ["server/*.ts"]
+  "client_scripts": ["client/*.js"],
+  "server_scripts": ["server/*.js"]
 }
