@@ -1,4 +1,6 @@
-import { FileManager, Plugin, File } from './FileManager.js';
+import { FileManager } from './FileManager.js';
+import { Plugin } from './types/Plugin.js';
+import { File } from './types/File.js';
 
 /**
  * Plugin manager

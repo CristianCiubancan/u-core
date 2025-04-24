@@ -2,6 +2,8 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { glob } from 'glob'; // For pattern matching in file paths
+import { Plugin } from './types/Plugin.js';
+import { File } from './types/File.js';
 
 /**
  * File manager
@@ -708,20 +710,5 @@ class FileManager {
   }
 }
 
-// Define interfaces
-interface Plugin {
-  pluginName: string;
-  fullPath: string;
-  displayPath: string; // New property for display with forward slashes
-  parents: string[]; // Array of parent directories with forward slashes
-  files: File[];
-}
 
-interface File {
-  fileName: string;
-  fullPath: string;
-  displayPath: string;
-  plugin: Plugin;
-}
-
-export { FileManager, Plugin, File };
+export { FileManager };
