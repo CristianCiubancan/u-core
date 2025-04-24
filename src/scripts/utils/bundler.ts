@@ -66,8 +66,7 @@ export async function bundleTypeScript(
         .then(() => true)
         .catch(() => false);
 
-      if (exists) {
-      } else {
+      if (!exists) {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
         );
@@ -135,8 +134,7 @@ export async function bundleJavaScript(
         .then(() => true)
         .catch(() => false);
 
-      if (exists) {
-      } else {
+      if (!exists) {
         console.error(
           `Failed to verify file exists after bundling: ${outputFile}`
         );
@@ -163,8 +161,7 @@ export async function copyLuaFile(
       .then(() => true)
       .catch(() => false);
 
-    if (exists) {
-    } else {
+    if (!exists) {
       console.error(`Failed to verify file exists after copy: ${outputFile}`);
     }
   } catch (err) {
@@ -202,8 +199,6 @@ export async function verifyOutputDir(dir: string): Promise<void> {
 
       if (file.isDirectory()) {
         console.log(`  [DIR] ${file.name}`);
-        // Optionally recurse into subdirectories
-        // await verifyOutputDir(fullPath);
       } else {
         // Get file size
         const fileStats = await fsPromises.stat(fullPath);
