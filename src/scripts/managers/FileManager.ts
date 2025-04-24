@@ -720,7 +720,7 @@ interface Plugin {
 interface File {
   fileName: string;
   fullPath: string;
-  displayPath: string; // New property for display with forward slashes
+  displayPath: string;
   plugin: Plugin;
 }
 
