@@ -24,7 +24,8 @@ import {
 } from './utils/manifest.js';
 import { verifyOutputDir } from './utils/bundler.js';
 import { buildPluginWebview } from './utils/webview.js';
-import { moveBuiltResources } from './utils/moveBuiltResources.js';
+import { ResourceManagerImpl } from './core/resources/ResourceManager.js';
+import { ConsoleLogger } from './utils/logger/ConsoleLogger.js';
 
 interface PluginBuildResult {
   updatedPluginJson: Record<string, any>;
@@ -1136,8 +1137,15 @@ async function build() {
 
     console.log('Build completed successfully!');
 
-    // 4. Move built resources
-    await moveBuiltResources(distDir);
+    // 4. Deploy built resources
+    const logger = new ConsoleLogger();
+    const resourceManager = new ResourceManagerImpl(undefined, logger, {
+      reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+      reloaderHost: process.env.RELOADER_HOST || 'localhost',
+      reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+      reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+    });
+    await resourceManager.deployResources(distDir);
 
     return { plugins, corePlugins };
   } catch (error) {
@@ -1205,7 +1213,15 @@ async function rebuildComponent(
       );
     }
 
-    await moveBuiltResources(distDir);
+    // Deploy built resources
+    const logger = new ConsoleLogger();
+    const resourceManager = new ResourceManagerImpl(undefined, logger, {
+      reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
+      reloaderHost: process.env.RELOADER_HOST || 'localhost',
+      reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
+      reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+    });
+    await resourceManager.deployResources(distDir);
   } catch (error) {
     console.error(`Error rebuilding ${componentType}:`, error);
   } finally {
