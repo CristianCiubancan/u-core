@@ -65,20 +65,39 @@ export function getPluginsPaths(dirPath: string): { pluginPaths: string[] } {
  */
 export function parsePluginPathsIntoPlugins(pluginPaths: string[]): Plugin[] {
   const plugins: Plugin[] = [];
+
+  if (pluginPaths.length === 0) {
+    console.warn('No plugin paths provided to parsePluginPathsIntoPlugins');
+    return plugins;
+  }
+
   // We need a consistent base plugins directory to calculate relative paths
   const pluginsDir = path.normalize(path.dirname(path.dirname(pluginPaths[0])));
+  console.debug(`Base plugins directory: ${pluginsDir}`);
 
   for (const pluginPath of pluginPaths) {
+    console.debug(`Processing plugin path: ${pluginPath}`);
     const pluginJsonPath = path.join(pluginPath, 'plugin.json');
+    console.debug(`Looking for plugin.json at: ${pluginJsonPath}`);
+
     try {
+      // Check if the file exists first
+      if (!fs.existsSync(pluginJsonPath)) {
+        console.warn(`Plugin.json file not found at path: ${pluginJsonPath}`);
+        continue;
+      }
+
       const pluginJson = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf8'));
       const normalizedPluginPath = path.normalize(pluginPath);
+      console.debug(`Normalized plugin path: ${normalizedPluginPath}`);
 
       // Calculate the correct path relative to the plugins directory
       const relativePath = path.relative(pluginsDir, normalizedPluginPath);
+      console.debug(`Relative path: ${relativePath}`);
 
       // Normalize path separators to forward slashes for cross-platform consistency
       const consistentPath = relativePath.replace(/\\/g, '/');
+      console.debug(`Consistent path: ${consistentPath}`);
 
       const plugin: Plugin = {
         name: pluginJson.name,
@@ -87,6 +106,7 @@ export function parsePluginPathsIntoPlugins(pluginPaths: string[]): Plugin[] {
         fullPath: normalizedPluginPath, // Store the full normalized path
         files: [], // Initialize empty files array
       };
+      console.debug(`Created plugin object: ${JSON.stringify(plugin)}`);
       plugins.push(plugin);
     } catch (error) {
       console.error(`Error parsing plugin.json at ${pluginJsonPath}:`, error);
@@ -199,6 +219,16 @@ export function getPluginScripts(
     shared: [],
   };
 
+  // If pluginJsonData is null, return empty result
+  if (pluginJsonData === null) {
+    console.warn(
+      `No plugin JSON data available for ${path.basename(
+        pluginPath
+      )}, returning empty script list`
+    );
+    return result;
+  }
+
   // Helper function to resolve glob patterns relative to the plugin directory
   const resolvePatterns = (
     patterns: string[],
@@ -258,10 +288,31 @@ export function getPluginScripts(
  */
 export function readPluginJson(jsonPath: string) {
   try {
+    console.debug(`Attempting to read plugin.json from: ${jsonPath}`);
+    console.debug(`Absolute path: ${path.resolve(jsonPath)}`);
+
+    // Check if the file exists first
+    if (!fs.existsSync(jsonPath)) {
+      console.warn(`Plugin.json file not found at path: ${jsonPath}`);
+
+      // Try to list the directory contents to see what's there
+      try {
+        const dirPath = path.dirname(jsonPath);
+        console.debug(`Directory contents of ${dirPath}:`);
+        const files = fs.readdirSync(dirPath);
+        files.forEach((file) => console.debug(`- ${file}`));
+      } catch (dirErr) {
+        console.debug(`Could not read directory: ${dirErr}`);
+      }
+
+      return null;
+    }
+
     const pluginJsonContent = fs.readFileSync(jsonPath, 'utf8');
     return JSON.parse(pluginJsonContent);
   } catch (err) {
     console.error(`Error reading plugin.json at ${jsonPath}:`, err);
+    console.debug(`Absolute path: ${path.resolve(jsonPath)}`);
     throw err;
   }
 }
@@ -300,6 +351,36 @@ function getFileCategory(
  * Calculate output paths and directories for a plugin
  */
 export function getPluginOutputInfo(plugin: any, distDir: string) {
+  console.log(
+    `getPluginOutputInfo called for plugin:`,
+    JSON.stringify(plugin, null, 2)
+  );
+
+  // Check if plugin has a fullPath property
+  if (!plugin.fullPath) {
+    console.log(
+      `Plugin ${plugin.name || 'unknown'} does not have a fullPath property`
+    );
+  }
+
+  // Check if plugin.json exists at the expected path
+  if (plugin.fullPath) {
+    const pluginJsonPath = path.join(plugin.fullPath, 'plugin.json');
+    console.log(`Checking if plugin.json exists at: ${pluginJsonPath}`);
+    console.log(`Absolute path: ${path.resolve(pluginJsonPath)}`);
+    console.log(`File exists: ${fs.existsSync(pluginJsonPath)}`);
+
+    // List directory contents
+    try {
+      const dirPath = plugin.fullPath;
+      console.log(`Directory contents of ${dirPath}:`);
+      const files = fs.readdirSync(dirPath);
+      files.forEach((file) => console.log(`- ${file}`));
+    } catch (dirErr) {
+      console.log(`Could not read directory: ${dirErr}`);
+    }
+  }
+
   const normalizedPluginPath = path.normalize(plugin.pathFromPluginsDir);
   const pluginsPathNormalized = path.normalize('plugins');
   const pathContainsPluginsPrefix =
@@ -324,6 +405,12 @@ export function getPluginOutputInfo(plugin: any, distDir: string) {
 
   // Final output directory
   const outputDir = path.join(distDir, pluginRelativePath);
+
+  console.log(`Output info for plugin ${plugin.name || 'unknown'}:`, {
+    pluginRelativePath,
+    outputDir,
+    manifestPath: path.join(distDir, pluginRelativePath, 'fxmanifest.lua'),
+  });
 
   return {
     pluginRelativePath,
