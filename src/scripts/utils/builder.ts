@@ -15,10 +15,7 @@ import {
   processFile,
   readPluginJson,
 } from './file.js';
-import {
-  generateManifest,
-  preparePluginManifestData,
-} from './manifest.js';
+import { generateManifest, preparePluginManifestData } from './manifest.js';
 import { verifyOutputDir } from './bundler.js';
 import { buildPluginWebview } from './webview.js';
 import { ResourceManagerImpl } from '../core/resources/ResourceManager.js';
@@ -98,6 +95,61 @@ export async function buildPlugin(
     plugin.files = plugin.files || [];
     plugin.files.push(...pluginFiles);
 
+    // Check if plugin has HTML content to build webview
+    // This should be determined by checking if there's a 'html' directory with a Page.tsx file
+    plugin.hasHtml = plugin.hasHtml || (await checkForHtmlContent(plugin));
+
+    // Build the webview first if the plugin has HTML content
+    // This way, we can include the webview assets in the manifest
+    if (plugin.hasHtml && plugin.fullPath) {
+      try {
+        const webviewResult = await buildPluginWebview(plugin, distDir);
+
+        if (webviewResult.success) {
+          console.log(
+            `Webview built successfully at: ${webviewResult.htmlDir}`
+          );
+
+          // Check if the html directory exists and contains files
+          const htmlDir = path.join(outputDir, 'html');
+          if (fs.existsSync(htmlDir)) {
+            // Add html/**/* to the files array in the plugin.json data
+            if (!pluginJsonData.files) {
+              pluginJsonData.files = ['html/**/*'];
+            } else if (!pluginJsonData.files.includes('html/**/*')) {
+              pluginJsonData.files.push('html/**/*');
+            }
+
+            // Set the ui_page in the plugin.json data
+            pluginJsonData.ui_page = 'html/index.html';
+
+            // Log detailed information about what's being included in the manifest
+            console.log(
+              `Including webview assets in plugin.json for ${plugin.name}:`
+            );
+            console.log(`  - Added 'html/**/*' to files array`);
+            console.log(`  - Set ui_page to 'html/index.html'`);
+          } else {
+            console.warn(
+              `Webview build for plugin ${plugin.name} succeeded but html directory not found at ${htmlDir}.`
+            );
+            console.warn(`Not including webview assets in manifest.`);
+          }
+        } else {
+          console.warn(
+            `Webview build for plugin ${plugin.name} did not produce expected files.`
+          );
+          console.warn(`Not including webview assets in manifest.`);
+        }
+      } catch (error) {
+        console.error(
+          `Error building webview for plugin ${plugin.name}:`,
+          error
+        );
+        // Continue with the build even if webview fails
+      }
+    }
+
     // Get script files based on patterns in plugin.json
     const scriptFiles = getPluginScripts(pluginJsonData, plugin.fullPath);
 
@@ -117,36 +169,6 @@ export async function buildPlugin(
       scriptFiles
     );
 
-    // Check if plugin has HTML content to build webview
-    // This should be determined by checking if there's a 'html' directory with a Page.tsx file
-    plugin.hasHtml = plugin.hasHtml || (await checkForHtmlContent(plugin));
-
-    // Build the webview if the plugin has HTML content
-    if (plugin.hasHtml && plugin.fullPath) {
-      try {
-        const htmlDir = await buildPluginWebview(plugin, distDir);
-        console.log(`Webview built successfully at: ${htmlDir}`);
-
-        // The files are already in the html directory, so we just need to update the manifest
-        if (!updatedPluginJson.files) {
-          updatedPluginJson.files = ['html/**/*'];
-        } else if (!updatedPluginJson.files.includes('html/**/*')) {
-          updatedPluginJson.files.push('html/**/*');
-        }
-
-        // Set the ui_page if it's not already set
-        if (!updatedPluginJson.ui_page) {
-          updatedPluginJson.ui_page = 'html/index.html';
-        }
-      } catch (error) {
-        console.error(
-          `Error building webview for plugin ${plugin.name}:`,
-          error
-        );
-        // Continue with the build even if webview fails
-      }
-    }
-
     // Verify the output directory content
     await verifyOutputDir(outputDir);
 
@@ -160,7 +182,10 @@ export async function buildPlugin(
 /**
  * Build plugins and generate manifests
  */
-export async function buildAndGenerateManifests(plugins: Plugin[], distDir: string) {
+export async function buildAndGenerateManifests(
+  plugins: Plugin[],
+  distDir: string
+) {
   for (const plugin of plugins) {
     const result = await buildPlugin(plugin, distDir);
     if (!result) continue;

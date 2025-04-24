@@ -102,12 +102,15 @@ export class WebviewBuilderImpl implements WebviewBuilder {
               plugin.name || plugin.pathFromPluginsDir
             } (${plugin.fullPath})`
           );
-          await this.buildPluginWebview(plugin, distDir);
+          const htmlDir = await this.buildPluginWebview(plugin, distDir);
           this.logger.info(
             `Webview for plugin ${
               plugin.name || plugin.pathFromPluginsDir
             } built successfully`
           );
+
+          // Update the fxmanifest.lua file to include the webview assets
+          await this.updateManifestWithWebviewAssets(plugin, distDir, htmlDir);
         } catch (error) {
           this.logger.error(
             `Error building webview for plugin ${
@@ -154,6 +157,102 @@ files {
     } catch (error) {
       this.logger.error('Error building webview:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update the fxmanifest.lua file to include the webview assets
+   * @param plugin Plugin
+   * @param distDir Distribution directory
+   * @param htmlDir Path to the html directory
+   */
+  async updateManifestWithWebviewAssets(
+    plugin: Plugin,
+    distDir: string,
+    htmlDir: string
+  ): Promise<void> {
+    try {
+      // Get plugin output info
+      const pluginRelativePath = plugin.pathFromPluginsDir;
+      const resourcePath = path.join(distDir, pluginRelativePath);
+      const manifestPath = path.join(resourcePath, 'fxmanifest.lua');
+
+      // Check if the manifest file exists
+      if (!(await this.fs.exists(manifestPath))) {
+        this.logger.warn(
+          `Manifest file not found for plugin ${plugin.name}: ${manifestPath}`
+        );
+        return;
+      }
+
+      // Check if the html directory exists
+      if (!(await this.fs.exists(htmlDir))) {
+        this.logger.warn(
+          `HTML directory not found for plugin ${plugin.name}: ${htmlDir}`
+        );
+        return;
+      }
+
+      // Read the manifest file
+      let manifestContent = await this.fs.readFile(manifestPath, 'utf-8');
+
+      // Check if the manifest already includes the webview assets
+      if (
+        manifestContent.includes('html/**/*') &&
+        manifestContent.includes('ui_page')
+      ) {
+        this.logger.info(
+          `Manifest for plugin ${plugin.name} already includes webview assets`
+        );
+        return;
+      }
+
+      // Add the webview assets to the manifest
+      let updatedContent = manifestContent;
+
+      // Add the files entry
+      if (manifestContent.includes('files {')) {
+        // If files section exists, add the html/**/* entry
+        if (!manifestContent.includes('html/**/*')) {
+          // Check if the files section is empty
+          if (manifestContent.match(/files\s*{\s*}/s)) {
+            // If the files section is empty, replace it with a section containing html/**/*
+            updatedContent = updatedContent.replace(
+              /files\s*{\s*}/s,
+              `files {\n    'html/**/*',\n}`
+            );
+          } else {
+            // If the files section is not empty, add html/**/* to it
+            updatedContent = updatedContent.replace(
+              /files\s*{([^}]*)}/s,
+              (match, filesContent) => {
+                return `files {${filesContent}    'html/**/*',\n}`;
+              }
+            );
+          }
+        }
+      } else {
+        // If files section doesn't exist, add it
+        updatedContent += `\nfiles {\n    'html/**/*',\n}\n`;
+      }
+
+      // Add the ui_page entry
+      if (!manifestContent.includes('ui_page')) {
+        updatedContent += `\nui_page 'html/index.html'\n`;
+      }
+
+      // Write the updated manifest file
+      await this.fs.writeFile(manifestPath, updatedContent);
+
+      this.logger.info(
+        `Updated manifest for plugin ${plugin.name} to include webview assets`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error updating manifest for plugin ${plugin.name}:`,
+        error
+      );
+      // Continue with other plugins
     }
   }
 

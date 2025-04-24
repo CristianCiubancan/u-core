@@ -296,18 +296,18 @@ body {
  * Builds a webview UI for a single plugin by generating App.tsx and running the Vite build.
  * @param plugin The plugin object to build the webview for
  * @param distDir The main distribution directory
- * @returns Promise<string> Path to the built plugin webview directory
- */
-/**
- * Builds a webview UI for a single plugin by generating App.tsx and running the Vite build.
- * @param plugin The plugin object to build the webview for
- * @param distDir The main distribution directory
- * @returns Promise<string> Path to the built plugin webview directory
+ * @returns Promise<{ htmlDir: string; hasIndexHtml: boolean; hasAssets: boolean; success: boolean }>
+ * Object containing the html directory path and verification results
  */
 export async function buildPluginWebview(
   plugin: Plugin,
   distDir: string
-): Promise<string> {
+): Promise<{
+  htmlDir: string;
+  hasIndexHtml: boolean;
+  hasAssets: boolean;
+  success: boolean;
+}> {
   console.log(
     `\nBuilding webview UI for plugin: ${
       plugin.name || plugin.pathFromPluginsDir || 'unknown'
@@ -391,14 +391,24 @@ export async function buildPluginWebview(
     // Check if plugin has a webview page
     if (!plugin.hasHtml || !plugin.fullPath) {
       console.log('Plugin does not have webview pages, skipping build');
-      return webviewPluginDistDir;
+      return {
+        htmlDir: webviewPluginDistDir,
+        hasIndexHtml: false,
+        hasAssets: false,
+        success: false,
+      };
     }
 
     const pageFile = path.join(plugin.fullPath, 'html', 'Page.tsx');
 
     if (!(await fileSystem.exists(pageFile))) {
       console.log('Plugin does not have a Page.tsx file, skipping build');
-      return webviewPluginDistDir;
+      return {
+        htmlDir: webviewPluginDistDir,
+        hasIndexHtml: false,
+        hasAssets: false,
+        success: false,
+      };
     }
 
     console.log(`Found webview page for plugin: ${pageFile}`);
@@ -578,7 +588,30 @@ body {
         const relativePath = path.relative(htmlOutputDir, filePath);
         console.log(`  [FILE] ${relativePath}`);
       }
+
+      // Verify that the html directory contains the expected files
+      const hasIndexHtml = filePaths.some(
+        (file) => path.basename(file) === 'index.html'
+      );
+      const hasAssets = filePaths.some((file) => file.includes('assets/'));
+
+      if (!hasIndexHtml) {
+        console.warn(`Warning: No index.html found in ${htmlOutputDir}`);
+      }
+
+      if (!hasAssets) {
+        console.warn(`Warning: No assets directory found in ${htmlOutputDir}`);
+      }
+
       console.log(`--- End verification of ${webviewPluginDistDir} ---`);
+
+      // Return an object with the html directory path and verification results
+      return {
+        htmlDir: htmlOutputDir,
+        hasIndexHtml,
+        hasAssets,
+        success: hasIndexHtml, // Consider the build successful if at least index.html exists
+      };
     } catch (error: any) {
       console.error(`Vite build for plugin ${relPlugin} failed:`, error);
 
@@ -609,13 +642,14 @@ body {
         errorMessage += '\nPossible cause: index.html does not exist.';
       }
 
-      throw new Error(errorMessage);
+      // Return failure result
+      return {
+        htmlDir: htmlOutputDir,
+        hasIndexHtml: false,
+        hasAssets: false,
+        success: false,
+      };
     }
-
-    console.log(
-      `Plugin webview build for ${relPlugin} completed successfully!`
-    );
-    return htmlOutputDir; // Return the html directory path
   } catch (error) {
     console.error(
       `Plugin webview build for ${
@@ -623,7 +657,15 @@ body {
       } failed:`,
       error
     );
-    throw error;
+    // Return failure result instead of throwing
+    return {
+      htmlDir:
+        webviewPluginDistDir ||
+        path.join(distDir, plugin.name || 'unknown', 'html'),
+      hasIndexHtml: false,
+      hasAssets: false,
+      success: false,
+    };
   }
 }
 /**
