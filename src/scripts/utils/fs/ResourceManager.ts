@@ -503,6 +503,8 @@ export class ResourceManager {
    * @returns Whether the reloader API key is set
    */
   hasReloaderApiKey(): boolean {
-    return !!this.reloaderApiKey;
+    return (
+      !!this.reloaderApiKey && this.reloaderApiKey !== 'your-secure-api-key'
+    );
   }
 }

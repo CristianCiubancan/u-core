@@ -78,12 +78,8 @@ export class WatcherManager implements Watcher {
     // Initialize the ResourceManager with the generated directory
     const generatedDir = this.getGeneratedDir();
     if (generatedDir) {
-      // We're using the same ResourceManager instance, but we want to make sure
-      // it has the generatedDir property set correctly
-      Object.defineProperty(this.resourceManager, 'generatedDir', {
-        value: generatedDir,
-        writable: false,
-      });
+      // Initialize the resource manager with the generated directory
+      this.resourceManager.scanForResources(generatedDir);
     }
   }
 
@@ -485,6 +481,7 @@ export class WatcherManager implements Watcher {
       `Setting up watcher for generated resources: ${generatedDir}`
     );
 
+    // Log resource manager configuration
     this.logger.info(
       `Resource manager reloader enabled: ${this.resourceManager.isReloaderEnabled()}`
     );

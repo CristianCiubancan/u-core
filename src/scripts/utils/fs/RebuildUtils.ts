@@ -2,12 +2,10 @@
  * Rebuild utilities for handling component rebuilds
  */
 import * as path from 'path';
-import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
 import { ConsoleLogger, LogLevel } from '../logger/ConsoleLogger.js';
 import { ResourceManager } from './ResourceManager.js';
-import { PluginUtils } from './PluginUtils.js';
-import { getProjectPaths, generateManifest, fileSystem } from './index.js';
+import { getProjectPaths, fileSystem } from './index.js';
 import type { Logger, BuildContext } from '../../core/types.js';
 
 /**
@@ -102,7 +100,7 @@ export async function checkForWebviewContent(
  * Rebuild component wrapper to handle common tasks
  * @param componentType Type of component to rebuild
  * @param pluginDir Optional plugin directory for plugin rebuilds
- * @param context Optional rebuild context for class-based pipeline
+ * @param context Optional rebuild context for the pipeline
  */
 export async function rebuildComponent(
   componentType: 'plugin' | 'core' | 'webview',
@@ -119,13 +117,48 @@ export async function rebuildComponent(
   global.isBuilding = true;
 
   try {
-    // If context is provided, use the class-based pipeline
-    if (context) {
-      await rebuildWithClassPipeline(componentType, pluginDir, context);
-    } else {
-      // Otherwise use the function-based pipeline
-      await rebuildWithFunctionPipeline(componentType, pluginDir, logger);
+    // Create a context if one wasn't provided
+    if (!context) {
+      const { rootDir, pluginsDir, coreDir, distDir } = getProjectPaths();
+      const { BuildContextImpl } = await import(
+        '../../core/build/BuildContextImpl.js'
+      );
+      const config = {
+        env: {},
+        options: {
+          minify: false,
+          sourceMaps: true,
+          clean: false,
+        },
+        paths: {
+          rootDir,
+          pluginsDir,
+          coreDir,
+          distDir,
+          webviewDir: path.join(rootDir, 'src', 'webview'),
+        },
+        reloader: {
+          enabled: process.env.RELOADER_ENABLED === 'true',
+          host: process.env.RELOADER_HOST || 'localhost',
+          port: parseInt(process.env.RELOADER_PORT || '3414', 10),
+          apiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
+        },
+      };
+
+      context = new BuildContextImpl({
+        rootDir,
+        pluginsDir,
+        coreDir,
+        distDir,
+        watch: false,
+        reload: true,
+        logger,
+        config,
+      });
     }
+
+    // Use the pipeline
+    await rebuildWithPipeline(componentType, pluginDir, context);
   } catch (error) {
     logger.error(
       `Error in rebuildComponent for ${componentType}: ${
@@ -138,94 +171,12 @@ export async function rebuildComponent(
   }
 }
 
-/**
- * Rebuild using the function-based pipeline
- */
-async function rebuildWithFunctionPipeline(
-  componentType: 'plugin' | 'core' | 'webview',
-  pluginDir: string | undefined,
-  logger: Logger
-): Promise<void> {
-  try {
-    const { coreDir, distDir } = getProjectPaths();
-
-    // Import the builder functions dynamically to avoid circular dependencies
-    const { buildAndGenerateManifests } = await import('../builder/index.js');
-
-    switch (componentType) {
-      case 'plugin': {
-        if (!pluginDir) throw new Error('Plugin directory is required');
-        const pluginUtils = new PluginUtils();
-        const pluginPaths = pluginUtils.findPluginPaths(
-          path.dirname(pluginDir)
-        );
-        const plugins = pluginUtils.parsePluginPaths(
-          pluginPaths.filter((p: string) => p === pluginDir)
-        );
-        await buildAndGenerateManifests(plugins, distDir);
-        break;
-      }
-      case 'core': {
-        const pluginUtils = new PluginUtils();
-        const pluginPaths = pluginUtils.findPluginPaths(coreDir);
-        const corePlugins = pluginUtils.parsePluginPaths(pluginPaths);
-        await buildAndGenerateManifests(corePlugins, distDir);
-        break;
-      }
-      case 'webview': {
-        // If we need to rebuild webview assets, we would handle that here
-        logger.info(
-          'Webview rebuild requested, but no specific handler implemented'
-        );
-        break;
-      }
-    }
-
-    // Check if we need to generate a webview manifest
-    const webviewDir = path.join(distDir, 'webview');
-    if (fs.existsSync(webviewDir)) {
-      logger.info('Generating webview manifest...');
-      generateManifest(
-        {
-          name: 'webview',
-          version: '0.1.0',
-          fx_version: 'cerulean',
-          author: 'Baloony Gaze',
-          games: ['gta5', 'rdr3'],
-          description: 'Shared webview assets',
-          files: ['index.html', 'assets/**/*'],
-        },
-        path.join(webviewDir, 'fxmanifest.lua')
-      );
-    }
-
-    // Deploy built resources
-    const resourceManager = new ResourceManager(fileSystem, logger, {
-      reloaderEnabled: process.env.RELOADER_ENABLED === 'true',
-      reloaderHost: process.env.RELOADER_HOST || 'localhost',
-      reloaderPort: parseInt(process.env.RELOADER_PORT || '3414', 10),
-      reloaderApiKey: process.env.RELOADER_API_KEY || 'your-secure-api-key',
-    });
-    await resourceManager.deployResources(distDir);
-
-    // Notify the reload server about the rebuilt component
-    await notifyReloadServer(componentType, pluginDir, resourceManager, logger);
-
-    logger.info(
-      `Rebuild process for ${componentType}${
-        pluginDir ? `: ${pluginDir}` : ''
-      } completed`
-    );
-  } catch (error) {
-    logger.error(`Error rebuilding ${componentType}:`, error);
-    throw error;
-  }
-}
+// Function-based pipeline has been removed in favor of the class-based pipeline
 
 /**
- * Rebuild using the class-based pipeline
+ * Rebuild using the pipeline
  */
-async function rebuildWithClassPipeline(
+async function rebuildWithPipeline(
   componentType: 'plugin' | 'core' | 'webview',
   pluginDir: string | undefined,
   context: RebuildContext
