@@ -18,8 +18,7 @@ export class CLI {
    * Create a new CLI
    */
   constructor() {
-    // Set log level to Debug to see all logs
-    this.logger = new ConsoleLogger({ minLevel: LogLevel.Debug });
+    this.logger = new ConsoleLogger({ minLevel: LogLevel.Info });
     this.commands = new Map();
 
     // Register commands

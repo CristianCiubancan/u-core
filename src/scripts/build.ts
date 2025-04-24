@@ -999,22 +999,6 @@ async function buildPlugin(
     // Read plugin.json
     const jsonPath = path.join(plugin.fullPath, 'plugin.json');
 
-    // Debug information
-    console.log(`Plugin fullPath: ${plugin.fullPath}`);
-    console.log(`Looking for plugin.json at: ${jsonPath}`);
-    console.log(`Absolute path: ${path.resolve(jsonPath)}`);
-    console.log(`File exists: ${fs.existsSync(jsonPath)}`);
-
-    // List directory contents
-    try {
-      const dirPath = plugin.fullPath;
-      console.log(`Directory contents of ${dirPath}:`);
-      const files = fs.readdirSync(dirPath);
-      files.forEach((file) => console.log(`- ${file}`));
-    } catch (dirErr) {
-      console.log(`Could not read directory: ${dirErr}`);
-    }
-
     const pluginJsonData = readPluginJson(jsonPath);
 
     // If plugin.json is not found, skip this plugin
