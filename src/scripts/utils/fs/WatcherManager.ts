@@ -211,43 +211,28 @@ export class WatcherManager implements Watcher {
     this.logger.debug(`Setting up plugin watchers for ${pluginsDir}`);
 
     try {
-      // Method 1: Watch each plugin directory individually
-      const pluginPaths = findPluginPaths(pluginsDir);
-      const outputPaths = [distDir];
+      // Watch the entire plugins directory
+      this.setupDirectoryWatcher(
+        pluginsDir,
+        'plugins directory',
+        [distDir],
+        /\.(ts|json|lua|tsx|jsx|css|html)$/,
+        (filePath) => {
+          // Get the plugin directory
+          const pluginDir = this.getPluginDirFromFilePath(filePath, pluginsDir);
 
-      // Set up individual plugin watchers
-      for (const pluginDir of pluginPaths) {
-        const normalizedPluginDir = path.normalize(pluginDir);
-
-        this.setupDirectoryWatcher(
-          normalizedPluginDir,
-          `plugin ${path.basename(normalizedPluginDir)}`,
-          outputPaths,
-          /\.(ts|json|lua|tsx|jsx|css|html)$/,
-          () => {
-            this.debouncedTaskManager.execute(normalizedPluginDir, () =>
-              rebuildComponent('plugin', normalizedPluginDir)
+          if (pluginDir) {
+            this.logger.debug(
+              `File changed in plugin ${path.basename(pluginDir)}: ${filePath}`
             );
+
+            // Rebuild the plugin
+            this.debouncedTaskManager.execute(pluginDir, async () => {
+              await rebuildComponent('plugin', pluginDir);
+            });
           }
-        );
-      }
-
-      // Method 2: Watch the entire plugins directory
-      this.watch([pluginsDir], (filePath) => {
-        // Get the plugin directory
-        const pluginDir = this.getPluginDirFromFilePath(filePath, pluginsDir);
-
-        if (pluginDir) {
-          this.logger.debug(
-            `File changed in plugin ${path.basename(pluginDir)}: ${filePath}`
-          );
-
-          // Rebuild the plugin
-          this.debouncedTaskManager.execute(pluginDir, async () => {
-            await rebuildComponent('plugin', pluginDir);
-          });
         }
-      });
+      );
     } catch (error) {
       this.logger.error(`Error setting up plugin watchers:`, error);
     }
@@ -267,28 +252,21 @@ export class WatcherManager implements Watcher {
     this.logger.debug(`Setting up core watcher for ${coreDir}`);
 
     try {
-      // Method 1: Use setupDirectoryWatcher
+      // Use setupDirectoryWatcher for consistency
       this.setupDirectoryWatcher(
         coreDir,
         'core',
         [distDir],
         /\.(ts|json|lua)$/,
-        () => {
-          this.debouncedTaskManager.execute('core', () =>
-            rebuildComponent('core')
-          );
+        (filePath) => {
+          this.logger.debug(`File changed in core: ${filePath}`);
+
+          // Rebuild the core
+          this.debouncedTaskManager.execute('core', async () => {
+            await rebuildComponent('core');
+          });
         }
       );
-
-      // Method 2: Use watch
-      this.watch([coreDir], (filePath) => {
-        this.logger.debug(`File changed in core: ${filePath}`);
-
-        // Rebuild the core
-        this.debouncedTaskManager.execute('core', async () => {
-          await rebuildComponent('core');
-        });
-      });
     } catch (error) {
       this.logger.error(`Error setting up core watcher:`, error);
     }
@@ -308,91 +286,52 @@ export class WatcherManager implements Watcher {
     this.logger.debug(`Setting up webview watcher for ${pluginsDir}`);
 
     try {
-      // Method 1: Watch for changes in html/Page.tsx files
+      // Watch for Page.tsx files in the plugins directory
+      const pageTsxPattern = path.join(pluginsDir, '**', 'html', 'Page.tsx');
+
       this.setupDirectoryWatcher(
         pluginsDir,
         'webview files',
         [distDir],
         /html\/Page\.tsx$/,
         (filePath) => {
-          this.logger.info(`Webview file changed: ${filePath}`);
+          this.logger.info(`Page.tsx file changed: ${filePath}`);
+
           // Get the plugin directory containing this file
           const pluginDir = path.dirname(path.dirname(filePath));
-          this.debouncedTaskManager.execute(`webview-${pluginDir}`, () =>
-            rebuildComponent('plugin', pluginDir)
-          );
-        }
-      );
 
-      // Method 2: Watch for all .tsx files in the plugins directory
-      const tsxPattern = path.join(pluginsDir, '**', '*.tsx');
-      this.logger.info(
-        `Setting up watcher for TSX files with pattern: ${tsxPattern}`
-      );
-
-      this.watch([tsxPattern], (filePath) => {
-        this.logger.info(`TSX file changed: ${filePath}`);
-
-        // Get the plugin directory containing this file
-        const pluginDir = this.getPluginDirFromFilePath(filePath, pluginsDir);
-        if (!pluginDir) {
-          this.logger.warn(
-            `Could not determine plugin directory for ${filePath}`
-          );
-          return;
-        }
-
-        // Check if this is a Page.tsx file
-        const isPageTsx =
-          filePath.includes('html') && path.basename(filePath) === 'Page.tsx';
-
-        if (isPageTsx) {
-          this.logger.info(`=== PAGE.TSX FILE CHANGED: ${filePath} ===`);
-          this.logger.info(`This should trigger a complete webview rebuild`);
-        }
-
-        // Use a specific debounce key for this plugin
-        const debounceKey = `webview-${pluginDir}-${
-          isPageTsx ? 'page' : 'tsx'
-        }`;
-
-        this.debouncedTaskManager.execute(debounceKey, async () => {
-          try {
-            // First rebuild the plugin to ensure all assets are up to date
-            this.logger.info(
-              `Rebuilding plugin ${pluginDir} due to TSX file change`
+          if (!pluginDir) {
+            this.logger.warn(
+              `Could not determine plugin directory for ${filePath}`
             );
-            await rebuildComponent('plugin', pluginDir);
-
-            // If this is a Page.tsx file, also rebuild the webview
-            if (isPageTsx) {
-              this.logger.info(
-                `=== EXPLICITLY TRIGGERING WEBVIEW REBUILD FOR PAGE.TSX CHANGE ===`
-              );
-              this.logger.info(
-                `Rebuilding webview after plugin ${pluginDir} rebuild for Page.tsx`
-              );
-
-              // Force a small delay to ensure the plugin rebuild is complete
-              await new Promise((resolve) => setTimeout(resolve, 500));
-
-              try {
-                // Rebuild the webview
-                await rebuildComponent('webview', undefined);
-              } catch (webviewError) {
-                this.logger.error(`Error in webview rebuild:`, webviewError);
-              }
-
-              this.logger.info(`=== WEBVIEW REBUILD COMPLETED ===`);
-            }
-          } catch (error) {
-            this.logger.error(
-              `Error rebuilding after TSX file change in ${pluginDir}:`,
-              error
-            );
+            return;
           }
-        });
-      });
+
+          // Use a specific debounce key for this plugin
+          const debounceKey = `webview-${pluginDir}`;
+
+          this.debouncedTaskManager.execute(debounceKey, async () => {
+            try {
+              // First rebuild the plugin to ensure all assets are up to date
+              this.logger.info(
+                `Rebuilding plugin ${pluginDir} due to Page.tsx change`
+              );
+              await rebuildComponent('plugin', pluginDir);
+
+              // Then rebuild the webview
+              this.logger.info(
+                `Rebuilding webview after plugin ${pluginDir} rebuild`
+              );
+              await rebuildComponent('webview', undefined);
+            } catch (error) {
+              this.logger.error(
+                `Error rebuilding after Page.tsx change in ${pluginDir}:`,
+                error
+              );
+            }
+          });
+        }
+      );
     } catch (error) {
       this.logger.error(`Error setting up webview watcher:`, error);
     }
@@ -622,9 +561,9 @@ export class WatcherManager implements Watcher {
             !resourceName.endsWith(']')
           ) {
             this.logger.info(
-              `Resource change detected in generated folder for '${resourceName}' (will restart after 3s debounce)`
+              `Resource change detected in generated folder for '${resourceName}' (will restart after debounce)`
             );
-            // Use a longer debounce time (3 seconds) for generated resources to prevent rapid restarts
+            // Use the resource debounce time for generated resources to prevent rapid restarts
             this.debouncedTaskManager.execute(
               `generated-resource-${resourceName}`,
               async () => {
@@ -632,8 +571,7 @@ export class WatcherManager implements Watcher {
                   `Debounced restart for generated resource: ${resourceName}`
                 );
                 await this.resourceManager.restartResource(resourceName);
-              },
-              3000 // Use a longer debounce time (3 seconds)
+              }
             );
           }
         } catch (error) {
