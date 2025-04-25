@@ -11,8 +11,7 @@
     "translations/*.json",
     "translations/*.lua",
     "translations/*.js",
-    "html/**/*.js",
-    "html/**/*.css"
+    "html/**/*"
   ],
   "ui_page": "html/index.html"
 }
