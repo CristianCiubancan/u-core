@@ -22,12 +22,6 @@ interface BuildOptions {
   distDir: string;
 
   /**
-   * Number of plugins to build in parallel
-   * If not provided, it will use number of CPU cores - 1 (minimum 1)
-   */
-  concurrency: number;
-
-  /**
    * Whether to clean the dist directory before building
    * @default true
    */
@@ -64,19 +58,12 @@ class PluginBuilder {
   private watcher: chokidar.FSWatcher | null = null;
 
   constructor(options: Partial<BuildOptions> = {}) {
-    // Calculate default concurrency based on available CPU cores
-    const defaultConcurrency = Math.max(1, os.cpus().length - 1);
-
     // Set default options
     this.options = {
       pluginsDir: options.pluginsDir || 'src/plugins',
       distDir:
         options.distDir ||
         `txData/${process.env.SERVER_NAME}/resources/[GENERATED]`,
-      concurrency:
-        options.concurrency !== undefined
-          ? options.concurrency
-          : defaultConcurrency,
       clean: options.clean !== undefined ? options.clean : true,
       logLevel: options.logLevel || 'info',
       continueOnError:
@@ -124,12 +111,9 @@ class PluginBuilder {
       const plugins = this.fileManager.getAllPlugins();
 
       // Report how many plugins we'll build
-      const concurrency = this.options.concurrency;
       this.log(
         'info',
-        chalk.bold(
-          `Building ${plugins.length} plugins with concurrency ${concurrency}`
-        )
+        chalk.bold(`Building ${plugins.length} plugins sequentially`)
       );
 
       // Clean dist directory if requested
@@ -139,8 +123,10 @@ class PluginBuilder {
         this.log('info', chalk.green('✓') + ' Distribution directory cleaned');
       }
 
-      // Build plugins in parallel but with concurrency limit
-      await this.buildPluginsWithConcurrency(plugins, concurrency);
+      // Build plugins sequentially
+      for (const plugin of plugins) {
+        await this.buildSinglePlugin(plugin);
+      }
 
       // Log completion
       const totalTime = ((performance.now() - this.startTime) / 1000).toFixed(
@@ -260,11 +246,10 @@ class PluginBuilder {
         }
 
         if (plugins.length > 0) {
-          // Build the changed plugins with concurrency
-          await this.buildPluginsWithConcurrency(
-            plugins,
-            this.options.concurrency
-          );
+          // Build the changed plugins sequentially
+          for (const plugin of plugins) {
+            await this.buildSinglePlugin(plugin);
+          }
 
           // Log completion
           const totalTime = (
@@ -406,58 +391,6 @@ class PluginBuilder {
   }
 
   /**
-   * Build plugins with concurrency control
-   */
-  private async buildPluginsWithConcurrency(
-    plugins: Plugin[],
-    concurrency: number
-  ): Promise<void> {
-    const queue = [...plugins];
-    const inProgress = new Set<string>();
-    const completed = new Set<string>();
-
-    // Process queue until empty
-    while (queue.length > 0 || inProgress.size > 0) {
-      // Fill up to concurrency limit
-      while (queue.length > 0 && inProgress.size < concurrency) {
-        const plugin = queue.shift()!;
-        inProgress.add(plugin.pluginName);
-
-        // Start building this plugin (don't await here)
-        this.buildSinglePlugin(plugin)
-          .then(() => {
-            inProgress.delete(plugin.pluginName);
-            completed.add(plugin.pluginName);
-          })
-          .catch((error) => {
-            inProgress.delete(plugin.pluginName);
-            completed.add(plugin.pluginName);
-
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            this.pluginResults.set(plugin.pluginName, {
-              success: false,
-              time: 0,
-              error: errorMessage,
-            });
-
-            if (!this.options.continueOnError) {
-              throw error;
-            }
-          });
-      }
-
-      // Delay slightly before checking again to reduce CPU usage
-      if (
-        inProgress.size >= concurrency ||
-        (queue.length === 0 && inProgress.size > 0)
-      ) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-  }
-
-  /**
    * Build a single plugin
    */
   private async buildSinglePlugin(plugin: Plugin): Promise<void> {
@@ -578,10 +511,6 @@ function parseArgs(): Partial<BuildOptions> {
       case '-d':
         options.distDir = args[++i];
         break;
-      case '--concurrency':
-      case '-c':
-        options.concurrency = parseInt(args[++i], 10);
-        break;
       case '--no-clean':
         options.clean = false;
         break;
@@ -617,14 +546,13 @@ function parseArgs(): Partial<BuildOptions> {
  */
 function printHelp(): void {
   console.log(`
-Plugin Builder - Build plugins in parallel
+Plugin Builder - Build plugins sequentially
 
 Usage: ts-node build.ts [options]
 
 Options:
   --plugins-dir, -p <dir>  Path to plugins directory (default: src/plugins)
   --dist-dir, -d <dir>     Path to distribution directory (default: dist)
-  --concurrency, -c <num>  Number of plugins to build in parallel (default: CPU cores - 1)
   --no-clean               Don't clean the dist directory before building
   --log-level, -l <level>  Log level: verbose, info, warn, error (default: info)
   --stop-on-error          Stop building if a plugin fails
