@@ -77,7 +77,8 @@ class BuildManager {
         this.buildPluginTs(plugin),
         this.buildPluginJs(plugin),
         this.buildPluginPageTsx(plugin),
-        this.buildPluginManifest(plugin), // Add this line to build the manifest
+        this.buildPluginManifest(plugin),
+        this.buildPluginOtherFiles(plugin),
       ]);
 
       console.log(
@@ -1220,6 +1221,84 @@ export default App;
     }
 
     return custom;
+  }
+
+  /**
+   * Builds other files for a plugin by copying untreated extensions to the output folder
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginOtherFiles(
+    pluginNameOrPath: string | Plugin
+  ): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Define the extensions that are already handled by other methods
+      const handledExtensions = ['.lua', '.json', '.ts', '.js', '.tsx', '.jsx'];
+
+      // Filter files that don't have handled extensions
+      const otherFiles = plugin.files.filter(
+        (file) => !handledExtensions.some((ext) => file.fileName.endsWith(ext))
+      );
+
+      for (const file of otherFiles) {
+        console.log(`Copying other file: ${file.fileName}`);
+      }
+
+      if (otherFiles.length === 0) {
+        console.log(`No other files found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      // Log the types of files being copied
+      const extensionCounts = new Map<string, number>();
+      for (const file of otherFiles) {
+        const ext = path.extname(file.fileName).toLowerCase();
+        extensionCounts.set(ext, (extensionCounts.get(ext) || 0) + 1);
+      }
+
+      const extensionSummary = Array.from(extensionCounts.entries())
+        .map(([ext, count]) => `${count} ${ext || '(no extension)'} file(s)`)
+        .join(', ');
+
+      console.log(
+        `Copying other files for plugin ${plugin.pluginName}: ${extensionSummary}`
+      );
+
+      await this.copyFilesToDist(plugin, otherFiles);
+      console.log(
+        `✓ Built ${otherFiles.length} other file(s) for plugin ${plugin.pluginName}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building other files for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build other files for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building other files for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build other files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
   }
 }
 
