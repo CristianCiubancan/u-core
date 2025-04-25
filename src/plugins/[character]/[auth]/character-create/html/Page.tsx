@@ -235,7 +235,7 @@ export default function Page() {
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Right content - Tab content */}
-        <div className="flex-1 p-4 overflow-y-auto text-readable">
+        <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
           {activeTab === 'model' && (
             <ModelTab
               currentModel={characterData.model}
