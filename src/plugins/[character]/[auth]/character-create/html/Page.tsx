@@ -230,7 +230,7 @@ export default function Page() {
       onZoomCamera={handleZoomCamera}
       onFocusCamera={handleFocusCamera}
     >
-      <div className="flex h-auto min-h-[500px] max-h-[80vh]">
+      <div className="flex h-full">
         {/* Left sidebar - Tabs */}
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 

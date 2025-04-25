@@ -58,9 +58,9 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className={`absolute inset-0 flex ${getPositionClasses()}`}>
+    <div className={`inset-0 h-screen py-8 flex ${getPositionClasses()}`}>
       <div
-        className={`glass-dark font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full sm:w-[90%] md:w-[60%] lg:w-[45%] xl:w-[35%] overflow-hidden flex flex-col ${getContainerClasses()}`}
+        className={`glass-dark h-full font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full sm:w-[90%] md:w-[60%] lg:w-[45%] xl:w-[35%] overflow-hidden flex flex-col ${getContainerClasses()}`}
       >
         {/* Header */}
         <div className="glass-brand-dark p-3 flex justify-between items-center border-b border-brand-700">
