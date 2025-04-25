@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const { grayPalettes, colorPalettes } = require('./colors');
+const { grayPalettes, colorPalettes, semanticColors } = require('./colors');
 const { createScrollbarStyles } = require('../utils/scrollbarUtils');
 const { getContrastRatio, hexToRgb } = require('../utils/colorUtils');
 
@@ -7,8 +7,8 @@ const fontSizeMultiplier = 1.15; // Optimized for readability
 
 // Configuration settings
 const config = {
-  brandColor: 'indigo', // Changed to indigo for better visual appeal and readability
-  grayColor: 'slate', // Changed to slate for better contrast with indigo
+  brandColor: 'indigo', // Modern, professional brand color
+  grayColor: 'slate', // Cool-toned gray for better contrast with indigo
 };
 
 // Get active palette references
@@ -33,65 +33,63 @@ function createGlassStyles(background, border, boxShadow, scrollbarConfig) {
 
 // Function to generate merged glass classes with the active brand color and matching scrollbars
 function generateMergedGlassClasses() {
-  const lightText = grayPalette[50]; // e.g., #f9fafb
-  const darkText = grayPalette[800]; // Using 800 instead of 900 for less harsh contrast
-
+  // Use semantic colors for glass effects
   return {
     '.glass': {
       ...createGlassStyles(
-        `rgba(${hexToRgb(grayPalette[50])}, 0.25)`, // Slightly increased opacity for better visibility
-        `1px solid rgba(${hexToRgb(grayPalette[200])}, 0.3)`, // Changed to slightly darker border
-        `0 4px 30px rgba(${hexToRgb(grayPalette[900])}, 0.15)`, // Increased shadow opacity
+        semanticColors.glass.light.background,
+        `1px solid ${semanticColors.glass.light.border}`,
+        `0 4px 30px rgba(${hexToRgb(grayPalette[900])}, 0.15)`,
         {
-          trackBg: `rgba(${hexToRgb(grayPalette[100])}, 0.2)`, // Darker track for better visibility
-          thumbBg: `rgba(${hexToRgb(grayPalette[300])}, 0.3)`, // Darker thumb
-          thumbBorder: `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`, // Darker border
-          thumbHoverBg: `rgba(${hexToRgb(grayPalette[400])}, 0.4)`, // Darker hover state
+          trackBg: `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+          thumbBg: `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+          thumbBorder: `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+          thumbHoverBg: `rgba(${hexToRgb(grayPalette[400])}, 0.4)`,
         }
       ),
-      color: darkText, // Dark text for light backgrounds
+      color: semanticColors.glass.light.text,
     },
     '.glass-dark': {
       ...createGlassStyles(
-        `rgba(${hexToRgb(grayPalette[900])}, 0.7)`, // Increased opacity for better visibility
-        `1px solid rgba(${hexToRgb(grayPalette[700])}, 0.2)`, // Darker border for better definition
-        `0 6px 32px rgba(${hexToRgb(grayPalette[900])}, 0.25)`, // Increased shadow size and opacity
+        semanticColors.glass.dark.background,
+        `1px solid ${semanticColors.glass.dark.border}`,
+        `0 6px 32px rgba(${hexToRgb(grayPalette[900])}, 0.25)`,
         {
-          trackBg: `rgba(${hexToRgb(grayPalette[800])}, 0.4)`, // Darker track
-          thumbBg: `rgba(${hexToRgb(grayPalette[600])}, 0.6)`, // Lighter thumb for better visibility
-          thumbBorder: `2px solid rgba(${hexToRgb(grayPalette[700])}, 0.3)`, // Lighter border
-          thumbHoverBg: `rgba(${hexToRgb(grayPalette[500])}, 0.7)`, // Even lighter on hover
+          trackBg: `rgba(${hexToRgb(grayPalette[800])}, 0.4)`,
+          thumbBg: `rgba(${hexToRgb(grayPalette[600])}, 0.6)`,
+          thumbBorder: `2px solid rgba(${hexToRgb(grayPalette[700])}, 0.3)`,
+          thumbHoverBg: `rgba(${hexToRgb(grayPalette[500])}, 0.7)`,
         }
       ),
-      color: lightText, // Light text for dark backgrounds
+      color: semanticColors.glass.dark.text,
     },
     '.glass-brand': {
       ...createGlassStyles(
-        `rgba(${hexToRgb(brandPalette[50])}, 0.6)`, // Using much lighter shade with higher opacity
-        `1px solid rgba(${hexToRgb(brandPalette[200])}, 0.4)`, // Lighter border with higher opacity
-        `0 6px 30px rgba(${hexToRgb(brandPalette[500])}, 0.15)`, // Using mid-tone for shadows
+        semanticColors.glass.brand.light.background,
+        `1px solid ${semanticColors.glass.brand.light.border}`,
+        `0 6px 30px rgba(${hexToRgb(brandPalette[500])}, 0.15)`,
         {
-          trackBg: `rgba(${hexToRgb(brandPalette[100])}, 0.3)`, // Lighter track
-          thumbBg: `rgba(${hexToRgb(brandPalette[400])}, 0.5)`, // Using mid-tone for thumb
-          thumbBorder: `2px solid rgba(${hexToRgb(brandPalette[300])}, 0.3)`, // Lighter border
-          thumbHoverBg: `rgba(${hexToRgb(brandPalette[500])}, 0.6)`, // Darker on hover for better feedback
+          trackBg: `rgba(${hexToRgb(brandPalette[100])}, 0.3)`,
+          thumbBg: `rgba(${hexToRgb(brandPalette[400])}, 0.5)`,
+          thumbBorder: `2px solid rgba(${hexToRgb(brandPalette[300])}, 0.3)`,
+          thumbHoverBg: `rgba(${hexToRgb(brandPalette[500])}, 0.6)`,
         }
       ),
-      color: darkText, // Dark text for light backgrounds
+      color: semanticColors.glass.brand.light.text,
     },
     '.glass-brand-dark': {
       ...createGlassStyles(
-        `rgba(${hexToRgb(brandPalette[800])}, 0.8)`, // Darker base with higher opacity for better readability
-        `1px solid rgba(${hexToRgb(brandPalette[600])}, 0.5)`, // Mid-tone border with higher opacity
-        `0 8px 36px rgba(${hexToRgb(brandPalette[900])}, 0.3)`, // Increased shadow size and opacity
+        semanticColors.glass.brand.dark.background,
+        `1px solid ${semanticColors.glass.brand.dark.border}`,
+        `0 8px 36px rgba(${hexToRgb(brandPalette[900])}, 0.3)`,
         {
-          trackBg: `rgba(${hexToRgb(brandPalette[700])}, 0.4)`, // Darker track
-          thumbBg: `rgba(${hexToRgb(brandPalette[400])}, 0.7)`, // Much lighter thumb for contrast
-          thumbBorder: `2px solid rgba(${hexToRgb(brandPalette[500])}, 0.5)`, // Lighter border with increased opacity
-          thumbHoverBg: `rgba(${hexToRgb(brandPalette[300])}, 0.8)`, // Even lighter on hover for clear feedback
+          trackBg: `rgba(${hexToRgb(brandPalette[700])}, 0.4)`,
+          thumbBg: `rgba(${hexToRgb(brandPalette[400])}, 0.7)`,
+          thumbBorder: `2px solid rgba(${hexToRgb(brandPalette[500])}, 0.5)`,
+          thumbHoverBg: `rgba(${hexToRgb(brandPalette[300])}, 0.8)`,
         }
       ),
-      color: lightText, // Light text for dark backgrounds
+      color: semanticColors.glass.brand.dark.text,
     },
   };
 }
@@ -134,6 +132,7 @@ function generateFontSizes() {
 
 // Generate safelist for colors
 function generateSafelist() {
+  // Core color classes
   const colorTypes = [
     { palettes: colorPalettes, prefix: '' },
     { palettes: grayPalettes, prefix: '' },
@@ -159,6 +158,7 @@ function generateSafelist() {
     )
   );
 
+  // Glass effect classes
   const glassClasses = [
     'glass',
     'glass-dark',
@@ -170,6 +170,7 @@ function generateSafelist() {
     'hover:glass-brand-dark',
   ];
 
+  // Accessibility classes
   const accessibilityClasses = [
     'text-accessible-light',
     'text-accessible-dark',
@@ -177,8 +178,16 @@ function generateSafelist() {
     'text-accessible-on-glass',
     'text-on-dark',
     'text-on-light',
+    'text-primary',
+    'text-secondary',
+    'text-tertiary',
+    'text-inverted',
+    'text-link',
+    'text-error',
+    'text-disabled',
   ];
 
+  // Cursor classes
   const cursorClasses = [
     'cursor-pointer',
     'cursor-default',
@@ -188,16 +197,60 @@ function generateSafelist() {
     'cursor-not-allowed',
   ];
 
+  // Semantic UI background classes
+  const uiBackgroundClasses = [
+    // Page backgrounds
+    'bg-ui-background-page',
+    'bg-ui-background-card',
+    'bg-ui-background-modal',
+
+    // Input backgrounds
+    'bg-ui-background-input-default',
+    'bg-ui-background-input-disabled',
+
+    // State backgrounds
+    'bg-ui-background-hover',
+    'bg-ui-background-selected',
+    'bg-ui-background-disabled',
+  ];
+
+  // Semantic UI border classes
+  const uiBorderClasses = [
+    'border-ui-border-default',
+    'border-ui-border-focus',
+    'border-ui-border-hover',
+    'border-ui-border-error',
+  ];
+
+  // Semantic feedback classes
+  const feedbackClasses = [
+    // Success
+    'bg-feedback-success-background',
+    'border-feedback-success-border',
+    'text-feedback-success-text',
+    'text-feedback-success-icon',
+
+    // Warning
+    'bg-feedback-warning-background',
+    'border-feedback-warning-border',
+    'text-feedback-warning-text',
+    'text-feedback-warning-icon',
+
+    // Error
+    'bg-feedback-error-background',
+    'border-feedback-error-border',
+    'text-feedback-error-text',
+    'text-feedback-error-icon',
+
+    // Info
+    'bg-feedback-info-background',
+    'border-feedback-info-border',
+    'text-feedback-info-text',
+    'text-feedback-info-icon',
+  ];
+
   // Enhanced utility classes for UI/UX readability
   const extraClasses = [
-    // Text colors
-    'text-gray-400',
-    'text-gray-500',
-    'text-gray-600',
-    'text-primary',
-    'text-secondary',
-    'text-muted',
-
     // Shadows for depth
     'shadow-sm',
     'shadow',
@@ -268,6 +321,9 @@ function generateSafelist() {
     ...glassClasses,
     ...accessibilityClasses,
     ...cursorClasses,
+    ...uiBackgroundClasses,
+    ...uiBorderClasses,
+    ...feedbackClasses,
     ...extraClasses,
   ];
 }
@@ -278,64 +334,80 @@ function generateAccessibleTextUtilities() {
   const isDarkBrand =
     getContrastRatio(brandPalette[600], grayPalette[50]) >= 4.5;
 
-  // Using 100 instead of 50 for light text - slightly darker for reduced eye strain
-  const lightTextColor = grayPalette[100];
-
-  // Using 800 instead of 900 for dark text - slightly lighter for less harsh contrast
-  const darkTextColor = grayPalette[800];
-
-  // Define background contexts and their accessible text colors
+  // Define background contexts and their accessible text colors using semantic tokens
   const accessibleTextUtilities = {
     // For light backgrounds (use dark text)
     '.text-accessible-light': {
-      color: darkTextColor,
+      color: semanticColors.ui.text.primary,
       'font-weight': '450', // Slightly heavier than normal for better readability on light backgrounds
     },
 
     // For dark backgrounds (use light text)
     '.text-accessible-dark': {
-      color: lightTextColor,
+      color: 'white',
       'font-weight': '400', // Normal weight for readability on dark backgrounds
       'letter-spacing': '0.01em', // Slightly increased letter spacing for better readability on dark
     },
 
     // For brand color backgrounds (dynamically choose based on brand color's brightness)
     '.text-accessible-on-brand': {
-      color: isDarkBrand ? lightTextColor : darkTextColor,
+      color: isDarkBrand ? 'white' : semanticColors.ui.text.primary,
       'font-weight': isDarkBrand ? '400' : '450', // Adaptive font weight
       'letter-spacing': isDarkBrand ? '0.01em' : 'normal', // Adaptive letter spacing
     },
 
     // For glass elements (general, assumes darkish background)
     '.text-accessible-on-glass': {
-      'color': lightTextColor,
+      'color': 'white',
       'text-shadow': `0 1px 3px rgba(${hexToRgb(grayPalette[900])}, 0.6)`, // Stronger text shadow for better readability
       'letter-spacing': '0.01em', // Slightly increased letter spacing
     },
 
     // For dark backgrounds (e.g., .glass-dark, .glass-brand-dark)
     '.text-on-dark': {
-      color: grayPalette[200], // Light text for dark backgrounds
+      color: semanticColors.ui.text.inverted,
       'font-weight': '400', // Normal weight
       'letter-spacing': '0.01em', // Slightly increased letter spacing
     },
 
     // For light backgrounds (e.g., .glass, .glass-brand)
     '.text-on-light': {
-      color: grayPalette[700], // Dark text for light backgrounds
+      color: semanticColors.ui.text.primary,
       'font-weight': '450', // Slightly heavier than normal
     },
 
-    // New: For primary UI elements
+    // For primary UI elements
     '.text-primary': {
-      color: brandPalette[600],
+      color: semanticColors.ui.text.primary,
       'font-weight': '500', // Medium weight for emphasis
     },
 
-    // New: For secondary/supporting text
+    // For secondary/supporting text
     '.text-secondary': {
-      color: grayPalette[500],
+      color: semanticColors.ui.text.secondary,
       'font-weight': '400', // Normal weight
+    },
+
+    // For tertiary/muted text
+    '.text-tertiary': {
+      color: semanticColors.ui.text.tertiary,
+      'font-weight': '400', // Normal weight
+    },
+
+    // For links
+    '.text-link': {
+      color: semanticColors.ui.text.link,
+      'font-weight': '500', // Medium weight for emphasis
+      'text-decoration': 'none',
+      '&:hover': {
+        'text-decoration': 'underline',
+      },
+    },
+
+    // For error text
+    '.text-error': {
+      color: semanticColors.ui.text.error,
+      'font-weight': '500', // Medium weight for emphasis
     },
   };
 
@@ -352,10 +424,59 @@ module.exports = {
     extend: {
       fontSize: generateFontSizes(),
       colors: {
-        // Set the active brand color
+        // Core color palettes
         brand: brandPalette,
-        // Set the active gray color
         gray: grayPalette,
+
+        // Semantic UI colors
+        ui: {
+          background: {
+            page: semanticColors.ui.background.page,
+            card: semanticColors.ui.background.card,
+            modal: semanticColors.ui.background.modal,
+            input: {
+              default: semanticColors.ui.background.input.default,
+              disabled: semanticColors.ui.background.input.disabled,
+            },
+            hover: semanticColors.ui.background.hover,
+            selected: semanticColors.ui.background.selected,
+            disabled: semanticColors.ui.background.disabled,
+          },
+          border: {
+            default: semanticColors.ui.border.default,
+            focus: semanticColors.ui.border.focus,
+            hover: semanticColors.ui.border.hover,
+            error: semanticColors.ui.border.error,
+          },
+        },
+
+        // Feedback colors
+        feedback: {
+          success: {
+            background: semanticColors.feedback.success.background,
+            border: semanticColors.feedback.success.border,
+            text: semanticColors.feedback.success.text,
+            icon: semanticColors.feedback.success.icon,
+          },
+          warning: {
+            background: semanticColors.feedback.warning.background,
+            border: semanticColors.feedback.warning.border,
+            text: semanticColors.feedback.warning.text,
+            icon: semanticColors.feedback.warning.icon,
+          },
+          error: {
+            background: semanticColors.feedback.error.background,
+            border: semanticColors.feedback.error.border,
+            text: semanticColors.feedback.error.text,
+            icon: semanticColors.feedback.error.icon,
+          },
+          info: {
+            background: semanticColors.feedback.info.background,
+            border: semanticColors.feedback.info.border,
+            text: semanticColors.feedback.info.text,
+            icon: semanticColors.feedback.info.icon,
+          },
+        },
       },
       boxShadow: {
         'glass': `0 4px 30px rgba(${hexToRgb(grayPalette[900])}, 0.1)`,
@@ -371,19 +492,15 @@ module.exports = {
           grayPalette[900]
         )}, 0.05), 0 8px 16px rgba(${hexToRgb(grayPalette[900])}, 0.1)`,
       },
-      // Add accessible text color combinations
+      // Add semantic text colors
       textColor: {
-        'accessible': {
-          'on-light': grayPalette[800], // Using 800 instead of 900 for less harsh contrast
-          'on-dark': grayPalette[100], // Using 100 instead of 50 for reduced eye strain
-          'on-brand':
-            getContrastRatio(brandPalette[600], grayPalette[50]) >= 4.5
-              ? grayPalette[100]
-              : grayPalette[800],
-        },
-        'primary': brandPalette[600],
-        'secondary': grayPalette[500],
-        'muted': grayPalette[400],
+        'primary': semanticColors.ui.text.primary,
+        'secondary': semanticColors.ui.text.secondary,
+        'tertiary': semanticColors.ui.text.tertiary,
+        'inverted': semanticColors.ui.text.inverted,
+        'link': semanticColors.ui.text.link,
+        'error': semanticColors.ui.text.error,
+        'disabled': semanticColors.ui.text.disabled,
       },
       borderRadius: {
         'xs': '0.125rem',
