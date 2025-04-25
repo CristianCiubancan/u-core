@@ -1,3 +1,3 @@
 export default function Page() {
-  return <div className="h-64 bg-teal-500"> 123121</div>;
+  return <div className="h-64 bg-blue-500"> Salutare 123123</div>;
 }

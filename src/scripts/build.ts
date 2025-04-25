@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { FileManager } from './managers/FileManager.js';
 import { BuildManager } from './managers/BuildManager.js';
 import { Plugin } from './types/Plugin.js';
@@ -69,7 +70,9 @@ class PluginBuilder {
     // Set default options
     this.options = {
       pluginsDir: options.pluginsDir || 'src/plugins',
-      distDir: options.distDir || 'dist',
+      distDir:
+        options.distDir ||
+        `txData/${process.env.SERVER_NAME}/resources/[GENERATED]`,
       concurrency:
         options.concurrency !== undefined
           ? options.concurrency
