@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
+import { CameraControls } from './CameraControls';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,9 @@ interface LayoutProps {
   onClose: () => void;
   isSaving: boolean;
   anchor: 'left' | 'top' | 'bottom' | 'right';
+  onRotateCamera: (direction: 'left' | 'right') => void;
+  onZoomCamera: (direction: 'in' | 'out') => void;
+  onFocusCamera: (focus: 'head' | 'body' | 'legs') => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -17,6 +21,9 @@ export const Layout: React.FC<LayoutProps> = ({
   onClose,
   isSaving,
   anchor = 'left',
+  onRotateCamera,
+  onZoomCamera,
+  onFocusCamera,
 }) => {
   // Determine positioning classes based on anchor
   const getPositionClasses = () => {
@@ -51,11 +58,9 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div
-      className={`absolute inset-0 flex bg-black bg-opacity-50 ${getPositionClasses()}`}
-    >
+    <div className={`absolute inset-0 flex ${getPositionClasses()}`}>
       <div
-        className={`glass-dark font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full sm:w-[90%] md:w-[60%] lg:w-[45%] xl:w-[35%] overflow-hidden ${getContainerClasses()}`}
+        className={`glass-dark font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full sm:w-[90%] md:w-[60%] lg:w-[45%] xl:w-[35%] overflow-hidden flex flex-col ${getContainerClasses()}`}
       >
         {/* Header */}
         <div className="glass-brand-dark p-3 flex justify-between items-center border-b border-brand-700">
@@ -78,7 +83,16 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
 
         {/* Content */}
-        {children}
+        <div className="flex-1 overflow-hidden">{children}</div>
+
+        {/* Footer - Camera Controls */}
+        <div className="glass-brand-dark p-2 border-t border-brand-700">
+          <CameraControls
+            onRotate={onRotateCamera}
+            onZoom={onZoomCamera}
+            onFocus={onFocusCamera}
+          />
+        </div>
       </div>
     </div>
   );

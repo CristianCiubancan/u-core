@@ -226,16 +226,13 @@ export default function Page() {
       onClose={handleCloseUi}
       anchor={'left'}
       isSaving={isSaving}
+      onRotateCamera={handleRotateCamera}
+      onZoomCamera={handleZoomCamera}
+      onFocusCamera={handleFocusCamera}
     >
       <div className="flex h-auto min-h-[500px] max-h-[80vh]">
         {/* Left sidebar - Tabs */}
-        <TabNavigation
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onRotateCamera={handleRotateCamera}
-          onZoomCamera={handleZoomCamera}
-          onFocusCamera={handleFocusCamera}
-        />
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Right content - Tab content */}
         <div className="flex-1 p-4 overflow-y-auto text-readable">
