@@ -6,12 +6,7 @@
   "type": "module",
   "scripts": {
     "example": "npx tsx src/scripts/index.ts",
-    "build": "npx tsx src/scripts/build.ts",
-    "build:prod": "npx tsx src/scripts/build.ts --log-level info",
-    "build:dev": "npx tsx src/scripts/build.ts --log-level verbose --no-clean",
-    "build:ci": "npx tsx src/scripts/build.ts --stop-on-error --concurrency 2",
-    "watch": "npx chokidar \"src/plugins/**/*\" -c \"npx tsx src/scripts/build.ts --no-clean --log-level warn\"",
-    "clean": "npx tsx src/scripts/build.ts --no-clean && rimraf dist"
+    "build": "npx tsx src/scripts/build.ts"
   },
   "keywords": [],
   "author": "",
