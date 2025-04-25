@@ -3,6 +3,7 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
 import * as esbuild from 'esbuild';
+import { spawn } from 'child_process';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
@@ -439,6 +440,7 @@ class BuildManager {
     this.ensureInitialized();
 
     try {
+      // Get the plugin object
       const plugin =
         typeof pluginNameOrPath === 'string'
           ? this.getPluginFromNameOrPath(pluginNameOrPath)
@@ -448,39 +450,188 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      // Get all TSX files
-      const tsxFiles = plugin.files.filter((file) =>
-        file.fileName.endsWith('.tsx')
+      // Find the Page.tsx file in the html directory
+      const pageTsxFile = plugin.files.find(
+        (file) =>
+          file.fileName === 'Page.tsx' &&
+          (file.fullPath.includes('/html/') ||
+            file.fullPath.includes('\\html\\'))
       );
 
-      if (tsxFiles.length === 0) {
-        console.log(`No TSX page files found in plugin ${plugin.pluginName}`);
+      if (!pageTsxFile) {
+        console.log(`No Page.tsx file found in plugin ${plugin.pluginName}`);
         return;
       }
 
-      await this.copyFilesToDist(plugin, tsxFiles);
       console.log(
-        `✓ Built ${tsxFiles.length} TSX page file(s) for plugin ${plugin.pluginName}`
+        `Building webview for plugin ${plugin.pluginName} from ${pageTsxFile.displayPath}`
       );
+
+      // Set up paths
+      const webviewDir = path.resolve('src/webview');
+      const srcDir = path.join(webviewDir, 'src');
+      const pluginDistDir = this.getPluginDestDir(plugin);
+      const htmlOutputDir = path.join(pluginDistDir, 'html');
+
+      // Ensure directories exist
+      await fs.mkdir(srcDir, { recursive: true });
+      await fs.mkdir(htmlOutputDir, { recursive: true });
+
+      // Backup original App.tsx if it exists
+      const appFilePath = path.join(srcDir, 'App.tsx');
+      let originalAppContent = '';
+      if (fsSync.existsSync(appFilePath)) {
+        originalAppContent = await fs.readFile(appFilePath, 'utf-8');
+      }
+
+      try {
+        // Generate and write temporary App.tsx
+        const appContent = this.generateAppTsxContent(srcDir, pageTsxFile);
+        await fs.writeFile(appFilePath, appContent, 'utf-8');
+        console.log(
+          `Generated temporary App.tsx for plugin ${plugin.pluginName}`
+        );
+
+        // Ensure other necessary files exist
+        await this.ensureWebviewFiles(srcDir);
+
+        // Run Vite build
+        console.log(`Running Vite build for plugin ${plugin.pluginName}...`);
+        await this.runViteBuild(htmlOutputDir);
+
+        // Verify the build output
+        const indexHtmlPath = path.join(htmlOutputDir, 'index.html');
+        if (!fsSync.existsSync(indexHtmlPath)) {
+          throw new Error(
+            `Failed to generate index.html for plugin ${plugin.pluginName}`
+          );
+        }
+
+        console.log(
+          `✓ Built webview for plugin ${
+            plugin.pluginName
+          } to ${this.pathToDisplay(htmlOutputDir)}`
+        );
+      } finally {
+        // Restore the original App.tsx
+        if (originalAppContent) {
+          await fs.writeFile(appFilePath, originalAppContent, 'utf-8');
+          console.log(`Restored original App.tsx`);
+        }
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (typeof pluginNameOrPath === 'string') {
-        console.error(
-          `Error building TSX page files for plugin ${pluginNameOrPath}:`,
-          error
-        );
-        throw new Error(
-          `Failed to build TSX page files for plugin ${pluginNameOrPath}: ${errorMessage}`
-        );
-      } else {
-        console.error(
-          `Error building TSX page files for plugin ${pluginNameOrPath.pluginName}:`,
-          error
-        );
-        throw new Error(
-          `Failed to build TSX page files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
-        );
+      const pluginName =
+        typeof pluginNameOrPath === 'string'
+          ? pluginNameOrPath
+          : pluginNameOrPath.pluginName;
+
+      console.error(`Error building webview for plugin ${pluginName}:`, error);
+      throw new Error(
+        `Failed to build webview for plugin ${pluginName}: ${errorMessage}`
+      );
+    }
+  }
+
+  /**
+   * Runs the Vite build process
+   * @param outputDir The directory to output the build to
+   * @private
+   */
+  private async runViteBuild(outputDir: string): Promise<void> {
+    const buildCommand = `npx vite build --outDir=${outputDir}`;
+    console.log(`Executing: ${buildCommand}`);
+
+    // Use spawn to run the build command
+    const child = spawn(buildCommand, {
+      cwd: process.cwd(),
+      shell: true,
+      stdio: 'inherit',
+    });
+
+    // Wait for the build to complete
+    await new Promise<void>((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Vite build failed with exit code ${code}`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Generates App.tsx content for a plugin's Page.tsx
+   * @param srcDir Source directory where App.tsx will be created
+   * @param pageTsxFile The Page.tsx file
+   * @returns Generated App.tsx content
+   * @private
+   */
+  private generateAppTsxContent(srcDir: string, pageTsxFile: File): string {
+    // Calculate relative path from src directory to the Page.tsx file
+    const importPath = path
+      .relative(srcDir, pageTsxFile.fullPath)
+      .replace(/\\/g, '/');
+    const formattedImportPath = importPath.startsWith('.')
+      ? importPath
+      : `../../${importPath}`;
+
+    // Create the App.tsx content
+    return `// Auto-generated by BuildManager
+// Generated on: ${new Date().toISOString()}
+
+import Page from '${formattedImportPath}';
+
+function App() {
+  return <Page />;
+}
+
+export default App;
+`;
+  }
+
+  /**
+   * Ensures all necessary files exist for the webview build
+   * @param srcDir Source directory
+   * @private
+   */
+  private async ensureWebviewFiles(srcDir: string): Promise<void> {
+    const webviewSrcDir = path.resolve('src/webview/src');
+
+    // Check if the webview src directory exists
+    if (!fsSync.existsSync(webviewSrcDir)) {
+      throw new Error(`Webview src directory not found: ${webviewSrcDir}`);
+    }
+
+    // Copy main.tsx if it doesn't exist in the target directory
+    const mainTsxPath = path.join(srcDir, 'main.tsx');
+    if (!fsSync.existsSync(mainTsxPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'main.tsx');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, mainTsxPath);
+        console.log(`Copied main.tsx from ${sourcePath}`);
+      }
+    }
+
+    // Copy index.html if it doesn't exist in the target directory
+    const indexHtmlPath = path.join(srcDir, 'index.html');
+    if (!fsSync.existsSync(indexHtmlPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'index.html');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, indexHtmlPath);
+        console.log(`Copied index.html from ${sourcePath}`);
+      }
+    }
+
+    // Copy index.css if it doesn't exist in the target directory
+    const indexCssPath = path.join(srcDir, 'index.css');
+    if (!fsSync.existsSync(indexCssPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'index.css');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, indexCssPath);
+        console.log(`Copied index.css from ${sourcePath}`);
       }
     }
   }

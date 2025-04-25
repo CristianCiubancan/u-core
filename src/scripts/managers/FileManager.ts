@@ -855,6 +855,63 @@ class FileManager {
     // Scan again
     await this.scanPlugins();
   }
+
+  /**
+   * Reloads a specific plugin by re-reading its files from the file system.
+   * @param pluginPath The full path to the plugin directory.
+   * @throws {Error} If the plugin is not found or if there is an error during reloading.
+   */
+  async reloadPlugin(pluginPath: string): Promise<void> {
+    try {
+      const normalizedPath = this.normalizePath(pluginPath);
+      const plugin = this.pathToPlugin.get(normalizedPath);
+      if (!plugin) {
+        throw new Error(
+          `Plugin not found at path: ${this.pathToDisplay(pluginPath)}`
+        );
+      }
+
+      // Remove existing files associated with the plugin
+      for (const file of plugin.files) {
+        this.files.delete(file.fullPath);
+      }
+
+      // Remove the plugin from registries
+      const pathIdentifier = this.generatePluginPathIdentifier(
+        path.relative(this.rootPath, plugin.fullPath)
+      );
+      this.plugins.delete(pathIdentifier);
+      this.pathToPlugin.delete(normalizedPath);
+
+      // Re-register the plugin
+      const reloadedPlugin = await this.registerPlugin(normalizedPath);
+
+      // Reload the manifest
+      const manifestPath = path.join(normalizedPath, 'plugin.json');
+      try {
+        reloadedPlugin.manifest = await this.loadPluginManifest(manifestPath);
+      } catch (error) {
+        console.warn(
+          `Warning: Failed to load manifest for plugin at ${this.pathToDisplay(
+            manifestPath
+          )}: ${error}`
+        );
+      }
+
+      // Re-scan the plugin files
+      await this.scanPluginFiles(reloadedPlugin);
+
+      console.log(`Plugin reloaded successfully: ${reloadedPlugin.pluginName}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        `Error reloading plugin at ${this.pathToDisplay(pluginPath)}:`,
+        error
+      );
+      throw new Error(`Failed to reload plugin: ${errorMessage}`);
+    }
+  }
 }
 
 export { FileManager };
