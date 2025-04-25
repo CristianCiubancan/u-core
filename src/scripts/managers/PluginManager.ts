@@ -27,7 +27,9 @@ class PluginManager {
     if (!this.initialized) {
       await this.fileManager.initialize();
       this.initialized = true;
-      console.log(`PluginManager initialized with ${this.getAllPlugins().length} plugins`);
+      console.log(
+        `PluginManager initialized with ${this.getAllPlugins().length} plugins`
+      );
     }
   }
 
@@ -83,27 +85,33 @@ class PluginManager {
     this.ensureInitialized();
     return this.fileManager.getParentFolders();
   }
-  
+
   /**
    * Gets files of a plugin by file extension
    * @param pluginNameOrPath The name or path of the plugin
    * @param extension The file extension to filter by (with or without leading dot)
    */
-  getPluginFilesByExtension(pluginNameOrPath: string, extension: string): File[] {
+  getPluginFilesByExtension(
+    pluginNameOrPath: string,
+    extension: string
+  ): File[] {
     this.ensureInitialized();
     return this.fileManager.getFilesByExtension(pluginNameOrPath, extension);
   }
-  
+
   /**
    * Gets files of a plugin matching a pattern
    * @param pluginNameOrPath The name or path of the plugin
    * @param pattern The glob pattern to match files against
    */
-  async getPluginFilesByPattern(pluginNameOrPath: string, pattern: string): Promise<File[]> {
+  async getPluginFilesByPattern(
+    pluginNameOrPath: string,
+    pattern: string
+  ): Promise<File[]> {
     this.ensureInitialized();
     return this.fileManager.getFilesMatchingPattern(pluginNameOrPath, pattern);
   }
-  
+
   /**
    * Gets the FileManager instance
    */
@@ -117,8 +125,36 @@ class PluginManager {
    */
   private ensureInitialized(): void {
     if (!this.initialized) {
-      throw new Error('PluginManager must be initialized before use. Call initialize() first.');
+      throw new Error(
+        'PluginManager must be initialized before use. Call initialize() first.'
+      );
     }
+  }
+
+  /**
+   * Reloads a specific plugin by re-reading its files from the file system.
+   * @param pluginNameOrPath The name or path of the plugin to reload.
+   * @throws {Error} If the plugin is not found or if multiple plugins with the same name are found.
+   */
+  async reloadPlugin(pluginNameOrPath: string): Promise<void> {
+    this.ensureInitialized();
+    // Try to get the plugin by path first
+    let plugin = this.getPluginByPath(pluginNameOrPath);
+    if (!plugin) {
+      // If not found by path, try by name
+      const plugins = this.getPluginsByName(pluginNameOrPath);
+      if (plugins.length === 1) {
+        plugin = plugins[0];
+      } else if (plugins.length > 1) {
+        throw new Error(
+          `Multiple plugins found with name '${pluginNameOrPath}'. Please specify the full path.`
+        );
+      } else {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+    }
+    // Delegate reloading to FileManager using the plugin's path
+    await this.fileManager.reloadPlugin(plugin.fullPath);
   }
 }
 

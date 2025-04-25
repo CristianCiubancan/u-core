@@ -226,7 +226,23 @@ async function main() {
     // Build a specific plugin if any exists
     if (allPlugins.length > 0) {
       const firstPlugin = allPlugins[0];
-      console.log(`\n🛠️ Building specific plugin: ${firstPlugin.pluginName}`);
+      console.log(`\n🛠️ Preparing to build plugin: ${firstPlugin.pluginName}`);
+
+      // Reload the plugin to ensure its info is up to date
+      try {
+        console.log(`Reloading plugin: ${firstPlugin.pluginName}`);
+        await pluginManager.reloadPlugin(firstPlugin.pluginName);
+        console.log(`✓ Plugin ${firstPlugin.pluginName} reloaded successfully`);
+      } catch (reloadError) {
+        const errorMessage =
+          reloadError instanceof Error
+            ? reloadError.message
+            : String(reloadError);
+        console.error(
+          `Failed to reload plugin ${firstPlugin.pluginName}: ${errorMessage}`
+        );
+        throw reloadError; // Re-throw to halt execution if reloading fails
+      }
 
       // Show build process for specific file types
       console.log('\nBuilding by file type:');
