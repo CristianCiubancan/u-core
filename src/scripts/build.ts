@@ -3,7 +3,9 @@ import { BuildManager } from './managers/BuildManager.js';
 import { Plugin } from './types/Plugin.js';
 import chalk from 'chalk';
 import * as os from 'os';
+import * as path from 'path';
 import { performance } from 'perf_hooks';
+import * as chokidar from 'chokidar';
 
 interface BuildOptions {
   /**
@@ -22,7 +24,7 @@ interface BuildOptions {
    * Number of plugins to build in parallel
    * If not provided, it will use number of CPU cores - 1 (minimum 1)
    */
-  concurrency?: number;
+  concurrency: number;
 
   /**
    * Whether to clean the dist directory before building
@@ -43,11 +45,10 @@ interface BuildOptions {
   continueOnError: boolean;
 
   /**
-   * Filter function to select which plugins to build
-   * @param plugin Plugin object
-   * @returns true if the plugin should be built, false otherwise
+   * Whether to watch for changes and rebuild
+   * @default false
    */
-  filter?: (plugin: Plugin) => boolean;
+  watch: boolean;
 }
 
 class PluginBuilder {
@@ -59,6 +60,7 @@ class PluginBuilder {
     string,
     { success: boolean; time: number; error?: string }
   > = new Map();
+  private watcher: chokidar.FSWatcher | null = null;
 
   constructor(options: Partial<BuildOptions> = {}) {
     // Calculate default concurrency based on available CPU cores
@@ -76,7 +78,7 @@ class PluginBuilder {
       logLevel: options.logLevel || 'info',
       continueOnError:
         options.continueOnError !== undefined ? options.continueOnError : true,
-      filter: options.filter,
+      watch: options.watch !== undefined ? options.watch : false,
     };
 
     this.fileManager = new FileManager(this.options.pluginsDir);
@@ -99,6 +101,11 @@ class PluginBuilder {
     await this.fileManager.initialize();
     await this.buildManager.initialize();
 
+    // Initialize reload manager if watching
+    if (this.options.watch) {
+      await this.buildManager.initializeReloadManager();
+    }
+
     this.log('info', chalk.green('✓') + ' Plugin builder initialized');
   }
 
@@ -108,19 +115,13 @@ class PluginBuilder {
   async buildAll(): Promise<boolean> {
     try {
       // Initialize if not already done
-      // Using a method to check initialization instead of accessing private property
       await this.ensureInitialized();
 
       // Get all plugins
-      let plugins = this.fileManager.getAllPlugins();
-
-      // Apply filter if provided
-      if (this.options.filter) {
-        plugins = plugins.filter(this.options.filter);
-      }
+      const plugins = this.fileManager.getAllPlugins();
 
       // Report how many plugins we'll build
-      const concurrency = this.options.concurrency || 1;
+      const concurrency = this.options.concurrency;
       this.log(
         'info',
         chalk.bold(
@@ -177,6 +178,11 @@ class PluginBuilder {
         )
       );
 
+      // If in watch mode, start watching for changes
+      if (this.options.watch && !this.watcher) {
+        this.startWatching();
+      }
+
       return failureCount === 0;
     } catch (error) {
       const errorMessage =
@@ -195,8 +201,194 @@ class PluginBuilder {
   }
 
   /**
-   * Build plugins with concurrency control
+   * Start watching for file changes
    */
+  private startWatching(): void {
+    this.log('info', chalk.bold('\nStarting watch mode...'));
+    this.log(
+      'info',
+      chalk.blue('Watching for changes in: ') +
+        chalk.cyan(this.options.pluginsDir)
+    );
+    this.log('info', chalk.gray('Press Ctrl+C to stop watching\n'));
+
+    // Initialize watcher
+    this.watcher = chokidar.watch(this.options.pluginsDir, {
+      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 300,
+        pollInterval: 100,
+      },
+    });
+
+    // Track which plugin was last changed to avoid multiple rebuilds for the same plugin
+    let rebuildQueue = new Set<string>();
+    let isBuilding = false;
+    let debounceTimer: NodeJS.Timeout | null = null;
+
+    const processRebuildQueue = async () => {
+      if (isBuilding || rebuildQueue.size === 0) return;
+
+      isBuilding = true;
+      const pluginsToRebuild = Array.from(rebuildQueue);
+      rebuildQueue.clear();
+
+      try {
+        this.log(
+          'info',
+          chalk.bold(
+            `Rebuilding ${pluginsToRebuild.length} changed plugin(s)...`
+          )
+        );
+
+        // Reset results for new build
+        this.pluginResults.clear();
+        this.startTime = performance.now();
+
+        // Find the plugin objects for all changes
+        const plugins: Plugin[] = [];
+        for (const pluginPath of pluginsToRebuild) {
+          const plugin = this.fileManager.getPluginByPath(pluginPath);
+          if (plugin) {
+            plugins.push(plugin);
+          }
+        }
+
+        if (plugins.length > 0) {
+          // Build the changed plugins with concurrency
+          await this.buildPluginsWithConcurrency(
+            plugins,
+            this.options.concurrency
+          );
+
+          // Log completion
+          const totalTime = (
+            (performance.now() - this.startTime) /
+            1000
+          ).toFixed(2);
+          const successCount = Array.from(this.pluginResults.values()).filter(
+            (r) => r.success
+          ).length;
+          const failureCount = this.pluginResults.size - successCount;
+
+          this.log('info', chalk.bold(`Rebuild completed in ${totalTime}s`));
+          this.log('info', chalk.green.bold(`✓ Success: ${successCount}`));
+
+          if (failureCount > 0) {
+            this.log('info', chalk.red.bold(`✗ Failed: ${failureCount}`));
+          }
+
+          // Reload plugins
+          if (successCount > 0) {
+            for (const plugin of plugins) {
+              const result = await this.buildManager.reloadPlugin(
+                plugin.pluginName
+              );
+              if (result.success) {
+                this.log(
+                  'info',
+                  chalk.green(`✓ Reloaded plugin: ${plugin.pluginName}`)
+                );
+              } else {
+                this.log(
+                  'warn',
+                  chalk.yellow(
+                    `⚠ Failed to reload plugin: ${plugin.pluginName} - ${result.message}`
+                  )
+                );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.log('error', chalk.red(`Error during rebuild: ${errorMessage}`));
+      } finally {
+        isBuilding = false;
+        // Check if more items were added to the queue while we were building
+        if (rebuildQueue.size > 0) {
+          process.nextTick(processRebuildQueue);
+        }
+      }
+    };
+
+    // File change handler
+    const handleFileChange = (filePath: string, eventType: string) => {
+      // Convert to absolute path if it's not already
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(process.cwd(), filePath);
+
+      // Find which plugin this file belongs to
+      const plugin = this.findPluginForPath(absolutePath);
+
+      if (plugin) {
+        this.log(
+          'info',
+          chalk.blue(`File ${eventType}: `) +
+            chalk.cyan(path.relative(process.cwd(), absolutePath))
+        );
+
+        // Add the plugin to the rebuild queue
+        rebuildQueue.add(plugin.fullPath);
+
+        // Debounce rebuilds to avoid rapid consecutive builds
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+
+        debounceTimer = setTimeout(() => {
+          processRebuildQueue();
+          debounceTimer = null;
+        }, 300);
+      }
+    };
+
+    // Set up event handlers
+    this.watcher
+      .on('add', (filePath) => handleFileChange(filePath, 'added'))
+      .on('change', (filePath) => handleFileChange(filePath, 'changed'))
+      .on('unlink', (filePath) => handleFileChange(filePath, 'deleted'));
+  }
+
+  /**
+   * Find which plugin a file belongs to
+   */
+  private findPluginForPath(filePath: string): Plugin | undefined {
+    const plugins = this.fileManager.getAllPlugins();
+
+    // Find the plugin with the longest matching path prefix
+    let bestMatch: Plugin | undefined;
+    let bestMatchLength = 0;
+
+    for (const plugin of plugins) {
+      if (
+        filePath.startsWith(plugin.fullPath) &&
+        plugin.fullPath.length > bestMatchLength
+      ) {
+        bestMatch = plugin;
+        bestMatchLength = plugin.fullPath.length;
+      }
+    }
+
+    return bestMatch;
+  }
+
+  /**
+   * Stop watching for file changes
+   */
+  async stopWatching(): Promise<void> {
+    if (this.watcher) {
+      this.log('info', 'Stopping watch mode...');
+      await this.watcher.close();
+      this.watcher = null;
+      this.log('info', 'Watch mode stopped');
+    }
+  }
+
   /**
    * Ensures the builder is initialized
    */
@@ -402,6 +594,10 @@ function parseArgs(): Partial<BuildOptions> {
       case '--stop-on-error':
         options.continueOnError = false;
         break;
+      case '--watch':
+      case '-w':
+        options.watch = true;
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -429,6 +625,7 @@ Options:
   --no-clean               Don't clean the dist directory before building
   --log-level, -l <level>  Log level: verbose, info, warn, error (default: info)
   --stop-on-error          Stop building if a plugin fails
+  --watch, -w              Watch for changes and rebuild automatically
   --help, -h               Show this help message
 `);
 }
@@ -450,8 +647,17 @@ async function main(): Promise<void> {
     // Build all plugins
     const success = await builder.buildAll();
 
-    // Exit with appropriate code
-    process.exit(success ? 0 : 1);
+    // If not in watch mode, exit with appropriate code
+    if (!options.watch) {
+      process.exit(success ? 0 : 1);
+    } else {
+      // In watch mode, handle process termination
+      process.on('SIGINT', async () => {
+        console.log('\nReceived SIGINT, shutting down...');
+        await builder.stopWatching();
+        process.exit(0);
+      });
+    }
   } catch (error) {
     console.error('Fatal error:', error);
     process.exit(1);

@@ -1,13 +1,17 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
 import * as esbuild from 'esbuild';
 import { spawn } from 'child_process';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
 import { PluginManifest } from '../types/Manifest.js';
+import {
+  PluginReloadManager,
+  ReloadOptions,
+  ReloadResult,
+} from './PluginReloadManager.js';
 
 /**
  * Build manager
@@ -49,11 +53,79 @@ class BuildManager {
     }
   }
 
+  private reloadManager: PluginReloadManager | null = null;
+
+  /**
+   * Initializes the reload manager
+   * @param options Configuration options for the reload manager
+   */
+  async initializeReloadManager(options: ReloadOptions = {}): Promise<void> {
+    try {
+      this.reloadManager = new PluginReloadManager(options);
+      await this.reloadManager.initialize();
+      console.log('✓ Reload manager initialized successfully');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.warn(`⚠ Failed to initialize reload manager: ${errorMessage}`);
+      console.warn('Plugins will be built but not automatically reloaded');
+      this.reloadManager = null;
+    }
+  }
+
+  /**
+   * Reloads a plugin after building
+   * @param pluginNameOrPath The name or path of the plugin to reload
+   * @returns The result of the reload operation
+   */
+  async reloadPlugin(pluginNameOrPath: string): Promise<ReloadResult> {
+    if (!this.reloadManager) {
+      return {
+        success: false,
+        message: 'Reload manager not initialized',
+      };
+    }
+
+    try {
+      // Get the plugin
+      const plugin = this.getPluginFromNameOrPath(pluginNameOrPath);
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Reload the plugin
+      const result = await this.reloadManager.reloadPlugin(plugin);
+
+      if (result.success) {
+        console.log(`✓ Plugin ${plugin.pluginName} reloaded successfully`);
+      } else {
+        console.warn(
+          `⚠ Plugin ${plugin.pluginName} reload failed: ${result.message}`
+        );
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Error reloading plugin ${pluginNameOrPath}:`, error);
+
+      return {
+        success: false,
+        message: `Failed to reload plugin ${pluginNameOrPath}: ${errorMessage}`,
+      };
+    }
+  }
+
   /**
    * Builds a plugin by copying all files to the dist directory
    * @param pluginNameOrPath The name or path of the plugin to build
    */
-  async buildPlugin(pluginNameOrPath: string): Promise<void> {
+  async buildPlugin(
+    pluginNameOrPath: string,
+    reload: boolean = false
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -94,6 +166,17 @@ class BuildManager {
       throw new Error(
         `Failed to build plugin ${pluginNameOrPath}: ${errorMessage}`
       );
+    }
+
+    // After successful build, reload if requested
+    if (reload && this.reloadManager) {
+      try {
+        await this.reloadPlugin(pluginNameOrPath);
+      } catch (reloadError) {
+        console.warn(
+          `⚠ Plugin built successfully but reload failed: ${reloadError}`
+        );
+      }
     }
   }
 
@@ -723,7 +806,7 @@ export default App;
   /**
    * Builds all plugins
    */
-  async buildAllPlugins(): Promise<void> {
+  async buildAllPlugins(reload: boolean = false): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -746,6 +829,35 @@ export default App;
         error instanceof Error ? error.message : String(error);
       console.error('Error building all plugins:', error);
       throw new Error(`Failed to build all plugins: ${errorMessage}`);
+    }
+
+    // After all plugins are built, reload them if requested
+    if (reload && this.reloadManager) {
+      try {
+        console.log('\n🔄 Reloading all resources...');
+        const result = await this.reloadManager.reloadAllResources();
+
+        if (result.success) {
+          console.log('✓ All resources reloaded successfully');
+        } else {
+          console.warn('⚠ Some resources failed to reload');
+
+          // Log failed resources
+          if (result.results) {
+            const failedResources = Object.entries(result.results)
+              .filter(([_, success]) => !success)
+              .map(([name]) => name);
+
+            if (failedResources.length > 0) {
+              console.warn('Failed resources:', failedResources.join(', '));
+            }
+          }
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.warn(`⚠ Error reloading resources: ${errorMessage}`);
+      }
     }
   }
 

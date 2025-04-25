@@ -2,9 +2,7 @@
  * Configuration loader
  */
 import * as path from 'path';
-import * as fs from 'fs';
 import { BuildConfig } from '../core/types.js';
-import { fileURLToPath } from 'url';
 import 'dotenv/config'; // Load environment variables from .env file
 
 /**
