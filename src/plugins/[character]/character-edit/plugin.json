@@ -1,17 +1,12 @@
 {
-  "name": "example1",
+  "name": "character-edit",
   "version": "0.1.0",
   "fx_version": "cerulean",
   "author": "Baloony Gaze",
-  "description": "Example 3",
+  "description": "Character Edit",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
-  "files": [
-    "translations/*.json",
-    "translations/*.lua",
-    "translations/*.js",
-    "html/**/*"
-  ],
+  "files": ["html/**/*"],
   "ui_page": "html/index.html"
 }
