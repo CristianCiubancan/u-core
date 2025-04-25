@@ -167,8 +167,9 @@ class BuildManager {
       }
 
       // Get all JSON files
-      const jsonFiles = plugin.files.filter((file) =>
-        file.fileName.endsWith('.json')
+      const jsonFiles = plugin.files.filter(
+        (file) =>
+          file.fileName.endsWith('.json') && file.fileName !== 'plugin.json'
       );
 
       if (jsonFiles.length === 0) {
@@ -267,7 +268,7 @@ class BuildManager {
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             minify: false,
-            sourcemap: 'external',
+            sourcemap: 'inline',
             loader,
             logLevel: 'info',
             external: externalPackages,
@@ -379,7 +380,7 @@ class BuildManager {
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             minify: false,
-            sourcemap: 'external',
+            sourcemap: 'inline',
             external: externalPackages,
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',
