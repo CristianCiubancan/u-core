@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
+import { PluginManifest } from '../types/Manifest.js';
 
 /**
  * Build manager
@@ -76,6 +77,7 @@ class BuildManager {
         this.buildPluginTs(plugin),
         this.buildPluginJs(plugin),
         this.buildPluginPageTsx(plugin),
+        this.buildPluginManifest(plugin), // Add this line to build the manifest
       ]);
 
       console.log(
@@ -823,6 +825,400 @@ export default App;
           'child_process',
         ]
       : [];
+  }
+
+  /**
+   * Builds an fxmanifest.lua file from a plugin.json file
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginManifest(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Check if the plugin has a manifest
+      if (!plugin.manifest) {
+        console.warn(
+          `No manifest found for plugin ${plugin.pluginName}, skipping fxmanifest.lua generation`
+        );
+        return;
+      }
+
+      // Generate the fxmanifest.lua content
+      const manifestContent = this.generateFxManifest(plugin);
+
+      // Get the destination directory for the plugin
+      const destDir = this.getPluginDestDir(plugin);
+
+      // Ensure the destination directory exists
+      await fs.mkdir(destDir, { recursive: true });
+
+      // Write the fxmanifest.lua file
+      const manifestPath = path.join(destDir, 'fxmanifest.lua');
+      await fs.writeFile(manifestPath, manifestContent, 'utf-8');
+
+      console.log(`✓ Generated fxmanifest.lua for plugin ${plugin.pluginName}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building manifest for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build manifest for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building manifest for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build manifest for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Generates fxmanifest.lua content from a plugin manifest
+   * @param plugin The plugin object containing the manifest
+   * @returns The fxmanifest.lua content as a string
+   * @private
+   */
+  private generateFxManifest(plugin: Plugin): string {
+    const manifest = plugin.manifest!;
+    let content = '';
+
+    // Add header comment
+    content += `-- Generated from plugin.json by BuildManager\n`;
+    content += `-- Plugin: ${plugin.pluginName}\n`;
+    content += `-- Generated on: ${new Date().toISOString()}\n\n`;
+
+    // Add resource metadata
+    content += `-- Resource Metadata\n`;
+
+    // FX Version (default to "cerulean" if not specified)
+    content += `fx_version '${manifest.fx_version || 'cerulean'}'\n`;
+
+    // Games
+    if (manifest.games && manifest.games.length > 0) {
+      content += `games { '${manifest.games.join("', '")}' }\n`;
+    } else {
+      // Default to GTA5 if not specified
+      content += `games { 'gta5' }\n`;
+    }
+
+    content += `\n`;
+
+    // Basic metadata
+    if (manifest.author) {
+      content += `author '${this.escapeLuaString(manifest.author)}'\n`;
+    }
+
+    if (manifest.description) {
+      content += `description '${this.escapeLuaString(
+        manifest.description
+      )}'\n`;
+    }
+
+    if (manifest.version) {
+      content += `version '${this.escapeLuaString(manifest.version)}'\n`;
+    }
+
+    content += `\n`;
+
+    // Scripts
+    content += `-- What to run\n`;
+
+    // Client scripts
+    if (manifest.client_scripts) {
+      if (Array.isArray(manifest.client_scripts)) {
+        if (manifest.client_scripts.length === 1) {
+          content += `client_script '${this.escapeLuaString(
+            manifest.client_scripts[0]
+          )}'\n`;
+        } else if (manifest.client_scripts.length > 1) {
+          content += `client_scripts {\n`;
+          for (const script of manifest.client_scripts) {
+            content += `    '${this.escapeLuaString(script)}',\n`;
+          }
+          content += `}\n`;
+        }
+      } else {
+        content += `client_script '${this.escapeLuaString(
+          manifest.client_scripts
+        )}'\n`;
+      }
+    }
+
+    // Server scripts
+    if (manifest.server_scripts) {
+      if (Array.isArray(manifest.server_scripts)) {
+        if (manifest.server_scripts.length === 1) {
+          content += `server_script '${this.escapeLuaString(
+            manifest.server_scripts[0]
+          )}'\n`;
+        } else if (manifest.server_scripts.length > 1) {
+          content += `server_scripts {\n`;
+          for (const script of manifest.server_scripts) {
+            content += `    '${this.escapeLuaString(script)}',\n`;
+          }
+          content += `}\n`;
+        }
+      } else {
+        content += `server_script '${this.escapeLuaString(
+          manifest.server_scripts
+        )}'\n`;
+      }
+    }
+
+    // Shared scripts
+    if (manifest.shared_scripts) {
+      if (Array.isArray(manifest.shared_scripts)) {
+        if (manifest.shared_scripts.length === 1) {
+          content += `shared_script '${this.escapeLuaString(
+            manifest.shared_scripts[0]
+          )}'\n`;
+        } else if (manifest.shared_scripts.length > 1) {
+          content += `shared_scripts {\n`;
+          for (const script of manifest.shared_scripts) {
+            content += `    '${this.escapeLuaString(script)}',\n`;
+          }
+          content += `}\n`;
+        }
+      } else {
+        content += `shared_script '${this.escapeLuaString(
+          manifest.shared_scripts
+        )}'\n`;
+      }
+    }
+
+    // UI page
+    if (manifest.ui_page) {
+      content += `\n-- UI\n`;
+      content += `ui_page '${this.escapeLuaString(manifest.ui_page)}'\n`;
+    }
+
+    // Files
+    if (manifest.files && manifest.files.length > 0) {
+      content += `\n-- Files\n`;
+      content += `files {\n`;
+      for (const file of manifest.files) {
+        content += `    '${this.escapeLuaString(file)}',\n`;
+      }
+      content += `}\n`;
+    }
+
+    // Data files
+    if (manifest.data_files && manifest.data_files.length > 0) {
+      content += `\n-- Data Files\n`;
+      for (const dataFile of manifest.data_files) {
+        if (Array.isArray(dataFile.files)) {
+          for (const file of dataFile.files) {
+            content += `data_file '${this.escapeLuaString(
+              dataFile.type
+            )}' '${this.escapeLuaString(file)}'\n`;
+          }
+        } else {
+          content += `data_file '${this.escapeLuaString(
+            dataFile.type
+          )}' '${this.escapeLuaString(dataFile.files)}'\n`;
+        }
+      }
+    }
+
+    // Dependencies
+    if (manifest.dependencies && manifest.dependencies.length > 0) {
+      content += `\n-- Dependencies\n`;
+      if (manifest.dependencies.length === 1) {
+        content += `dependency '${this.escapeLuaString(
+          manifest.dependencies[0]
+        )}'\n`;
+      } else {
+        content += `dependencies {\n`;
+        for (const dep of manifest.dependencies) {
+          content += `    '${this.escapeLuaString(dep)}',\n`;
+        }
+        content += `}\n`;
+      }
+    }
+
+    // Provides
+    if (manifest.provide) {
+      content += `\n-- Provides\n`;
+      if (Array.isArray(manifest.provide)) {
+        for (const provide of manifest.provide) {
+          content += `provide '${this.escapeLuaString(provide)}'\n`;
+        }
+      } else {
+        content += `provide '${this.escapeLuaString(manifest.provide)}'\n`;
+      }
+    }
+
+    // Constraints (special handling)
+    if (manifest.constraints) {
+      content += `\n-- Runtime Constraints\n`;
+      content += `dependencies {\n`;
+
+      if (manifest.constraints.server) {
+        content += `    '/server:${manifest.constraints.server}',\n`;
+      }
+
+      if (
+        manifest.constraints.policy &&
+        manifest.constraints.policy.length > 0
+      ) {
+        for (const policy of manifest.constraints.policy) {
+          content += `    '/policy:${policy}',\n`;
+        }
+      }
+
+      if (manifest.constraints.onesync) {
+        content += `    '/onesync',\n`;
+      }
+
+      if (manifest.constraints.gameBuild) {
+        content += `    '/gameBuild:${manifest.constraints.gameBuild}',\n`;
+      }
+
+      if (
+        manifest.constraints.natives &&
+        manifest.constraints.natives.length > 0
+      ) {
+        for (const native of manifest.constraints.natives) {
+          content += `    '/native:${native}',\n`;
+        }
+      }
+
+      content += `}\n`;
+    }
+
+    // Exports
+    if (manifest.exports && manifest.exports.length > 0) {
+      content += `\n-- Exports\n`;
+      content += `exports {\n`;
+      for (const exp of manifest.exports) {
+        content += `    '${this.escapeLuaString(exp)}',\n`;
+      }
+      content += `}\n`;
+    }
+
+    // Server exports
+    if (manifest.server_exports && manifest.server_exports.length > 0) {
+      content += `\n-- Server Exports\n`;
+      content += `server_exports {\n`;
+      for (const exp of manifest.server_exports) {
+        content += `    '${this.escapeLuaString(exp)}',\n`;
+      }
+      content += `}\n`;
+    }
+
+    // Map flag
+    if (manifest.is_map) {
+      content += `\n-- Map flag\n`;
+      content += `this_is_a_map 'yes'\n`;
+    }
+
+    // Server only
+    if (manifest.server_only) {
+      content += `\n-- Server only\n`;
+      content += `server_only 'yes'\n`;
+    }
+
+    // Loadscreen
+    if (manifest.loadscreen) {
+      content += `\n-- Loadscreen\n`;
+      content += `loadscreen '${this.escapeLuaString(manifest.loadscreen)}'\n`;
+
+      if (manifest.loadscreen_manual_shutdown) {
+        content += `loadscreen_manual_shutdown 'yes'\n`;
+      }
+    }
+
+    // Add any custom properties
+    const customProps = this.getCustomProperties(manifest);
+    if (Object.keys(customProps).length > 0) {
+      content += `\n-- Additional Metadata\n`;
+      for (const [key, value] of Object.entries(customProps)) {
+        if (Array.isArray(value)) {
+          for (const val of value) {
+            content += `${key} '${this.escapeLuaString(String(val))}'\n`;
+          }
+        } else {
+          content += `${key} '${this.escapeLuaString(String(value))}'\n`;
+        }
+      }
+    }
+
+    return content;
+  }
+
+  /**
+   * Escapes special characters in Lua strings
+   * @param str The string to escape
+   * @returns Escaped string safe for Lua
+   * @private
+   */
+  private escapeLuaString(str: string): string {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  }
+
+  /**
+   * Gets custom properties from the manifest (properties not explicitly handled)
+   * @param manifest The plugin manifest
+   * @returns Object with custom properties
+   * @private
+   */
+  private getCustomProperties(manifest: PluginManifest): Record<string, any> {
+    const standardProps = [
+      'name',
+      'description',
+      'author',
+      'version',
+      'fx_version',
+      'games',
+      'client_scripts',
+      'server_scripts',
+      'shared_scripts',
+      'ui_page',
+      'dependencies',
+      'provide',
+      'constraints',
+      'files',
+      'data_files',
+      'is_map',
+      'server_only',
+      'loadscreen',
+      'loadscreen_manual_shutdown',
+      'exports',
+      'server_exports',
+      'config',
+    ];
+
+    const custom: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(manifest)) {
+      if (!standardProps.includes(key)) {
+        custom[key] = value;
+      }
+    }
+
+    return custom;
   }
 }
 

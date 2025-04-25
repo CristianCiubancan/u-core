@@ -1,5 +1,1156 @@
 # .\index.ts
 
+import { FileManager } from './managers/FileManager.js';
+import { ManifestManager } from './managers/ManifestManager.js';
+import { PluginManager } from './managers/PluginManager.js';
+import { BuildManager } from './managers/BuildManager.js';
+import { Plugin } from './types/Plugin.js';
+import { File } from './types/File.js';
+import { PluginManifest } from './types/Manifest.js';
+
+/**
+ * Plugin Explorer Demo
+ *
+ * Demonstrates how to:
+ * 1. Get all plugins
+ * 2. Get all files from all plugins
+ * 3. Load and display plugin manifests with formatted output
+ * 4. Build plugins to distribution directory
+ */
+async function main() {
+  try {
+    // Create a horizontal divider with title
+    const createDivider = (title: string) => {
+      const divider = '='.repeat(80);
+      const paddedTitle = ` ${title} `;
+      // Center the title in the divider
+      const startPos = Math.floor((divider.length - paddedTitle.length) / 2);
+      const titleDivider =
+        divider.substring(0, startPos) +
+        paddedTitle +
+        divider.substring(startPos + paddedTitle.length);
+      console.log('\n' + titleDivider + '\n');
+    };
+
+    createDivider('PLUGIN EXPLORER DEMO');
+
+    // Initialize the managers
+    console.log('Initializing managers...');
+
+    const pluginsPath = 'src/plugins';
+    const fileManager = new FileManager(pluginsPath);
+    await fileManager.initialize();
+
+    const manifestManager = new ManifestManager(fileManager);
+    await manifestManager.initialize();
+
+    const pluginManager = new PluginManager(fileManager);
+    await pluginManager.initialize();
+
+    const buildManager = new BuildManager(fileManager);
+    await buildManager.initialize();
+
+    console.log('✓ All managers initialized successfully\n');
+
+    // 1. Get all plugins with formatted output
+    createDivider('ALL PLUGINS');
+
+    const allPlugins = pluginManager.getAllPlugins();
+
+    if (allPlugins.length === 0) {
+      console.log('No plugins found in the system.');
+    } else {
+      console.log(`Found ${allPlugins.length} plugins in the system:\n`);
+
+      // Convert to table-friendly format
+      const pluginTableData = allPlugins.map((plugin, index) => {
+        return {
+          '#': index + 1,
+          'Name': plugin.pluginName,
+          'Path': plugin.displayPath,
+          'Parent Folders': plugin.parents.join(', ') || 'None',
+          'Files Count': plugin.files.length,
+        };
+      });
+
+      console.table(pluginTableData);
+    }
+
+    // 2. Get all files of all plugins with formatted output
+    createDivider('ALL FILES FROM ALL PLUGINS');
+
+    let totalFiles = 0;
+    let filesByType = new Map<string, number>();
+
+    // Display files for each plugin
+    for (const plugin of allPlugins) {
+      console.log(`\n📁 Plugin: ${plugin.pluginName} (${plugin.displayPath})`);
+
+      if (plugin.files.length === 0) {
+        console.log('  No files found in this plugin.');
+        continue;
+      }
+
+      // Group files by directory (relative to plugin root)
+      const filesByDirectory = new Map<string, File[]>();
+
+      plugin.files.forEach((file) => {
+        // Get the relative path within the plugin
+        const relativePath = file.displayPath.replace(
+          `${plugin.displayPath}/`,
+          ''
+        );
+        // Get directory name
+        const dirName = relativePath.includes('/')
+          ? relativePath.substring(0, relativePath.lastIndexOf('/'))
+          : '(root)';
+
+        if (!filesByDirectory.has(dirName)) {
+          filesByDirectory.set(dirName, []);
+        }
+        filesByDirectory.get(dirName)?.push(file);
+
+        // Count files by extension
+        const extension = file.fileName.includes('.')
+          ? file.fileName.substring(file.fileName.lastIndexOf('.') + 1)
+          : 'unknown';
+        filesByType.set(extension, (filesByType.get(extension) || 0) + 1);
+      });
+
+      // Print files grouped by directory
+      for (const [dirName, files] of filesByDirectory.entries()) {
+        console.log(`  📂 ${dirName} (${files.length} files):`);
+        files.forEach((file) => {
+          console.log(`    📄 ${file.fileName}`);
+        });
+      }
+
+      totalFiles += plugin.files.length;
+    }
+
+    // Print summary
+    console.log(`\nTotal files across all plugins: ${totalFiles}`);
+    console.log('Files by type:');
+    for (const [extension, count] of filesByType.entries()) {
+      console.log(`  .${extension}: ${count} files`);
+    }
+
+    // 3. Display manifests for all plugins
+    createDivider('PLUGIN MANIFESTS');
+
+    for (const plugin of allPlugins) {
+      console.log(`\n📦 Plugin: ${plugin.pluginName} (${plugin.displayPath})`);
+
+      // Get the manifest
+      const manifest = await manifestManager.getManifest(plugin.fullPath);
+
+      if (!manifest) {
+        console.log('  ⚠️ No manifest found for this plugin.');
+        continue;
+      }
+
+      console.log('  📋 Manifest Contents:');
+      console.log('  --------------------------------------------------');
+
+      // Display core metadata with proper formatting
+      const displayManifestField = (label: string, value: any) => {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            console.log(`  📌 ${label}: `);
+            value.forEach((item: any) => console.log(`    - ${item}`));
+          } else if (typeof value === 'object') {
+            console.log(`  📌 ${label}: `);
+            Object.entries(value).forEach(([k, v]) =>
+              console.log(`    - ${k}: ${v}`)
+            );
+          } else {
+            console.log(`  📌 ${label}: ${value}`);
+          }
+        }
+      };
+
+      // Core metadata
+      displayManifestField('Name', manifest.name);
+      displayManifestField('Version', manifest.version);
+      displayManifestField('Description', manifest.description);
+      displayManifestField('Author', manifest.author);
+      displayManifestField('FX Version', manifest.fx_version);
+
+      // Scripts
+      displayManifestField('Client Scripts', manifest.client_scripts);
+      displayManifestField('Server Scripts', manifest.server_scripts);
+      displayManifestField('Shared Scripts', manifest.shared_scripts);
+
+      // Dependencies and games
+      displayManifestField('Games', manifest.games);
+      displayManifestField('Dependencies', manifest.dependencies);
+
+      // Additional metadata (excluding already displayed fields)
+      const displayedFields = [
+        'name',
+        'version',
+        'description',
+        'author',
+        'fx_version',
+        'client_scripts',
+        'server_scripts',
+        'shared_scripts',
+        'games',
+        'dependencies',
+      ];
+
+      const otherFields = Object.entries(manifest).filter(
+        ([key]) => !displayedFields.includes(key)
+      );
+
+      if (otherFields.length > 0) {
+        console.log('\n  📌 Additional Properties:');
+        otherFields.forEach(([key, value]) => {
+          if (typeof value === 'object' && value !== null) {
+            console.log(`    - ${key}: ${JSON.stringify(value)}`);
+          } else {
+            console.log(`    - ${key}: ${value}`);
+          }
+        });
+      }
+
+      console.log('  --------------------------------------------------');
+    }
+
+    // 4. Demonstrate the plugin build process
+    createDivider('PLUGIN BUILD DEMONSTRATION');
+
+    // First, clean the dist directory
+    console.log('Cleaning distribution directory...');
+    await buildManager.clean();
+    console.log('✓ Distribution directory cleaned\n');
+
+    // Build a specific plugin if any exists
+    if (allPlugins.length > 0) {
+      const firstPlugin = allPlugins[0];
+      console.log(`\n🛠️ Preparing to build plugin: ${firstPlugin.pluginName}`);
+
+      // Reload the plugin to ensure its info is up to date
+      try {
+        console.log(`Reloading plugin: ${firstPlugin.pluginName}`);
+        await pluginManager.reloadPlugin(firstPlugin.pluginName);
+        console.log(`✓ Plugin ${firstPlugin.pluginName} reloaded successfully`);
+      } catch (reloadError) {
+        const errorMessage =
+          reloadError instanceof Error
+            ? reloadError.message
+            : String(reloadError);
+        console.error(
+          `Failed to reload plugin ${firstPlugin.pluginName}: ${errorMessage}`
+        );
+        throw reloadError; // Re-throw to halt execution if reloading fails
+      }
+
+      // Show build process for specific file types
+      console.log('\nBuilding by file type:');
+      console.log('----------------------');
+
+      await buildManager.buildPluginJson(firstPlugin);
+      await buildManager.buildPluginLua(firstPlugin);
+      await buildManager.buildPluginTs(firstPlugin);
+      await buildManager.buildPluginJs(firstPlugin);
+      await buildManager.buildPluginPageTsx(firstPlugin);
+
+      console.log('\n✓ Individual file type builds completed');
+
+      // Build first plugin completely in one go
+      console.log(`\n🔨 Building complete plugin: ${firstPlugin.pluginName}`);
+      await buildManager.buildPlugin(firstPlugin.pluginName);
+      console.log(`✓ Complete build of ${firstPlugin.pluginName} finished`);
+    }
+
+    // Build all plugins
+    console.log('\n🏗️ Building all plugins...');
+    await buildManager.buildAllPlugins();
+    console.log('✓ All plugins built successfully');
+
+    // Count files in dist directory
+    const builtPluginsCount = allPlugins.length;
+    const filesByExtension = new Map<string, number>();
+    allPlugins.forEach((plugin) => {
+      plugin.files.forEach((file) => {
+        const extension = file.fileName.includes('.')
+          ? file.fileName.substring(file.fileName.lastIndexOf('.') + 1)
+          : 'unknown';
+        filesByExtension.set(
+          extension,
+          (filesByExtension.get(extension) || 0) + 1
+        );
+      });
+    });
+
+    // Output build statistics
+    console.log('\n📊 Build Statistics:');
+    console.log(`  Total plugins built: ${builtPluginsCount}`);
+    console.log('  Files by extension:');
+    for (const [extension, count] of filesByExtension.entries()) {
+      console.log(`    .${extension}: ${count} files`);
+    }
+
+    createDivider('DEMO COMPLETE');
+    console.log('Plugin Explorer demo finished successfully. Summary:');
+    console.log(`✓ Scanned ${allPlugins.length} plugins`);
+    console.log(`✓ Found ${totalFiles} total files`);
+    console.log(`✓ Displayed ${allPlugins.length} manifests`);
+    console.log(
+      `✓ Built ${builtPluginsCount} plugins to distribution directory`
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('\n❌ ERROR: ' + errorMessage);
+
+    if (error instanceof Error && error.stack) {
+      console.error('\nStack trace:');
+      console.error(error.stack);
+    }
+  }
+}
+
+// Execute the main function
+main().catch((error) => {
+  console.error('❌ FATAL ERROR:', error);
+  process.exit(1);
+});
+
+
+================================================================================
+
+# .\managers\BuildManager.ts
+
+import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
+import * as path from 'path';
+import { glob } from 'glob';
+import * as esbuild from 'esbuild';
+import { spawn } from 'child_process';
+import { FileManager } from './FileManager.js';
+import { Plugin } from '../types/Plugin.js';
+import { File } from '../types/File.js';
+
+/**
+ * Build manager
+ * This class provides functionality to build plugins by copying files to a dist directory
+ */
+class BuildManager {
+  private fileManager: FileManager;
+  private distPath: string;
+  private initialized: boolean = false;
+
+  /**
+   * Creates a new BuildManager instance
+   * @param fileManager The FileManager instance to use for file operations
+   * @param distPath Optional path to the distribution directory
+   */
+  constructor(fileManager: FileManager, distPath: string = 'dist') {
+    this.fileManager = fileManager;
+    this.distPath = path.resolve(distPath);
+  }
+
+  /**
+   * Initializes the build manager
+   * Must be called before using other methods
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Create the dist directory if it doesn't exist
+      if (!fsSync.existsSync(this.distPath)) {
+        await fs.mkdir(this.distPath, { recursive: true });
+      }
+
+      this.initialized = true;
+      console.log('BuildManager initialized successfully');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error('Error initializing BuildManager:', error);
+      throw new Error(`Failed to initialize BuildManager: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Builds a plugin by copying all files to the dist directory
+   * @param pluginNameOrPath The name or path of the plugin to build
+   */
+  async buildPlugin(pluginNameOrPath: string): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      // Get the plugin
+      const plugin = this.getPluginFromNameOrPath(pluginNameOrPath);
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      console.log(`Building plugin: ${plugin.pluginName}`);
+
+      // Create the destination directory
+      const destDir = this.getPluginDestDir(plugin);
+      await fs.mkdir(destDir, { recursive: true });
+
+      // Build all file types
+      await Promise.all([
+        this.buildPluginLua(plugin),
+        this.buildPluginJson(plugin),
+        this.buildPluginTs(plugin),
+        this.buildPluginJs(plugin),
+        this.buildPluginPageTsx(plugin),
+      ]);
+
+      console.log(
+        `✓ Plugin ${
+          plugin.pluginName
+        } built successfully to ${this.pathToDisplay(destDir)}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Error building plugin ${pluginNameOrPath}:`, error);
+      throw new Error(
+        `Failed to build plugin ${pluginNameOrPath}: ${errorMessage}`
+      );
+    }
+  }
+
+  /**
+   * Builds Lua files for a plugin
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginLua(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Get all Lua files
+      const luaFiles = plugin.files.filter((file) =>
+        file.fileName.endsWith('.lua')
+      );
+
+      if (luaFiles.length === 0) {
+        console.log(`No Lua files found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      await this.copyFilesToDist(plugin, luaFiles);
+      console.log(
+        `✓ Built ${luaFiles.length} Lua file(s) for plugin ${plugin.pluginName}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building Lua files for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build Lua files for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building Lua files for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build Lua files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Builds JSON files for a plugin
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginJson(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Get all JSON files
+      const jsonFiles = plugin.files.filter((file) =>
+        file.fileName.endsWith('.json')
+      );
+
+      if (jsonFiles.length === 0) {
+        console.log(`No JSON files found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      await this.copyFilesToDist(plugin, jsonFiles);
+      console.log(
+        `✓ Built ${jsonFiles.length} JSON file(s) for plugin ${plugin.pluginName}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building JSON files for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build JSON files for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building JSON files for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build JSON files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Builds TypeScript files for a plugin
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginTs(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Get all TypeScript files (excluding .tsx files which are handled separately)
+      const tsFiles = plugin.files.filter(
+        (file) =>
+          file.fileName.endsWith('.ts') && !file.fileName.endsWith('.tsx')
+      );
+
+      if (tsFiles.length === 0) {
+        console.log(`No TypeScript files found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      const destDir = this.getPluginDestDir(plugin);
+
+      // Process each TypeScript file
+      for (const file of tsFiles) {
+        // Get the relative path within the plugin
+        const relativePath = path.relative(plugin.fullPath, file.fullPath);
+
+        // Change the extension from .ts to .js for the output file
+        const outputRelativePath = relativePath.replace(/\.ts$/, '.js');
+        const outputPath = path.join(destDir, outputRelativePath);
+
+        // Create the destination directory if it doesn't exist
+        const outputDir = path.dirname(outputPath);
+        await fs.mkdir(outputDir, { recursive: true });
+
+        // Determine if this is a server-side script
+        const isServerScript = this.isServerScript(file.fullPath);
+        const externalPackages = this.getExternalPackages(isServerScript);
+
+        // Configure loader based on file type
+        const loader: Record<string, esbuild.Loader> = {
+          '.ts': 'ts',
+          '.js': 'js',
+        };
+
+        console.log(`Bundling TypeScript file: ${relativePath}`);
+
+        try {
+          // Bundle the file
+          const result = await esbuild.build({
+            entryPoints: [file.fullPath],
+            bundle: true,
+            outfile: outputPath,
+            format: 'iife', // Use IIFE format for FiveM compatibility
+            target: 'es2017',
+            minify: false,
+            sourcemap: 'external',
+            loader,
+            logLevel: 'info',
+            external: externalPackages,
+            // Use node platform for server scripts, browser platform for client scripts
+            platform: isServerScript ? 'node' : 'browser',
+          });
+
+          // Check for errors
+          if (result.errors.length > 0) {
+            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
+            throw new Error(
+              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            );
+          }
+
+          // Verify the file was created
+          if (!fsSync.existsSync(outputPath)) {
+            throw new Error(
+              `Failed to verify file exists after bundling: ${outputPath}`
+            );
+          }
+        } catch (bundleError) {
+          console.error(
+            `Error bundling TypeScript file ${file.fullPath}:`,
+            bundleError
+          );
+          throw bundleError;
+        }
+      }
+
+      console.log(
+        `✓ Built ${tsFiles.length} TypeScript file(s) for plugin ${plugin.pluginName}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building TypeScript files for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build TypeScript files for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building TypeScript files for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build TypeScript files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Builds JavaScript files for a plugin
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginJs(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Get all JavaScript files (excluding .jsx files)
+      const jsFiles = plugin.files.filter(
+        (file) =>
+          file.fileName.endsWith('.js') && !file.fileName.endsWith('.jsx')
+      );
+
+      if (jsFiles.length === 0) {
+        console.log(`No JavaScript files found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      const destDir = this.getPluginDestDir(plugin);
+
+      // Process each JavaScript file
+      for (const file of jsFiles) {
+        // Get the relative path within the plugin
+        const relativePath = path.relative(plugin.fullPath, file.fullPath);
+        const outputPath = path.join(destDir, relativePath);
+
+        // Create the destination directory if it doesn't exist
+        const outputDir = path.dirname(outputPath);
+        await fs.mkdir(outputDir, { recursive: true });
+
+        // Determine if this is a server-side script
+        const isServerScript = this.isServerScript(file.fullPath);
+        const externalPackages = this.getExternalPackages(isServerScript);
+
+        console.log(`Bundling JavaScript file: ${relativePath}`);
+
+        try {
+          // Bundle the file
+          const result = await esbuild.build({
+            entryPoints: [file.fullPath],
+            bundle: true,
+            outfile: outputPath,
+            format: 'iife', // Use IIFE format for FiveM compatibility
+            target: 'es2017',
+            minify: false,
+            sourcemap: 'external',
+            external: externalPackages,
+            // Use node platform for server scripts, browser platform for client scripts
+            platform: isServerScript ? 'node' : 'browser',
+          });
+
+          // Check for errors
+          if (result.errors.length > 0) {
+            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
+            throw new Error(
+              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            );
+          }
+
+          // Verify the file was created
+          if (!fsSync.existsSync(outputPath)) {
+            throw new Error(
+              `Failed to verify file exists after bundling: ${outputPath}`
+            );
+          }
+        } catch (bundleError) {
+          console.error(
+            `Error bundling JavaScript file ${file.fullPath}:`,
+            bundleError
+          );
+          throw bundleError;
+        }
+      }
+
+      console.log(
+        `✓ Built ${jsFiles.length} JavaScript file(s) for plugin ${plugin.pluginName}`
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (typeof pluginNameOrPath === 'string') {
+        console.error(
+          `Error building JavaScript files for plugin ${pluginNameOrPath}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build JavaScript files for plugin ${pluginNameOrPath}: ${errorMessage}`
+        );
+      } else {
+        console.error(
+          `Error building JavaScript files for plugin ${pluginNameOrPath.pluginName}:`,
+          error
+        );
+        throw new Error(
+          `Failed to build JavaScript files for plugin ${pluginNameOrPath.pluginName}: ${errorMessage}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Builds TSX (TypeScript JSX) page files for a plugin
+   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   */
+  async buildPluginPageTsx(pluginNameOrPath: string | Plugin): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      // Get the plugin object
+      const plugin =
+        typeof pluginNameOrPath === 'string'
+          ? this.getPluginFromNameOrPath(pluginNameOrPath)
+          : pluginNameOrPath;
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+
+      // Find the Page.tsx file in the html directory
+      const pageTsxFile = plugin.files.find(
+        (file) =>
+          file.fileName === 'Page.tsx' &&
+          (file.fullPath.includes('/html/') ||
+            file.fullPath.includes('\\html\\'))
+      );
+
+      if (!pageTsxFile) {
+        console.log(`No Page.tsx file found in plugin ${plugin.pluginName}`);
+        return;
+      }
+
+      console.log(
+        `Building webview for plugin ${plugin.pluginName} from ${pageTsxFile.displayPath}`
+      );
+
+      // Set up paths
+      const webviewDir = path.resolve('src/webview');
+      const srcDir = path.join(webviewDir, 'src');
+      const pluginDistDir = this.getPluginDestDir(plugin);
+      const htmlOutputDir = path.join(pluginDistDir, 'html');
+
+      // Ensure directories exist
+      await fs.mkdir(srcDir, { recursive: true });
+      await fs.mkdir(htmlOutputDir, { recursive: true });
+
+      // Backup original App.tsx if it exists
+      const appFilePath = path.join(srcDir, 'App.tsx');
+      let originalAppContent = '';
+      if (fsSync.existsSync(appFilePath)) {
+        originalAppContent = await fs.readFile(appFilePath, 'utf-8');
+      }
+
+      try {
+        // Generate and write temporary App.tsx
+        const appContent = this.generateAppTsxContent(srcDir, pageTsxFile);
+        await fs.writeFile(appFilePath, appContent, 'utf-8');
+        console.log(
+          `Generated temporary App.tsx for plugin ${plugin.pluginName}`
+        );
+
+        // Ensure other necessary files exist
+        await this.ensureWebviewFiles(srcDir);
+
+        // Run Vite build
+        console.log(`Running Vite build for plugin ${plugin.pluginName}...`);
+        await this.runViteBuild(htmlOutputDir);
+
+        // Verify the build output
+        const indexHtmlPath = path.join(htmlOutputDir, 'index.html');
+        if (!fsSync.existsSync(indexHtmlPath)) {
+          throw new Error(
+            `Failed to generate index.html for plugin ${plugin.pluginName}`
+          );
+        }
+
+        console.log(
+          `✓ Built webview for plugin ${
+            plugin.pluginName
+          } to ${this.pathToDisplay(htmlOutputDir)}`
+        );
+      } finally {
+        // Restore the original App.tsx
+        if (originalAppContent) {
+          await fs.writeFile(appFilePath, originalAppContent, 'utf-8');
+          console.log(`Restored original App.tsx`);
+        }
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const pluginName =
+        typeof pluginNameOrPath === 'string'
+          ? pluginNameOrPath
+          : pluginNameOrPath.pluginName;
+
+      console.error(`Error building webview for plugin ${pluginName}:`, error);
+      throw new Error(
+        `Failed to build webview for plugin ${pluginName}: ${errorMessage}`
+      );
+    }
+  }
+
+  /**
+   * Runs the Vite build process
+   * @param outputDir The directory to output the build to
+   * @private
+   */
+  private async runViteBuild(outputDir: string): Promise<void> {
+    const buildCommand = `npx vite build --outDir=${outputDir}`;
+    console.log(`Executing: ${buildCommand}`);
+
+    // Use spawn to run the build command
+    const child = spawn(buildCommand, {
+      cwd: process.cwd(),
+      shell: true,
+      stdio: 'inherit',
+    });
+
+    // Wait for the build to complete
+    await new Promise<void>((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Vite build failed with exit code ${code}`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Generates App.tsx content for a plugin's Page.tsx
+   * @param srcDir Source directory where App.tsx will be created
+   * @param pageTsxFile The Page.tsx file
+   * @returns Generated App.tsx content
+   * @private
+   */
+  private generateAppTsxContent(srcDir: string, pageTsxFile: File): string {
+    // Calculate relative path from src directory to the Page.tsx file
+    const importPath = path
+      .relative(srcDir, pageTsxFile.fullPath)
+      .replace(/\\/g, '/');
+    const formattedImportPath = importPath.startsWith('.')
+      ? importPath
+      : `../../${importPath}`;
+
+    // Create the App.tsx content
+    return `// Auto-generated by BuildManager
+// Generated on: ${new Date().toISOString()}
+
+import Page from '${formattedImportPath}';
+
+function App() {
+  return <Page />;
+}
+
+export default App;
+`;
+  }
+
+  /**
+   * Ensures all necessary files exist for the webview build
+   * @param srcDir Source directory
+   * @private
+   */
+  private async ensureWebviewFiles(srcDir: string): Promise<void> {
+    const webviewSrcDir = path.resolve('src/webview/src');
+
+    // Check if the webview src directory exists
+    if (!fsSync.existsSync(webviewSrcDir)) {
+      throw new Error(`Webview src directory not found: ${webviewSrcDir}`);
+    }
+
+    // Copy main.tsx if it doesn't exist in the target directory
+    const mainTsxPath = path.join(srcDir, 'main.tsx');
+    if (!fsSync.existsSync(mainTsxPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'main.tsx');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, mainTsxPath);
+        console.log(`Copied main.tsx from ${sourcePath}`);
+      }
+    }
+
+    // Copy index.html if it doesn't exist in the target directory
+    const indexHtmlPath = path.join(srcDir, 'index.html');
+    if (!fsSync.existsSync(indexHtmlPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'index.html');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, indexHtmlPath);
+        console.log(`Copied index.html from ${sourcePath}`);
+      }
+    }
+
+    // Copy index.css if it doesn't exist in the target directory
+    const indexCssPath = path.join(srcDir, 'index.css');
+    if (!fsSync.existsSync(indexCssPath)) {
+      const sourcePath = path.join(webviewSrcDir, 'index.css');
+      if (fsSync.existsSync(sourcePath)) {
+        await fs.copyFile(sourcePath, indexCssPath);
+        console.log(`Copied index.css from ${sourcePath}`);
+      }
+    }
+  }
+
+  /**
+   * Copies files to the dist directory
+   * @param plugin The plugin object
+   * @param files The files to copy
+   * @private
+   */
+  private async copyFilesToDist(plugin: Plugin, files: File[]): Promise<void> {
+    const destDir = this.getPluginDestDir(plugin);
+
+    // Ensure the destination directory exists
+    await fs.mkdir(destDir, { recursive: true });
+
+    // Copy each file, preserving directory structure within the plugin
+    for (const file of files) {
+      // Get the relative path within the plugin
+      const relativePath = path.relative(plugin.fullPath, file.fullPath);
+      const destPath = path.join(destDir, relativePath);
+
+      // Create the destination directory if it doesn't exist
+      const destFileDir = path.dirname(destPath);
+      await fs.mkdir(destFileDir, { recursive: true });
+
+      // Copy the file
+      await fs.copyFile(file.fullPath, destPath);
+    }
+  }
+
+  /**
+   * Gets the destination directory for a plugin
+   * @param plugin The plugin object
+   * @private
+   */
+  private getPluginDestDir(plugin: Plugin): string {
+    // Use the plugin's parent folders to build the destination path
+    let destPath = this.distPath;
+
+    // If the plugin has parent folders, include them in the path
+    if (plugin.parents.length > 0) {
+      // We only need the last parent entry which contains the full parent path
+      // For example, if parents are ['[misc2]', '[misc2]/[sub-sub-folder]'],
+      // we only need the last one which already has the full path structure
+      const parentPath = plugin.parents[plugin.parents.length - 1];
+
+      // Combine the parent path with the plugin name
+      destPath = path.join(this.distPath, parentPath, plugin.pluginName);
+    } else {
+      // No parent folders, just place directly under dist
+      destPath = path.join(this.distPath, plugin.pluginName);
+    }
+
+    return destPath;
+  }
+
+  /**
+   * Gets a Plugin object from a name or path
+   * @param pluginNameOrPath The name or path of the plugin
+   * @private
+   */
+  private getPluginFromNameOrPath(
+    pluginNameOrPath: string
+  ): Plugin | undefined {
+    if (pluginNameOrPath.includes(path.sep)) {
+      // It's a path
+      return this.fileManager.getPluginByPath(pluginNameOrPath);
+    } else {
+      // It's a name
+      return this.fileManager.getPlugin(pluginNameOrPath);
+    }
+  }
+
+  /**
+   * Converts a path to display format (with forward slashes)
+   * @param filePath The path to convert
+   * @private
+   */
+  private pathToDisplay(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
+  }
+
+  /**
+   * Builds all plugins
+   */
+  async buildAllPlugins(): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      const plugins = this.fileManager.getAllPlugins();
+
+      if (plugins.length === 0) {
+        console.log('No plugins found to build');
+        return;
+      }
+
+      console.log(`Building all ${plugins.length} plugins...`);
+
+      for (const plugin of plugins) {
+        await this.buildPlugin(plugin.fullPath);
+      }
+
+      console.log(`✓ All ${plugins.length} plugins built successfully`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error('Error building all plugins:', error);
+      throw new Error(`Failed to build all plugins: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Cleans the dist directory
+   */
+  async clean(): Promise<void> {
+    this.ensureInitialized();
+
+    try {
+      console.log(
+        `Cleaning dist directory: ${this.pathToDisplay(this.distPath)}`
+      );
+
+      // Check if the directory exists
+      if (fsSync.existsSync(this.distPath)) {
+        // Remove all files and subdirectories
+        await fs.rm(this.distPath, { recursive: true, force: true });
+
+        // Recreate the empty directory
+        await fs.mkdir(this.distPath, { recursive: true });
+      }
+
+      console.log('✓ Dist directory cleaned successfully');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error('Error cleaning dist directory:', error);
+      throw new Error(`Failed to clean dist directory: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Helper method to ensure the manager is initialized
+   * @private
+   */
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new Error(
+        'BuildManager must be initialized before use. Call initialize() first.'
+      );
+    }
+  }
+
+  /**
+   * Determines if a file is a server-side script based on its path
+   * @param filePath Path to check
+   * @returns Whether the file is a server-side script
+   * @private
+   */
+  private isServerScript(filePath: string): boolean {
+    return filePath.includes('/server/') || filePath.includes('\\server\\');
+  }
+
+  /**
+   * Gets the list of packages to not inline
+   * @param isServerScript Whether the file is a server-side script
+   * @returns List of external packages
+   * @private
+   */
+  private getExternalPackages(isServerScript: boolean): string[] {
+    // For server scripts, make Node.js modules external
+    return isServerScript
+      ? [
+          'http',
+          'https',
+          'url',
+          'fs',
+          'path',
+          'os',
+          'crypto',
+          'buffer',
+          'stream',
+          'util',
+          'events',
+          'zlib',
+          'net',
+          'tls',
+          'dns',
+          'child_process',
+        ]
+      : [];
+  }
+}
+
+export { BuildManager };
 
 
 ================================================================================
@@ -863,6 +2014,63 @@ class FileManager {
     // Scan again
     await this.scanPlugins();
   }
+
+  /**
+   * Reloads a specific plugin by re-reading its files from the file system.
+   * @param pluginPath The full path to the plugin directory.
+   * @throws {Error} If the plugin is not found or if there is an error during reloading.
+   */
+  async reloadPlugin(pluginPath: string): Promise<void> {
+    try {
+      const normalizedPath = this.normalizePath(pluginPath);
+      const plugin = this.pathToPlugin.get(normalizedPath);
+      if (!plugin) {
+        throw new Error(
+          `Plugin not found at path: ${this.pathToDisplay(pluginPath)}`
+        );
+      }
+
+      // Remove existing files associated with the plugin
+      for (const file of plugin.files) {
+        this.files.delete(file.fullPath);
+      }
+
+      // Remove the plugin from registries
+      const pathIdentifier = this.generatePluginPathIdentifier(
+        path.relative(this.rootPath, plugin.fullPath)
+      );
+      this.plugins.delete(pathIdentifier);
+      this.pathToPlugin.delete(normalizedPath);
+
+      // Re-register the plugin
+      const reloadedPlugin = await this.registerPlugin(normalizedPath);
+
+      // Reload the manifest
+      const manifestPath = path.join(normalizedPath, 'plugin.json');
+      try {
+        reloadedPlugin.manifest = await this.loadPluginManifest(manifestPath);
+      } catch (error) {
+        console.warn(
+          `Warning: Failed to load manifest for plugin at ${this.pathToDisplay(
+            manifestPath
+          )}: ${error}`
+        );
+      }
+
+      // Re-scan the plugin files
+      await this.scanPluginFiles(reloadedPlugin);
+
+      console.log(`Plugin reloaded successfully: ${reloadedPlugin.pluginName}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        `Error reloading plugin at ${this.pathToDisplay(pluginPath)}:`,
+        error
+      );
+      throw new Error(`Failed to reload plugin: ${errorMessage}`);
+    }
+  }
 }
 
 export { FileManager };
@@ -1250,7 +2458,9 @@ class PluginManager {
     if (!this.initialized) {
       await this.fileManager.initialize();
       this.initialized = true;
-      console.log(`PluginManager initialized with ${this.getAllPlugins().length} plugins`);
+      console.log(
+        `PluginManager initialized with ${this.getAllPlugins().length} plugins`
+      );
     }
   }
 
@@ -1306,27 +2516,33 @@ class PluginManager {
     this.ensureInitialized();
     return this.fileManager.getParentFolders();
   }
-  
+
   /**
    * Gets files of a plugin by file extension
    * @param pluginNameOrPath The name or path of the plugin
    * @param extension The file extension to filter by (with or without leading dot)
    */
-  getPluginFilesByExtension(pluginNameOrPath: string, extension: string): File[] {
+  getPluginFilesByExtension(
+    pluginNameOrPath: string,
+    extension: string
+  ): File[] {
     this.ensureInitialized();
     return this.fileManager.getFilesByExtension(pluginNameOrPath, extension);
   }
-  
+
   /**
    * Gets files of a plugin matching a pattern
    * @param pluginNameOrPath The name or path of the plugin
    * @param pattern The glob pattern to match files against
    */
-  async getPluginFilesByPattern(pluginNameOrPath: string, pattern: string): Promise<File[]> {
+  async getPluginFilesByPattern(
+    pluginNameOrPath: string,
+    pattern: string
+  ): Promise<File[]> {
     this.ensureInitialized();
     return this.fileManager.getFilesMatchingPattern(pluginNameOrPath, pattern);
   }
-  
+
   /**
    * Gets the FileManager instance
    */
@@ -1340,12 +2556,41 @@ class PluginManager {
    */
   private ensureInitialized(): void {
     if (!this.initialized) {
-      throw new Error('PluginManager must be initialized before use. Call initialize() first.');
+      throw new Error(
+        'PluginManager must be initialized before use. Call initialize() first.'
+      );
     }
+  }
+
+  /**
+   * Reloads a specific plugin by re-reading its files from the file system.
+   * @param pluginNameOrPath The name or path of the plugin to reload.
+   * @throws {Error} If the plugin is not found or if multiple plugins with the same name are found.
+   */
+  async reloadPlugin(pluginNameOrPath: string): Promise<void> {
+    this.ensureInitialized();
+    // Try to get the plugin by path first
+    let plugin = this.getPluginByPath(pluginNameOrPath);
+    if (!plugin) {
+      // If not found by path, try by name
+      const plugins = this.getPluginsByName(pluginNameOrPath);
+      if (plugins.length === 1) {
+        plugin = plugins[0];
+      } else if (plugins.length > 1) {
+        throw new Error(
+          `Multiple plugins found with name '${pluginNameOrPath}'. Please specify the full path.`
+        );
+      } else {
+        throw new Error(`Plugin not found: ${pluginNameOrPath}`);
+      }
+    }
+    // Delegate reloading to FileManager using the plugin's path
+    await this.fileManager.reloadPlugin(plugin.fullPath);
   }
 }
 
 export { PluginManager };
+
 
 ================================================================================
 
@@ -1463,4 +2708,4 @@ export interface Plugin {
 
 
 --------------------------------------------------------------------------------
-Total TypeScript files found: 7
+Total TypeScript files found: 8
