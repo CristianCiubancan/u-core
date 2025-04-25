@@ -22,14 +22,14 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           <div className="flex space-x-2">
             <Button
               variant="secondary"
-              onClick={() => onRotate('left')}
+              onClick={() => onRotate('right')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
               ← Rotate
             </Button>
             <Button
               variant="secondary"
-              onClick={() => onRotate('right')}
+              onClick={() => onRotate('left')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
               Rotate →
