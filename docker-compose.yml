@@ -1,6 +1,9 @@
 services:
   fivem:
-    build: ./
+    build:
+      context: ./
+      args:
+        BINARIES_ARCHIVE_URL: ${BINARIES_ARCHIVE_URL}
     env_file: .env
     ports:
       - '30120:30120/tcp'
@@ -14,14 +17,6 @@ services:
     tty: true
     depends_on:
       - db
-    deploy:
-      resources:
-        limits:
-          cpus: '5'
-          memory: 6G
-        reservations:
-          cpus: '3'
-          memory: 4G
 
   db:
     image: mariadb:10.5
@@ -35,14 +30,6 @@ services:
     restart: unless-stopped
     ports:
       - '3306:3306'
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
 
 volumes:
   db_data:
