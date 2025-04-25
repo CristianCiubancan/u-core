@@ -79,6 +79,10 @@ namespace CharacterCreate {
       firstTimeOpened = false;
     }
 
+    // Set player heading to face forward (0.0 is north/forward)
+    const playerPed = PlayerPedId();
+    SetEntityHeading(playerPed, 0.0);
+
     // Set up camera
     setupCamera();
   }
@@ -228,6 +232,9 @@ namespace CharacterCreate {
     const playerPed = PlayerPedId();
     SetPedDefaultComponentVariation(playerPed);
     ClearAllPedProps(playerPed);
+
+    // Ensure player is still facing forward after model change
+    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
@@ -265,6 +272,9 @@ namespace CharacterCreate {
         false // Is parent inheritance
       );
     }
+
+    // Ensure player is still facing forward
+    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
@@ -283,6 +293,9 @@ namespace CharacterCreate {
 
       SetPedHairColor(playerPed, colorId, highlightId);
     }
+
+    // Ensure player is still facing forward
+    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
@@ -309,6 +322,9 @@ namespace CharacterCreate {
     } else if (category === 'eyeColor') {
       SetPedEyeColor(playerPed, value);
     }
+
+    // Ensure player is still facing forward
+    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
@@ -354,6 +370,9 @@ namespace CharacterCreate {
       const componentId = GetPedDrawableVariation(playerPed, 6);
       SetPedComponentVariation(playerPed, 6, componentId, value, 0);
     }
+
+    // Ensure player is still facing forward
+    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
