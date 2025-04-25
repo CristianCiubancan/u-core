@@ -7,6 +7,6 @@
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
-  "files": ["translations/*.json", "html/**/*"],
+  "files": ["html/**/*", "translations/*.json"],
   "ui_page": "html/index.html"
 }
