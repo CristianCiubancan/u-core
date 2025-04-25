@@ -70,13 +70,14 @@ class BuildManager {
       const destDir = this.getPluginDestDir(plugin);
       await fs.mkdir(destDir, { recursive: true });
 
+      await this.buildPluginPageTsx(plugin);
+
       // Build all file types
       await Promise.all([
         this.buildPluginLua(plugin),
         this.buildPluginJson(plugin),
         this.buildPluginTs(plugin),
         this.buildPluginJs(plugin),
-        this.buildPluginPageTsx(plugin),
         this.buildPluginManifest(plugin),
         this.buildPluginOtherFiles(plugin),
       ]);
