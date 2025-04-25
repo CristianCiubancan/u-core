@@ -2,6 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Base styles for better text rendering across resolutions */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+}
+
+/* Apply resolution-aware base font size */
+@media (min-resolution: 2dppx) {
+  html {
+    font-size: 16.5px; /* Slightly larger base font size for high-DPI displays */
+  }
+}
+
+/* Apply resolution-aware text rendering */
+@media (min-width: 2560px) {
+  html {
+    font-size: 18px; /* Larger base font size for 4K displays */
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* Even larger text for 8K displays */
+@media (min-width: 3840px) {
+  html {
+    font-size: 20px; /* Even larger base font size for 8K displays */
+  }
+}
+
+/* Apply global text scaling to all text elements by default */
+body,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+button,
+input,
+select,
+textarea,
+a,
+span,
+div {
+  @apply text-scale-with-screen;
+}
+
 body {
   min-height: 100vh;
   max-height: 100vh;

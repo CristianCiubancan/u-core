@@ -21,7 +21,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
   ];
 
   return (
-    <div className="w-[30%] min-w-[140px] max-w-[180px] glass-brand-dark p-3 border-r border-brand-800">
+    <div className="w-[30%] min-w-[140px] max-w-[200px] glass-brand-dark p-3 border-r border-brand-800">
       <nav className="space-y-2">
         {tabs.map((tab) => (
           <Button
@@ -29,6 +29,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
             variant="tab"
             active={activeTab === tab.id}
             onClick={() => onTabChange(tab.id)}
+            className="text-responsive-base"
           >
             {tab.label}
           </Button>

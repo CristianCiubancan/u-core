@@ -64,7 +64,7 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         {/* Header */}
         <div className="glass-brand-dark p-3 flex justify-between items-center border-b border-brand-700">
-          <h1 className="text-xl font-semibold tracking-tight text-accessible-on-glass">
+          <h1 className="text-responsive-xl font-semibold tracking-tight text-accessible-on-glass">
             {title}
           </h1>
           <div className="flex space-x-2">
@@ -72,11 +72,15 @@ export const Layout: React.FC<LayoutProps> = ({
               variant="success"
               onClick={onSave}
               disabled={isSaving}
-              className="text-sm"
+              className="text-responsive-sm"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
-            <Button variant="danger" onClick={onClose} className="text-sm">
+            <Button
+              variant="danger"
+              onClick={onClose}
+              className="text-responsive-sm"
+            >
               Cancel
             </Button>
           </div>
