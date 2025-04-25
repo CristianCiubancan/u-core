@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../utils/fetchNui';
 import { isEnvBrowser } from '../../../../utils/misc';
@@ -22,6 +22,18 @@ export default function Page() {
     } catch (error) {
       console.error('[UI] Failed to close UI:', error);
     }
+  }, []);
+
+  useEffect(() => {
+    // listen for F2 key press
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F2') {
+        handleCloseUi();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Render UI
