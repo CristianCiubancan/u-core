@@ -1,12 +1,17 @@
 {
-  "name": "example3",
+  "name": "character-select",
   "version": "0.1.0",
   "fx_version": "cerulean",
   "author": "Baloony Gaze",
-  "description": "Example 3",
+  "description": "Character Select",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
-  "files": ["html/**/*"],
+  "files": [
+    "translations/*.json",
+    "translations/*.lua",
+    "translations/*.js",
+    "html/**/*"
+  ],
   "ui_page": "html/index.html"
 }

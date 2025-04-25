@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "fx_version": "cerulean",
   "author": "Baloony Gaze",
-  "description": "Example 3",
+  "description": "Example",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js", "client/*.lua"],
   "server_scripts": ["server/*.js", "server/*.lua"],

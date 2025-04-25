@@ -1,9 +1,9 @@
 {
-  "name": "example2",
+  "name": "character-create",
   "version": "0.1.0",
   "fx_version": "cerulean",
   "author": "Baloony Gaze",
-  "description": "Example 3",
+  "description": "Character Create",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
