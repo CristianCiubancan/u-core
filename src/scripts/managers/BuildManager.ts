@@ -557,7 +557,7 @@ class BuildManager {
 
       // Set up paths
       const webviewDir = path.resolve('src/webview');
-      const srcDir = path.join(webviewDir, 'src');
+      const srcDir = webviewDir;
       const pluginDistDir = this.getPluginDestDir(plugin);
       const htmlOutputDir = path.join(pluginDistDir, 'html');
 
@@ -686,7 +686,7 @@ export default App;
    * @private
    */
   private async ensureWebviewFiles(srcDir: string): Promise<void> {
-    const webviewSrcDir = path.resolve('src/webview/src');
+    const webviewSrcDir = path.resolve('src/webview');
 
     // Check if the webview src directory exists
     if (!fsSync.existsSync(webviewSrcDir)) {
