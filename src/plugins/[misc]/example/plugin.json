@@ -5,14 +5,8 @@
   "author": "Baloony Gaze",
   "description": "Example",
   "games": ["gta5", "rdr3"],
-  "client_scripts": ["client/*.js", "client/*.lua"],
-  "server_scripts": ["server/*.js", "server/*.lua"],
-  "shared_scripts": ["shared/*.js"],
-  "files": [
-    "translations/*.json",
-    "translations/*.lua",
-    "translations/*.js",
-    "html/**/*"
-  ],
+  "client_scripts": ["client/*.js"],
+  "server_scripts": ["server/*.js"],
+  "files": ["translations/*.json", "html/**/*"],
   "ui_page": "html/index.html"
 }
