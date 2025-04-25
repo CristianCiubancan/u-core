@@ -253,6 +253,8 @@ async function main() {
       await buildManager.buildPluginTs(firstPlugin);
       await buildManager.buildPluginJs(firstPlugin);
       await buildManager.buildPluginPageTsx(firstPlugin);
+      await buildManager.buildPluginManifest(firstPlugin);
+      await buildManager.buildPluginOtherFiles(firstPlugin);
 
       console.log('\n✓ Individual file type builds completed');
 
