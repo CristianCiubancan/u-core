@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
-const themeConfig = require('./config/theme');
-const plugins = require('./config/plugins');
-const safelist = require('./config/safelist');
+const themeConfig = require('./theme/theme');
+const plugins = require('./theme/plugins');
+const safelist = require('./theme/safelist');
 
 module.exports = {
   content: [

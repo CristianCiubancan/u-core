@@ -11,7 +11,12 @@
  * @param {string} thumbHoverBg - Thumb hover background color
  * @returns {Object} Scrollbar style object for Tailwind
  */
-function createScrollbarStyles(trackBg, thumbBg, thumbBorder, thumbHoverBg) {
+function createScrollbarStyles(
+  trackBg: string,
+  thumbBg: string,
+  thumbBorder: string,
+  thumbHoverBg: string
+): Record<string, string | Record<string, string>> {
   return {
     // Basic scrollbar width and height
     '&::-webkit-scrollbar': {
@@ -50,7 +55,27 @@ function createScrollbarStyles(trackBg, thumbBg, thumbBorder, thumbHoverBg) {
  * @param {Function} hexToRgb - Function to convert hex to RGB
  * @returns {Object} Predefined scrollbar variants
  */
-function getScrollbarVariants(grayPalette, brandPalette, hexToRgb) {
+type HexToRgbFunction = (hex: string) => string;
+
+interface ScrollbarVariant {
+  trackBg: string;
+  thumbBg: string;
+  thumbBorder: string;
+  thumbHoverBg: string;
+}
+
+interface ScrollbarVariants {
+  light: ScrollbarVariant;
+  dark: ScrollbarVariant;
+  brand: ScrollbarVariant;
+  brandDark: ScrollbarVariant;
+}
+
+function getScrollbarVariants(
+  grayPalette: Record<number, string>,
+  brandPalette: Record<number, string>,
+  hexToRgb: HexToRgbFunction
+): ScrollbarVariants {
   return {
     // Light theme scrollbar
     light: {

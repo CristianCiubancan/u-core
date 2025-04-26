@@ -8,7 +8,7 @@
  * @param {string} hex - Hex color code (with or without #)
  * @returns {string} RGB values as a comma-separated string
  */
-function hexToRgb(hex) {
+function hexToRgb(hex: string): string {
   // Safety check for undefined or invalid values
   if (!hex || typeof hex !== 'string') {
     console.warn(`Invalid hex color provided: ${hex}, using fallback black`);
@@ -37,8 +37,9 @@ function hexToRgb(hex) {
     const b = bigint & 255;
 
     return `${r}, ${g}, ${b}`;
-  } catch (error) {
-    console.error(`Error converting hex to RGB: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error converting hex to RGB: ${errorMessage}`);
     return '0, 0, 0'; // Return black as fallback
   }
 }
@@ -48,7 +49,7 @@ function hexToRgb(hex) {
  * @param {string} hex - Hex color code
  * @returns {number} Relative luminance value (0-1)
  */
-function getLuminance(hex) {
+function getLuminance(hex: string): number {
   // Remove # if present
   hex = hex.replace(/^#/, '');
 
@@ -71,7 +72,7 @@ function getLuminance(hex) {
  * @param {string} color2 - Second hex color code
  * @returns {number} Contrast ratio (1-21)
  */
-function getContrastRatio(color1, color2) {
+function getContrastRatio(color1: string, color2: string): number {
   const luminance1 = getLuminance(color1);
   const luminance2 = getLuminance(color2);
 
@@ -87,7 +88,7 @@ function getContrastRatio(color1, color2) {
  * @param {string} hex - Hex color code
  * @returns {boolean} True if color is dark
  */
-function isDarkColor(hex) {
+function isDarkColor(hex: string): boolean {
   return getLuminance(hex) < 0.5;
 }
 
@@ -96,7 +97,7 @@ function isDarkColor(hex) {
  * @param {string} bgColor - Background color hex code
  * @returns {string} Either white or black depending on contrast
  */
-function getAccessibleTextColor(bgColor) {
+function getAccessibleTextColor(bgColor: string): string {
   return isDarkColor(bgColor) ? '#ffffff' : '#000000';
 }
 

@@ -22,7 +22,9 @@ function generateFontSizes(fontSizeMultiplier = 1.15) {
     '6xl': [3.75, 1.05], // Improved for very large text
   };
 
-  return Object.entries(sizes).reduce((acc, [key, [size, lineHeight]]) => {
+  return Object.entries(sizes).reduce<
+    Record<string, [string, Record<string, string>]>
+  >((acc, [key, [size, lineHeight]]) => {
     acc[key] = [
       `${size * fontSizeMultiplier}rem`,
       {
@@ -47,7 +49,10 @@ function generateFontSizes(fontSizeMultiplier = 1.15) {
  * Generates responsive typography utility classes
  * @returns {Object} Tailwind utility classes for responsive typography
  */
-function generateResponsiveTypography() {
+function generateResponsiveTypography(): Record<
+  string,
+  Record<string, unknown>
+> {
   return {
     // Resolution-independent text sizing utilities with larger sizes for 4K/extra large screens
     '.text-responsive-xs': {

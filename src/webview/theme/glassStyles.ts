@@ -2,8 +2,8 @@
  * Glass effect styles for Tailwind CSS
  * Creates customizable glass morphism effects with scrollbar integration
  */
-const { createScrollbarStyles } = require('../utils/scrollbarUtils');
-const { hexToRgb } = require('../utils/colorUtils');
+const { createScrollbarStyles } = require('./scrollbarUtils');
+const { hexToRgb } = require('./colorUtils');
 
 /**
  * Create glass effect styles with matching scrollbars
@@ -13,7 +13,19 @@ const { hexToRgb } = require('../utils/colorUtils');
  * @param {Object} scrollbarConfig - Scrollbar configuration object
  * @returns {Object} Glass effect style object
  */
-function createGlassStyles(background, border, boxShadow, scrollbarConfig) {
+interface ScrollbarConfig {
+  trackBg: string;
+  thumbBg: string;
+  thumbBorder: string;
+  thumbHoverBg: string;
+}
+
+function createGlassStyles(
+  background: string,
+  border: string,
+  boxShadow: string,
+  scrollbarConfig: ScrollbarConfig
+): Record<string, string | Record<string, string>> {
   return {
     background,
     border,
@@ -35,7 +47,38 @@ function createGlassStyles(background, border, boxShadow, scrollbarConfig) {
  * @param {Object} brandPalette - Brand color palette
  * @returns {Object} Glass effect utilities for Tailwind
  */
-function generateGlassStyles(semanticColors, grayPalette, brandPalette) {
+interface SemanticColors {
+  glass: {
+    light: {
+      background: string;
+      border: string;
+      text: string;
+    };
+    dark: {
+      background: string;
+      border: string;
+      text: string;
+    };
+    brand: {
+      light: {
+        background: string;
+        border: string;
+        text: string;
+      };
+      dark: {
+        background: string;
+        border: string;
+        text: string;
+      };
+    };
+  };
+}
+
+function generateGlassStyles(
+  semanticColors: SemanticColors,
+  grayPalette: Record<number, string>,
+  brandPalette: Record<number, string>
+): Record<string, Record<string, unknown>> {
   // Safety check to ensure we have valid palettes
   if (!brandPalette) {
     console.warn('Brand palette is undefined, falling back to gray palette');
@@ -43,7 +86,11 @@ function generateGlassStyles(semanticColors, grayPalette, brandPalette) {
   }
 
   // Ensure we have all needed color values with fallbacks
-  const ensureColor = (palette, shade, fallbackShade) => {
+  const ensureColor = (
+    palette: Record<number, string>,
+    shade: number,
+    fallbackShade: number
+  ): string => {
     return palette[shade] || palette[fallbackShade] || '#000000';
   };
 

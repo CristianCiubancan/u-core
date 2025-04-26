@@ -268,7 +268,7 @@ export default function Page() {
             { id: 'clothing', label: 'Clothing' },
           ]}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
           orientation="vertical"
           className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800"
         />
