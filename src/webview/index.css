@@ -61,3 +61,15 @@ body {
   height: 100vh;
   overflow: auto;
 }
+
+@layer base {
+  body {
+    @apply text-base;
+  }
+}
+
+body {
+  font-family: 'Libre Baskerville', serif;
+  font-weight: 400;
+  font-style: normal;
+}

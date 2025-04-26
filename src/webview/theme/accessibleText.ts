@@ -2,7 +2,7 @@
  * Accessible text utilities for Tailwind CSS
  * Ensures text has proper contrast and readability across contexts
  */
-const { getContrastRatio, hexToRgb } = require('../utils/colorUtils');
+const { getContrastRatio, hexToRgb } = require('./colorUtils');
 const { semanticColors, resolveColorReference } = require('../colors');
 
 /**
@@ -11,7 +11,10 @@ const { semanticColors, resolveColorReference } = require('../colors');
  * @param {Object} brandPalette - Brand color palette
  * @returns {Object} Accessible text utilities for Tailwind
  */
-function generateAccessibleTextUtilities(grayPalette, brandPalette) {
+function generateAccessibleTextUtilities(
+  grayPalette: Record<number, string>,
+  brandPalette: Record<number, string>
+) {
   if (!grayPalette || !brandPalette) {
     console.warn('Missing palette data for accessible text utilities');
     return {}; // Return empty object to prevent errors

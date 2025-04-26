@@ -3,10 +3,10 @@
  * Centralizes all plugin definitions for easier management
  */
 const { generateGlassStyles } = require('./glassStyles');
-const { createScrollbarStyles } = require('../utils/scrollbarUtils');
+const { createScrollbarStyles } = require('./scrollbarUtils');
 const { generateAccessibleTextUtilities } = require('./accessibleText');
 const { generateResponsiveTypography } = require('./typography');
-const { hexToRgb } = require('../utils/colorUtils');
+const { hexToRgb } = require('./colorUtils');
 const themeConfig = require('./theme');
 
 // Get active palette references
@@ -15,7 +15,14 @@ const { brandPalette, grayPalette } = themeConfig;
 // Define plugins array
 const plugins = [
   // Glass morphism effects plugin
-  function ({ addUtilities }) {
+  function ({
+    addUtilities,
+  }: {
+    addUtilities: (
+      utilities: Record<string, unknown>,
+      variants?: string[]
+    ) => void;
+  }) {
     try {
       // Ensure we have valid palette data before generating styles
       if (!brandPalette || !grayPalette) {
@@ -28,8 +35,10 @@ const plugins = [
       );
 
       addUtilities(glassStyles, ['responsive', 'hover']);
-    } catch (error) {
-      console.error(`Error generating glass styles: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Error generating glass styles: ${errorMessage}`);
       // Add minimal glass styles to prevent build failures
       addUtilities(
         {
@@ -50,7 +59,16 @@ const plugins = [
   },
 
   // Global scrollbar styles plugin
-  function ({ addBase, addUtilities }) {
+  function ({
+    addBase,
+    addUtilities,
+  }: {
+    addBase: (base: Record<string, unknown>) => void;
+    addUtilities: (
+      utilities: Record<string, unknown>,
+      variants?: string[]
+    ) => void;
+  }) {
     // Add global styles to html and body
     addBase({
       'html': {
@@ -118,12 +136,21 @@ const plugins = [
   },
 
   // Accessible text utilities plugin
-  function ({ addUtilities }) {
+  function ({
+    addUtilities,
+  }: {
+    addUtilities: (
+      utilities: Record<string, unknown>,
+      variants?: string[]
+    ) => void;
+  }) {
     try {
       addUtilities(generateAccessibleTextUtilities(grayPalette, brandPalette));
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error(
-        `Error generating accessible text utilities: ${error.message}`
+        `Error generating accessible text utilities: ${errorMessage}`
       );
       // Add minimal text utilities to prevent build failures
       addUtilities({
@@ -140,7 +167,14 @@ const plugins = [
   },
 
   // Enhanced typography and readability utilities plugin
-  function ({ addUtilities }) {
+  function ({
+    addUtilities,
+  }: {
+    addUtilities: (
+      utilities: Record<string, unknown>,
+      variants?: string[]
+    ) => void;
+  }) {
     addUtilities(generateResponsiveTypography());
   },
 ];
