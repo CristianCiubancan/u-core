@@ -193,7 +193,7 @@ namespace CharacterCreate {
     let yaw = Math.atan2(dirVector.x, dirVector.y) * (180 / Math.PI);
 
     // Add our left-looking offset (adjust this value as needed)
-    const leftAngleOffset = 30; // 15 degrees offset
+    const leftAngleOffset = 30;
     yaw += leftAngleOffset;
 
     // Create or update the camera
