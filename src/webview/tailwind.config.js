@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 const themeConfig = require('./config/theme');
 const plugins = require('./config/plugins');
+const safelist = require('./config/safelist');
 
 module.exports = {
   content: [
@@ -17,5 +18,5 @@ module.exports = {
     }),
     ...plugins,
   ],
-  safelist: require('./config/safelist'),
+  safelist,
 };
