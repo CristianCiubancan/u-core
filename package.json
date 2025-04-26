@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "example": "npx tsx src/scripts/index.ts",
-    "build": "npx tsx src/scripts/build.ts"
+    "build": "npx tsx src/scripts/build.ts",
+    "start:docker": "docker-compose down && docker-compose up -d --build",
+    "start:windows": "npx tsx -r dotenv/config scripts/start-windows.js"
   },
   "keywords": [],
   "author": "",
