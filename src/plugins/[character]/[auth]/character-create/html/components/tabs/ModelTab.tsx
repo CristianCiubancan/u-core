@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '../Button';
+import { Button } from '../../../../../../../webview/components';
 import { MODELS } from '../../types';
 
 interface ModelTabProps {

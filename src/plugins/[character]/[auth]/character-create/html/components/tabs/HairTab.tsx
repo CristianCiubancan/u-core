@@ -1,5 +1,5 @@
 import React from 'react';
-import { SliderInput } from '../SliderInput';
+import { SliderInput } from '../../../../../../../webview/components';
 import { CharacterData } from '../../types';
 
 interface HairTabProps {
