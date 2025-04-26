@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
-import { fetchNui } from '../../../../utils/fetchNui';
+import { fetchNui } from '../../../../webview/utils/fetchNui';
 import {
   Button,
   Card,

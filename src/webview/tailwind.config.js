@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 const { grayPalettes, colorPalettes, semanticColors } = require('./colors');
-const { createScrollbarStyles } = require('../utils/scrollbarUtils');
-const { getContrastRatio, hexToRgb } = require('../utils/colorUtils');
+const { createScrollbarStyles } = require('./utils/scrollbarUtils');
+const { getContrastRatio, hexToRgb } = require('./utils/colorUtils');
 
 const fontSizeMultiplier = 1.15; // Optimized for readability
 
