@@ -269,6 +269,7 @@ export default function Page() {
             <ClothingTab
               clothingData={characterData.clothing}
               onClothingChange={handleClothingChange}
+              model={characterData.model}
             />
           )}
         </div>
