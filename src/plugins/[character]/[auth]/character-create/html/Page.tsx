@@ -5,11 +5,15 @@ import { isEnvBrowser } from '../../../../../utils/misc';
 import {
   Layout,
   TabNavigation,
+  Button,
+} from '../../../../../webview/components';
+import {
   ModelTab,
   FaceTab,
   HairTab,
   AppearanceTab,
   ClothingTab,
+  CameraControls,
 } from './components';
 import {
   CharacterData,
@@ -224,15 +228,50 @@ export default function Page() {
       title="Character Creation"
       onSave={handleSaveCharacter}
       onClose={handleCloseUi}
-      anchor={'left'}
+      position="left"
       isSaving={isSaving}
-      onRotateCamera={handleRotateCamera}
-      onZoomCamera={handleZoomCamera}
-      onFocusCamera={handleFocusCamera}
+      saveButtonText="Save"
+      cancelButtonText="Cancel"
+      headerContent={
+        <div className="flex space-x-2">
+          <Button
+            variant="success"
+            onClick={handleSaveCharacter}
+            disabled={isSaving}
+            size="sm"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+          <Button variant="danger" onClick={handleCloseUi} size="sm">
+            Cancel
+          </Button>
+        </div>
+      }
+      footerContent={
+        <div className="glass-brand-dark p-2 border-t border-brand-700">
+          <CameraControls
+            onRotate={handleRotateCamera}
+            onZoom={handleZoomCamera}
+            onFocus={handleFocusCamera}
+          />
+        </div>
+      }
     >
       <div className="flex h-full">
         {/* Left sidebar - Tabs */}
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabNavigation
+          tabs={[
+            { id: 'model', label: 'Character Model' },
+            { id: 'face', label: 'Face' },
+            { id: 'hair', label: 'Hair' },
+            { id: 'appearance', label: 'Appearance' },
+            { id: 'clothing', label: 'Clothing' },
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          orientation="vertical"
+          className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800"
+        />
 
         {/* Right content - Tab content */}
         <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">

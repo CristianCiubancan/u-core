@@ -1,6 +1,7 @@
 import React from 'react';
 
 interface SliderInputProps {
+  id?: string;
   label: string;
   min: number;
   max: number;
@@ -14,7 +15,8 @@ interface SliderInputProps {
   className?: string;
 }
 
-export const SliderInput: React.FC<SliderInputProps> = ({
+const SliderInput: React.FC<SliderInputProps> = ({
+  id,
   label,
   min,
   max,
@@ -38,6 +40,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
       <label className="block mb-2 text-primary font-medium">{label}</label>
       <input
         type="range"
+        id={id}
         min={min}
         max={max}
         step={step}
@@ -59,3 +62,5 @@ export const SliderInput: React.FC<SliderInputProps> = ({
     </div>
   );
 };
+
+export default SliderInput;

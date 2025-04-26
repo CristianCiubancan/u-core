@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../utils/fetchNui';
+import {
+  Button,
+  Card,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  GlassContainer,
+} from '../../../../webview/components';
 
 // Constants
 const NUI_EVENT = 'example:toggle-ui';
 
 export default function Page() {
   const [isOpen, setIsOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data) => {
@@ -24,6 +35,11 @@ export default function Page() {
     }
   }, []);
 
+  const handleSubmit = useCallback(() => {
+    console.log('Form submitted:', { name, description, category });
+    // Here you would typically send this data to the server
+  }, [name, description, category]);
+
   useEffect(() => {
     // listen for F2 key press
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -34,21 +50,64 @@ export default function Page() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleCloseUi]);
+
+  // Category options for the select input
+  const categoryOptions = [
+    { label: 'Category 1', value: 'category1' },
+    { label: 'Category 2', value: 'category2' },
+    { label: 'Category 3', value: 'category3' },
+  ];
 
   // Render UI
   return isOpen ? (
-    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-80 text-white p-5 rounded-md shadow-lg text-center">
-      <h1 className="text-xl font-bold">Example UI</h1>
-      <p className="my-3">
-        This UI is now visible! Press F2 or click the button below to close it.
-      </p>
-      <button
-        onClick={handleCloseUi}
-        className="bg-red-500 text-white py-2 px-5 rounded cursor-pointer mt-3 hover:bg-red-600 transition-colors"
-      >
-        Close UI
-      </button>
+    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1/3 max-w-md">
+      <GlassContainer>
+        <Card
+          title="Example UI"
+          footerContent={
+            <div className="flex justify-between">
+              <Button variant="primary" onClick={handleSubmit}>
+                Submit
+              </Button>
+              <Button variant="danger" onClick={handleCloseUi}>
+                Close UI
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-responsive-base text-primary">
+              This UI demonstrates the use of shared components from the webview
+              folder.
+            </p>
+
+            <FormInput
+              id="name"
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name"
+            />
+
+            <FormSelect
+              id="category"
+              label="Category"
+              value={category}
+              onChange={setCategory}
+              options={categoryOptions}
+            />
+
+            <FormTextarea
+              id="description"
+              label="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter a description"
+            />
+          </div>
+        </Card>
+      </GlassContainer>
     </div>
   ) : null;
 }
