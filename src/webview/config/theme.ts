@@ -2,24 +2,44 @@
  * Main theme configuration for Tailwind CSS
  * Centralizes all theme extensions and design tokens
  */
-const { grayPalettes, colorPalettes, semanticColors } = require('../colors');
+const { colorPalettes, grayPalettes, semanticColors } = require('../colors');
+const { resolveColorReference } = require('../colors');
 const { hexToRgb } = require('../utils/colorUtils');
 const typography = require('./typography');
 
 // Configuration settings
 const config = {
-  brandColor: 'gray', // Changed from 'indigo' to 'gray'
-  grayColor: 'slate', // Cool-toned gray for better contrast
+  brandColor: 'indigo', // Can be changed to 'gray' or any available palette name
+  grayColor: 'slate', // Cool-toned gray
   fontSizeMultiplier: 1.15, // Optimized for readability
 };
 
-// Get active palette references with fallback handling
-// If brandColor is a gray variant, get it from grayPalettes instead of colorPalettes
-const brandPalette = Object.keys(grayPalettes).includes(config.brandColor)
-  ? grayPalettes[config.brandColor]
-  : colorPalettes[config.brandColor] || colorPalettes['indigo']; // Fallback to indigo if not found
+/**
+ * Get palette object with proper fallback handling
+ * @param {string} colorName - Name of the color to retrieve
+ * @returns {Object} Color palette object
+ */
+function getColorPalette(colorName: string) {
+  // First check in colorPalettes
+  if (colorPalettes[colorName]) {
+    return colorPalettes[colorName];
+  }
 
-const grayPalette = grayPalettes[config.grayColor];
+  // Then check in grayPalettes
+  if (grayPalettes[colorName]) {
+    return grayPalettes[colorName];
+  }
+
+  // Fallback to a default
+  console.warn(
+    `Color "${colorName}" not found in any palette, falling back to indigo`
+  );
+  return colorPalettes.indigo;
+}
+
+// Get active palette references with proper error handling
+const brandPalette = getColorPalette(config.brandColor);
+const grayPalette = getColorPalette(config.grayColor);
 
 module.exports = {
   // Typography
@@ -31,34 +51,149 @@ module.exports = {
     brand: brandPalette,
     gray: grayPalette,
 
-    // Semantic UI colors
+    // Add all color palettes directly
+    ...colorPalettes,
+    ...grayPalettes,
+
+    // UI Element Colors
     ui: {
       background: {
-        page: semanticColors.ui.background.page,
-        card: semanticColors.ui.background.card,
-        modal: semanticColors.ui.background.modal,
+        page: resolveColorReference(semanticColors.ui.background.page),
+        card: resolveColorReference(semanticColors.ui.background.card),
+        modal: resolveColorReference(semanticColors.ui.background.modal),
         input: {
-          default: semanticColors.ui.background.input.default,
-          disabled: semanticColors.ui.background.input.disabled,
+          default: resolveColorReference(
+            semanticColors.ui.background.input.default
+          ),
+          disabled: resolveColorReference(
+            semanticColors.ui.background.input.disabled
+          ),
         },
-        hover: semanticColors.ui.background.hover,
-        selected: semanticColors.ui.background.selected,
-        disabled: semanticColors.ui.background.disabled,
+        hover: resolveColorReference(semanticColors.ui.background.hover),
+        selected: resolveColorReference(semanticColors.ui.background.selected),
+        disabled: resolveColorReference(semanticColors.ui.background.disabled),
       },
       border: {
-        default: semanticColors.ui.border.default,
-        focus: semanticColors.ui.border.focus,
-        hover: semanticColors.ui.border.hover,
-        error: semanticColors.ui.border.error,
+        default: resolveColorReference(semanticColors.ui.border.default),
+        focus: resolveColorReference(semanticColors.ui.border.focus),
+        hover: resolveColorReference(semanticColors.ui.border.hover),
+        error: resolveColorReference(semanticColors.ui.border.error),
+      },
+      text: {
+        primary: resolveColorReference(semanticColors.ui.text.primary),
+        secondary: resolveColorReference(semanticColors.ui.text.secondary),
+        tertiary: resolveColorReference(semanticColors.ui.text.tertiary),
+        inverted: resolveColorReference(semanticColors.ui.text.inverted),
+        link: resolveColorReference(semanticColors.ui.text.link),
+        error: resolveColorReference(semanticColors.ui.text.error),
+        disabled: resolveColorReference(semanticColors.ui.text.disabled),
+      },
+    },
+
+    // Button Colors
+    button: {
+      primary: {
+        DEFAULT: resolveColorReference(
+          semanticColors.button.primary.background.default
+        ),
+        hover: resolveColorReference(
+          semanticColors.button.primary.background.hover
+        ),
+        active: resolveColorReference(
+          semanticColors.button.primary.background.active
+        ),
+        disabled: resolveColorReference(
+          semanticColors.button.primary.background.disabled
+        ),
+        text: {
+          DEFAULT: resolveColorReference(
+            semanticColors.button.primary.text.default
+          ),
+          disabled: resolveColorReference(
+            semanticColors.button.primary.text.disabled
+          ),
+        },
+      },
+      secondary: {
+        DEFAULT: resolveColorReference(
+          semanticColors.button.secondary.background.default
+        ),
+        hover: resolveColorReference(
+          semanticColors.button.secondary.background.hover
+        ),
+        active: resolveColorReference(
+          semanticColors.button.secondary.background.active
+        ),
+        disabled: resolveColorReference(
+          semanticColors.button.secondary.background.disabled
+        ),
+        text: {
+          DEFAULT: resolveColorReference(
+            semanticColors.button.secondary.text.default
+          ),
+          disabled: resolveColorReference(
+            semanticColors.button.secondary.text.disabled
+          ),
+        },
+      },
+      danger: {
+        DEFAULT: resolveColorReference(
+          semanticColors.button.danger.background.default
+        ),
+        hover: resolveColorReference(
+          semanticColors.button.danger.background.hover
+        ),
+        active: resolveColorReference(
+          semanticColors.button.danger.background.active
+        ),
+        disabled: resolveColorReference(
+          semanticColors.button.danger.background.disabled
+        ),
+        text: {
+          DEFAULT: resolveColorReference(
+            semanticColors.button.danger.text.default
+          ),
+          disabled: resolveColorReference(
+            semanticColors.button.danger.text.disabled
+          ),
+        },
       },
     },
 
     // Feedback colors
     feedback: {
-      success: semanticColors.feedback.success,
-      warning: semanticColors.feedback.warning,
-      error: semanticColors.feedback.error,
-      info: semanticColors.feedback.info,
+      success: {
+        background: resolveColorReference(
+          semanticColors.feedback.success.background
+        ),
+        border: resolveColorReference(semanticColors.feedback.success.border),
+        text: resolveColorReference(semanticColors.feedback.success.text),
+        icon: resolveColorReference(semanticColors.feedback.success.icon),
+      },
+      warning: {
+        background: resolveColorReference(
+          semanticColors.feedback.warning.background
+        ),
+        border: resolveColorReference(semanticColors.feedback.warning.border),
+        text: resolveColorReference(semanticColors.feedback.warning.text),
+        icon: resolveColorReference(semanticColors.feedback.warning.icon),
+      },
+      error: {
+        background: resolveColorReference(
+          semanticColors.feedback.error.background
+        ),
+        border: resolveColorReference(semanticColors.feedback.error.border),
+        text: resolveColorReference(semanticColors.feedback.error.text),
+        icon: resolveColorReference(semanticColors.feedback.error.icon),
+      },
+      info: {
+        background: resolveColorReference(
+          semanticColors.feedback.info.background
+        ),
+        border: resolveColorReference(semanticColors.feedback.info.border),
+        text: resolveColorReference(semanticColors.feedback.info.text),
+        icon: resolveColorReference(semanticColors.feedback.info.icon),
+      },
     },
   },
 
@@ -76,17 +211,6 @@ module.exports = {
     'elevation-3': `0 4px 8px rgba(${hexToRgb(
       grayPalette[900]
     )}, 0.05), 0 8px 16px rgba(${hexToRgb(grayPalette[900])}, 0.1)`,
-  },
-
-  // Text colors
-  textColor: {
-    'primary': semanticColors.ui.text.primary,
-    'secondary': semanticColors.ui.text.secondary,
-    'tertiary': semanticColors.ui.text.tertiary,
-    'inverted': semanticColors.ui.text.inverted,
-    'link': semanticColors.ui.text.link,
-    'error': semanticColors.ui.text.error,
-    'disabled': semanticColors.ui.text.disabled,
   },
 
   // Border radius

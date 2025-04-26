@@ -11,6 +11,54 @@
  * Semantic tokens define how colors are used in specific contexts.
  */
 
+// Define types for the color palettes
+type ColorShade =
+  | '50'
+  | '100'
+  | '200'
+  | '300'
+  | '400'
+  | '500'
+  | '600'
+  | '700'
+  | '800'
+  | '900'
+  | '950';
+
+interface ColorPalette {
+  // Define all specific properties explicitly
+  50: string;
+  100: string;
+  200: string;
+  300: string;
+  400: string;
+  500: string;
+  600: string;
+  700: string;
+  800: string;
+  900: string;
+  950: string;
+  // Also allow string indexing for dynamic access
+  [key: string]: string | undefined;
+}
+
+interface ColorPalettes {
+  indigo: ColorPalette;
+  violet: ColorPalette;
+  slate: ColorPalette;
+  green: ColorPalette;
+  amber: ColorPalette;
+  red: ColorPalette;
+  [key: string]: ColorPalette | undefined;
+}
+
+interface GrayPalettes {
+  slate: ColorPalette;
+  gray: ColorPalette;
+  zinc: ColorPalette;
+  [key: string]: ColorPalette | undefined;
+}
+
 // ==============================
 // CORE TOKENS (Raw color values)
 // ==============================
@@ -19,7 +67,7 @@
  * Core color palettes - the raw color values
  * These serve as the foundation for our semantic color system
  */
-export const colorPalettes = {
+export const colorPalettes: ColorPalettes = {
   // Primary brand color - Indigo provides a modern, professional look
   indigo: {
     50: '#eef2ff',
@@ -115,7 +163,7 @@ export const colorPalettes = {
  * Gray palette options
  * These are separated to allow for easy switching between different gray tones
  */
-export const grayPalettes = {
+export const grayPalettes: GrayPalettes = {
   // Slate - Cool-toned gray (default)
   slate: {
     50: '#f8fafc',
@@ -306,3 +354,39 @@ export const semanticColors = {
     },
   },
 };
+
+export function resolveColorReference(colorRef: string): string {
+  if (!colorRef || typeof colorRef !== 'string') {
+    return colorRef as string; // Return as is if not a string
+  }
+
+  // Handle direct color values (for glass effects with rgba)
+  if (colorRef.startsWith('#') || colorRef.startsWith('rgb')) {
+    return colorRef;
+  }
+
+  try {
+    const [palette, shade] = colorRef.split('.');
+
+    // Handle 'white' and 'black' special cases
+    if (palette === 'white') return '#ffffff';
+    if (palette === 'black') return '#000000';
+
+    // Look in colorPalettes first
+    if (colorPalettes[palette] && colorPalettes[palette][shade as ColorShade]) {
+      return colorPalettes[palette][shade as ColorShade];
+    }
+
+    // Then check grayPalettes
+    if (grayPalettes[palette] && grayPalettes[palette][shade as ColorShade]) {
+      return grayPalettes[palette][shade as ColorShade];
+    }
+
+    // Fallback to a safe value
+    console.warn(`Color reference "${colorRef}" could not be resolved`);
+    return colorRef; // Return original value as fallback
+  } catch (error: any) {
+    console.error(`Error resolving color reference: ${error.message}`);
+    return colorRef; // Return original value as fallback
+  }
+}

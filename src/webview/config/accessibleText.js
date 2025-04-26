@@ -3,86 +3,100 @@
  * Ensures text has proper contrast and readability across contexts
  */
 const { getContrastRatio, hexToRgb } = require('../utils/colorUtils');
+const { semanticColors, resolveColorReference } = require('../colors');
 
 /**
  * Generate accessible text utilities for various contexts
- * @param {Object} semanticColors - Semantic color definitions
  * @param {Object} grayPalette - Gray color palette
  * @param {Object} brandPalette - Brand color palette
  * @returns {Object} Accessible text utilities for Tailwind
  */
-function generateAccessibleTextUtilities(
-  semanticColors,
-  grayPalette,
-  brandPalette
-) {
+function generateAccessibleTextUtilities(grayPalette, brandPalette) {
+  if (!grayPalette || !brandPalette) {
+    console.warn('Missing palette data for accessible text utilities');
+    return {}; // Return empty object to prevent errors
+  }
+
+  // Ensure we have color values with fallbacks
+  const gray = {
+    50: grayPalette[50] || '#f8fafc',
+    900: grayPalette[900] || '#0f172a',
+  };
+
+  const brand = {
+    600: brandPalette[600] || '#4f46e5',
+  };
+
   // Determine contrast-optimized text colors for each background context
-  const isDarkBrand =
-    getContrastRatio(brandPalette[600], grayPalette[50]) >= 4.5;
+  const isDarkBrand = getContrastRatio(brand[600], gray[50]) >= 4.5;
+
+  // Get resolved colors from semantic tokens
+  const textPrimary = resolveColorReference(semanticColors.ui.text.primary);
+  const textInverted = resolveColorReference(semanticColors.ui.text.inverted);
 
   // Define background contexts and their accessible text colors using semantic tokens
   return {
     // For light backgrounds (use dark text)
     '.text-accessible-light': {
-      color: semanticColors.ui.text.primary,
+      color: textPrimary,
       'font-weight': '450', // Slightly heavier than normal for better readability on light backgrounds
     },
 
     // For dark backgrounds (use light text)
     '.text-accessible-dark': {
-      color: 'white',
+      color: textInverted,
       'font-weight': '400', // Normal weight for readability on dark backgrounds
       'letter-spacing': '0.01em', // Slightly increased letter spacing for better readability on dark
     },
 
     // For brand color backgrounds (dynamically choose based on brand color's brightness)
     '.text-accessible-on-brand': {
-      color: isDarkBrand ? 'white' : semanticColors.ui.text.primary,
+      color: isDarkBrand ? textInverted : textPrimary,
       'font-weight': isDarkBrand ? '400' : '450', // Adaptive font weight
       'letter-spacing': isDarkBrand ? '0.01em' : 'normal', // Adaptive letter spacing
     },
 
     // For glass elements (general, assumes darkish background)
     '.text-accessible-on-glass': {
-      'color': 'white',
-      'text-shadow': `0 1px 3px rgba(${hexToRgb(grayPalette[900])}, 0.6)`, // Stronger text shadow for better readability
+      'color': textInverted,
+      'text-shadow': `0 1px 3px rgba(${hexToRgb(gray[900])}, 0.6)`, // Stronger text shadow for better readability
       'letter-spacing': '0.01em', // Slightly increased letter spacing
     },
 
     // For dark backgrounds (e.g., .glass-dark, .glass-brand-dark)
     '.text-on-dark': {
-      color: semanticColors.ui.text.inverted,
+      color: textInverted,
       'font-weight': '400', // Normal weight
       'letter-spacing': '0.01em', // Slightly increased letter spacing
     },
 
     // For light backgrounds (e.g., .glass, .glass-brand)
     '.text-on-light': {
-      color: semanticColors.ui.text.primary,
+      color: textPrimary,
       'font-weight': '450', // Slightly heavier than normal
     },
 
     // For primary UI elements
     '.text-primary': {
-      color: semanticColors.ui.text.primary,
+      color: textPrimary,
       'font-weight': '500', // Medium weight for emphasis
     },
 
     // For secondary/supporting text
     '.text-secondary': {
-      color: semanticColors.ui.text.secondary,
+      color: resolveColorReference(semanticColors.ui.text.secondary),
       'font-weight': '400', // Normal weight
     },
 
     // For tertiary/muted text
     '.text-tertiary': {
-      color: semanticColors.ui.text.tertiary,
+      color: resolveColorReference(semanticColors.ui.text.tertiary),
       'font-weight': '400', // Normal weight
     },
 
     // For links
     '.text-link': {
-      color: semanticColors.ui.text.link,
+      color: resolveColorReference(semanticColors.ui.text.link),
       'font-weight': '500', // Medium weight for emphasis
       'text-decoration': 'none',
       '&:hover': {
@@ -92,7 +106,7 @@ function generateAccessibleTextUtilities(
 
     // For error text
     '.text-error': {
-      color: semanticColors.ui.text.error,
+      color: resolveColorReference(semanticColors.ui.text.error),
       'font-weight': '500', // Medium weight for emphasis
     },
   };

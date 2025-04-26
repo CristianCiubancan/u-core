@@ -9,8 +9,7 @@ const { generateResponsiveTypography } = require('./typography');
 const { hexToRgb } = require('../utils/colorUtils');
 const themeConfig = require('./theme');
 
-// Import semantic colors and palettes
-const { semanticColors } = require('../colors');
+// Get active palette references
 const { brandPalette, grayPalette } = themeConfig;
 
 // Define plugins array
@@ -24,7 +23,6 @@ const plugins = [
       }
 
       const glassStyles = generateGlassStyles(
-        semanticColors,
         grayPalette || {},
         brandPalette || grayPalette || {}
       );
@@ -121,9 +119,24 @@ const plugins = [
 
   // Accessible text utilities plugin
   function ({ addUtilities }) {
-    addUtilities(
-      generateAccessibleTextUtilities(semanticColors, grayPalette, brandPalette)
-    );
+    try {
+      addUtilities(generateAccessibleTextUtilities(grayPalette, brandPalette));
+    } catch (error) {
+      console.error(
+        `Error generating accessible text utilities: ${error.message}`
+      );
+      // Add minimal text utilities to prevent build failures
+      addUtilities({
+        '.text-accessible-light': {
+          color: grayPalette[900] || '#000000',
+          'font-weight': '450',
+        },
+        '.text-accessible-dark': {
+          color: 'white',
+          'font-weight': '400',
+        },
+      });
+    }
   },
 
   // Enhanced typography and readability utilities plugin
