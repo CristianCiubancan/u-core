@@ -10,6 +10,7 @@ export default function Page() {
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data) => {
+    console.log(`${NUI_EVENT} event received: ${data}`);
     setIsOpen(!!data);
   });
 
