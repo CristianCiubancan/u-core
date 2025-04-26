@@ -1,3 +1,16 @@
+import React from 'react';
+
+type ButtonSize = 'sm' | 'base' | 'lg';
+
+interface ButtonProps {
+  children?: React.ReactNode;
+  type?: 'button' | 'submit' | 'reset';
+  text?: string;
+  fullWidth?: boolean;
+  onClick?: () => void;
+  size?: ButtonSize;
+}
+
 const Button = ({
   children,
   type,
@@ -5,14 +18,15 @@ const Button = ({
   fullWidth,
   onClick,
   size = 'base',
-}: any) => {
+}: ButtonProps) => {
   // Map size prop to responsive text class
-  const textSizeClass =
-    {
-      'sm': 'text-responsive-sm',
-      'base': 'text-responsive-base',
-      'lg': 'text-responsive-lg',
-    }[size] || 'text-responsive-base';
+  const sizeMap: Record<ButtonSize, string> = {
+    'sm': 'text-responsive-sm',
+    'base': 'text-responsive-base',
+    'lg': 'text-responsive-lg',
+  };
+
+  const textSizeClass = sizeMap[size] || 'text-responsive-base';
 
   return (
     <button
