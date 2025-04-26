@@ -46,42 +46,97 @@ namespace CharacterCreate {
    * Set up the character creation environment
    */
   async function setupCharacterCreation() {
-    // If this is the first time opening, set up a new character
-    if (firstTimeOpened) {
-      // Create a default character model
-      const isMale = Math.random() > 0.5;
-      const model = isMale ? 'mp_m_freemode_01' : 'mp_f_freemode_01';
+    console.log('[Character Create] Setting up character creation environment');
 
-      // Request the model
-      RequestModel(GetHashKey(model));
+    // Always ensure we have a valid character model when opening the UI
+    // Create a default character model
+    const isMale = Math.random() > 0.5;
+    const model = isMale ? 'mp_m_freemode_01' : 'mp_f_freemode_01';
 
-      // Wait for the model to load
-      const startTime = GetGameTimer();
-      while (!HasModelLoaded(GetHashKey(model))) {
-        await Delay(100);
+    console.log(`[Character Create] Loading model: ${model}`);
 
-        // Timeout after 5 seconds
-        if (GetGameTimer() - startTime > 5000) {
-          console.error('Failed to load character model');
+    // Request the model
+    RequestModel(GetHashKey(model));
+
+    // Wait for the model to load with improved timeout handling
+    const startTime = GetGameTimer();
+    let modelLoaded = false;
+
+    while (!modelLoaded) {
+      if (HasModelLoaded(GetHashKey(model))) {
+        modelLoaded = true;
+        console.log(`[Character Create] Model loaded successfully: ${model}`);
+        break;
+      }
+
+      await Delay(100);
+
+      // Timeout after 10 seconds (increased from 5)
+      if (GetGameTimer() - startTime > 10000) {
+        console.error(
+          `[Character Create] Failed to load character model: ${model}`
+        );
+        // Try one more time with a different approach
+        RequestModel(GetHashKey(model));
+        await Delay(1000);
+        if (HasModelLoaded(GetHashKey(model))) {
+          modelLoaded = true;
+          console.log(
+            `[Character Create] Model loaded on second attempt: ${model}`
+          );
+        } else {
+          console.error(
+            `[Character Create] Model loading failed after retry: ${model}`
+          );
           break;
         }
       }
-
-      // Set the player model
-      SetPlayerModel(PlayerId(), GetHashKey(model));
-      SetModelAsNoLongerNeeded(GetHashKey(model));
-
-      // Set default appearance
-      const playerPed = PlayerPedId();
-      SetPedDefaultComponentVariation(playerPed);
-      ClearAllPedProps(playerPed);
-
-      firstTimeOpened = false;
     }
 
-    // Set player heading to face forward (0.0 is north/forward)
-    const playerPed = PlayerPedId();
-    SetEntityHeading(playerPed, 0.0);
+    // Set the player model
+    SetPlayerModel(PlayerId(), GetHashKey(model));
+    SetModelAsNoLongerNeeded(GetHashKey(model));
+
+    // Set default appearance with improved error handling
+    try {
+      const playerPed = PlayerPedId();
+
+      // Ensure the ped exists and is valid
+      if (DoesEntityExist(playerPed)) {
+        console.log(
+          `[Character Create] Setting default appearance for ped: ${playerPed}`
+        );
+
+        // Set default component variations
+        SetPedDefaultComponentVariation(playerPed);
+
+        // Clear all props
+        ClearAllPedProps(playerPed);
+
+        // Ensure the character is visible
+        SetEntityVisible(playerPed, true, false);
+
+        // Set player heading to face forward (0.0 is north/forward)
+        SetEntityHeading(playerPed, 0.0);
+
+        // Apply some default clothing to ensure character is visible
+        SetPedComponentVariation(playerPed, 11, 0, 0, 0); // Tops
+        SetPedComponentVariation(playerPed, 8, 0, 0, 0); // Undershirt
+        SetPedComponentVariation(playerPed, 4, 0, 0, 0); // Legs
+        SetPedComponentVariation(playerPed, 6, 0, 0, 0); // Shoes
+
+        console.log('[Character Create] Default appearance set successfully');
+      } else {
+        console.error('[Character Create] Failed to get valid player ped');
+      }
+    } catch (error) {
+      console.error(
+        '[Character Create] Error setting default appearance:',
+        error
+      );
+    }
+
+    firstTimeOpened = false;
 
     // Set up camera
     setupCamera();
@@ -333,46 +388,78 @@ namespace CharacterCreate {
    * @param {number} value - The value to set
    */
   function updateClothing(key: string, value: number) {
-    const playerPed = PlayerPedId();
+    try {
+      const playerPed = PlayerPedId();
 
-    // Component IDs:
-    // 0: Face
-    // 1: Mask
-    // 2: Hair
-    // 3: Torso
-    // 4: Legs
-    // 5: Bags/Parachute
-    // 6: Shoes
-    // 7: Accessories
-    // 8: Undershirt
-    // 9: Body Armor
-    // 10: Decals
-    // 11: Tops
+      // Ensure the ped exists and is valid
+      if (!DoesEntityExist(playerPed)) {
+        console.error(
+          '[Character Create] Failed to get valid player ped for clothing update'
+        );
+        return;
+      }
 
-    if (key === 'tops') {
-      SetPedComponentVariation(playerPed, 11, value, 0, 0);
-    } else if (key === 'topsTexture') {
-      const componentId = GetPedDrawableVariation(playerPed, 11);
-      SetPedComponentVariation(playerPed, 11, componentId, value, 0);
-    } else if (key === 'undershirt') {
-      SetPedComponentVariation(playerPed, 8, value, 0, 0);
-    } else if (key === 'undershirtTexture') {
-      const componentId = GetPedDrawableVariation(playerPed, 8);
-      SetPedComponentVariation(playerPed, 8, componentId, value, 0);
-    } else if (key === 'legs') {
-      SetPedComponentVariation(playerPed, 4, value, 0, 0);
-    } else if (key === 'legsTexture') {
-      const componentId = GetPedDrawableVariation(playerPed, 4);
-      SetPedComponentVariation(playerPed, 4, componentId, value, 0);
-    } else if (key === 'shoes') {
-      SetPedComponentVariation(playerPed, 6, value, 0, 0);
-    } else if (key === 'shoesTexture') {
-      const componentId = GetPedDrawableVariation(playerPed, 6);
-      SetPedComponentVariation(playerPed, 6, componentId, value, 0);
+      console.log(`[Character Create] Updating clothing: ${key} = ${value}`);
+
+      // Component IDs:
+      // 0: Face
+      // 1: Mask
+      // 2: Hair
+      // 3: Torso
+      // 4: Legs
+      // 5: Bags/Parachute
+      // 6: Shoes
+      // 7: Accessories
+      // 8: Undershirt
+      // 9: Body Armor
+      // 10: Decals
+      // 11: Tops
+
+      // Map clothing keys to component IDs
+      const componentMap: Record<string, number> = {
+        'tops': 11,
+        'torso': 3,
+        'undershirt': 8,
+        'legs': 4,
+        'shoes': 6,
+        'accessories': 7,
+      };
+
+      // Handle style changes (drawable IDs)
+      if (Object.keys(componentMap).includes(key)) {
+        const componentId = componentMap[key];
+        SetPedComponentVariation(playerPed, componentId, value, 0, 0);
+        console.log(
+          `[Character Create] Set component ${componentId} to drawable ${value}`
+        );
+      }
+      // Handle texture changes
+      else if (key.endsWith('Texture')) {
+        const baseKey = key.replace('Texture', '');
+        if (Object.keys(componentMap).includes(baseKey)) {
+          const componentId = componentMap[baseKey];
+          const drawableId = GetPedDrawableVariation(playerPed, componentId);
+          SetPedComponentVariation(
+            playerPed,
+            componentId,
+            drawableId,
+            value,
+            0
+          );
+          console.log(
+            `[Character Create] Set component ${componentId} texture to ${value}`
+          );
+        }
+      }
+
+      // Ensure the character is visible
+      SetEntityVisible(playerPed, true, false);
+
+      // Ensure player is still facing forward
+      SetEntityHeading(playerPed, 0.0);
+    } catch (error) {
+      console.error('[Character Create] Error updating clothing:', error);
     }
-
-    // Ensure player is still facing forward
-    SetEntityHeading(playerPed, 0.0);
   }
 
   /**
@@ -496,14 +583,26 @@ namespace CharacterCreate {
   // Initialize UI as hidden on resource start
   AddEventHandler('onClientResourceStart', (resourceName: string) => {
     if (resourceName === GetCurrentResourceName()) {
+      console.log('[Character Create] Resource started');
+
+      // Initialize UI as hidden
       toggleUI(false);
 
-      // Auto-open character creation for new players
+      // Pre-load character models to ensure they're available when needed
+      const maleModel = 'mp_m_freemode_01';
+      const femaleModel = 'mp_f_freemode_01';
+
+      console.log('[Character Create] Pre-loading character models');
+      RequestModel(GetHashKey(maleModel));
+      RequestModel(GetHashKey(femaleModel));
+
+      // Auto-open character creation for new players with a slightly longer delay
       // This would typically be controlled by the server based on whether the player has a character
       // For demo purposes, we'll just open it automatically
       setTimeout(() => {
+        console.log('[Character Create] Auto-opening character creation UI');
         toggleUI(true);
-      }, 1000);
+      }, 2000); // Increased from 1000ms to 2000ms to ensure models have time to load
     }
   });
 

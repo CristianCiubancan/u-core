@@ -1,30 +1,178 @@
-import React, { useState } from 'react';
-import { SliderInput } from '../SliderInput';
+import React, { useState, useEffect } from 'react';
 import { CharacterData } from '../../types';
 import { ClothingPreview } from '../ClothingPreview';
+import { getClothingImage } from '../../utils/getClothingImage';
 
 interface ClothingTabProps {
   clothingData: CharacterData['clothing'];
   onClothingChange: (key: string, value: number) => void;
-  model: string; // Added model prop to pass to ClothingPreview
+  model: string;
 }
+
+// Define the clothing categories
+const CLOTHING_CATEGORIES = [
+  { id: 'tops', label: 'Tops', componentId: 11, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'undershirt',
+    label: 'Undershirt',
+    componentId: 8,
+    maxItems: 20,
+    maxTextures: 5,
+  },
+  { id: 'legs', label: 'Legs', componentId: 4, maxItems: 20, maxTextures: 5 },
+  { id: 'shoes', label: 'Shoes', componentId: 6, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'accessories',
+    label: 'Accessories',
+    componentId: 7,
+    maxItems: 20,
+    maxTextures: 5,
+  },
+  { id: 'torso', label: 'Torso', componentId: 3, maxItems: 20, maxTextures: 5 },
+];
+
+// ClothingItem component for the grid
+interface ClothingItemProps {
+  model: string;
+  componentId: number;
+  drawableId: number;
+  textureId: number;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const ClothingItem: React.FC<ClothingItemProps> = ({
+  model,
+  componentId,
+  drawableId,
+  textureId,
+  isSelected,
+  onClick,
+}) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imagePath, setImagePath] = useState('');
+
+  useEffect(() => {
+    try {
+      const path = getClothingImage(model, componentId, drawableId, textureId);
+      setImagePath(path);
+
+      // Preload the image
+      const img = new Image();
+      img.onload = () => setImageLoaded(true);
+      img.onerror = () => setImageLoaded(false);
+      img.src = path;
+    } catch (error) {
+      console.error('Error loading clothing image:', error);
+      setImageLoaded(false);
+    }
+  }, [model, componentId, drawableId, textureId]);
+
+  return (
+    <div
+      className={`relative w-16 h-16 rounded overflow-hidden cursor-pointer transition-all duration-200 ${
+        isSelected ? 'ring-2 ring-brand-500 scale-105' : 'hover:scale-105'
+      }`}
+      onClick={onClick}
+    >
+      {imageLoaded ? (
+        <img
+          src={imagePath}
+          alt={`Clothing item ${drawableId}`}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-black/30 text-xs text-center">
+          {drawableId}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ClothingGrid component for each category
+interface ClothingGridProps {
+  category: (typeof CLOTHING_CATEGORIES)[0];
+  model: string;
+  selectedDrawable: number;
+  selectedTexture: number;
+  onSelectDrawable: (value: number) => void;
+  onSelectTexture: (value: number) => void;
+}
+
+const ClothingGrid: React.FC<ClothingGridProps> = ({
+  category,
+  model,
+  selectedDrawable,
+  selectedTexture,
+  onSelectDrawable,
+  onSelectTexture,
+}) => {
+  // Generate a range of drawable IDs for the grid
+  const drawableIds = Array.from({ length: category.maxItems }, (_, i) => i);
+
+  // Generate a range of texture IDs for the selected drawable
+  const textureIds = Array.from({ length: category.maxTextures }, (_, i) => i);
+
+  return (
+    <div className="mb-6">
+      <h3 className="text-lg font-semibold mb-2">{category.label}</h3>
+
+      {/* Drawables grid */}
+      <div className="mb-4">
+        <h4 className="text-sm font-medium mb-1">Styles</h4>
+        <div className="grid grid-cols-5 gap-2">
+          {drawableIds.map((drawableId) => (
+            <ClothingItem
+              key={`${category.id}-${drawableId}`}
+              model={model}
+              componentId={category.componentId}
+              drawableId={drawableId}
+              textureId={0}
+              isSelected={selectedDrawable === drawableId}
+              onClick={() => onSelectDrawable(drawableId)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Textures grid for selected drawable */}
+      <div>
+        <h4 className="text-sm font-medium mb-1">Textures</h4>
+        <div className="grid grid-cols-5 gap-2">
+          {textureIds.map((textureId) => (
+            <ClothingItem
+              key={`${category.id}-${selectedDrawable}-${textureId}`}
+              model={model}
+              componentId={category.componentId}
+              drawableId={selectedDrawable}
+              textureId={textureId}
+              isSelected={selectedTexture === textureId}
+              onClick={() => onSelectTexture(textureId)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const ClothingTab: React.FC<ClothingTabProps> = ({
   clothingData,
   onClothingChange,
   model,
 }) => {
-  // State to track which clothing item is currently being previewed
-  const [previewItem, setPreviewItem] = useState<string>('tops');
+  // State to track which clothing category is currently active
+  const [activeCategory, setActiveCategory] = useState<string>('tops');
 
-  // Function to handle clicking on a clothing category to preview it
-  const handlePreviewSelect = (key: string) => {
-    setPreviewItem(key);
+  // Function to handle clicking on a clothing category
+  const handleCategorySelect = (categoryId: string) => {
+    setActiveCategory(categoryId);
   };
 
-  // Get the drawable ID and texture ID for the currently selected preview item
+  // Get the drawable ID and texture ID for the currently selected category
   const getDrawableAndTexture = () => {
-    switch (previewItem) {
+    switch (activeCategory) {
       case 'tops':
         return {
           drawableId: clothingData.tops,
@@ -65,139 +213,69 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
 
   const { drawableId, textureId } = getDrawableAndTexture();
 
+  // Handle drawable selection
+  const handleDrawableSelect = (value: number) => {
+    const key = activeCategory;
+    onClothingChange(key, value);
+  };
+
+  // Handle texture selection
+  const handleTextureSelect = (value: number) => {
+    const key = `${activeCategory}Texture`;
+    onClothingChange(key, value);
+  };
+
+  // Find the current active category object
+  const currentCategory =
+    CLOTHING_CATEGORIES.find((cat) => cat.id === activeCategory) ||
+    CLOTHING_CATEGORIES[0];
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Clothing Customization</h2>
 
-      {/* Preview section */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Preview</h3>
-        <div className="flex flex-col space-y-4">
-          <div className="flex flex-wrap gap-2 mb-2">
-            <button
-              className={`px-3 py-1 rounded ${
-                previewItem === 'tops' ? 'bg-brand-600' : 'bg-brand-800'
-              }`}
-              onClick={() => handlePreviewSelect('tops')}
-            >
-              Tops
-            </button>
-            <button
-              className={`px-3 py-1 rounded ${
-                previewItem === 'undershirt' ? 'bg-brand-600' : 'bg-brand-800'
-              }`}
-              onClick={() => handlePreviewSelect('undershirt')}
-            >
-              Undershirt
-            </button>
-            <button
-              className={`px-3 py-1 rounded ${
-                previewItem === 'legs' ? 'bg-brand-600' : 'bg-brand-800'
-              }`}
-              onClick={() => handlePreviewSelect('legs')}
-            >
-              Legs
-            </button>
-            <button
-              className={`px-3 py-1 rounded ${
-                previewItem === 'shoes' ? 'bg-brand-600' : 'bg-brand-800'
-              }`}
-              onClick={() => handlePreviewSelect('shoes')}
-            >
-              Shoes
-            </button>
-            <button
-              className={`px-3 py-1 rounded ${
-                previewItem === 'accessories' ? 'bg-brand-600' : 'bg-brand-800'
-              }`}
-              onClick={() => handlePreviewSelect('accessories')}
-            >
-              Accessories
-            </button>
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* Left side - Character preview and category selection */}
+        <div className="w-full md:w-1/3">
+          {/* Character preview */}
+          <div className="mb-4">
+            <ClothingPreview
+              model={model}
+              clothingKey={activeCategory}
+              drawableId={drawableId}
+              textureId={textureId}
+            />
           </div>
 
-          <ClothingPreview
+          {/* Category selection */}
+          <div className="flex flex-col gap-2">
+            {CLOTHING_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                className={`px-3 py-2 rounded w-full text-left ${
+                  activeCategory === category.id
+                    ? 'bg-brand-600'
+                    : 'bg-brand-800 hover:bg-brand-700'
+                }`}
+                onClick={() => handleCategorySelect(category.id)}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right side - Clothing grid */}
+        <div className="w-full md:w-2/3 overflow-y-auto max-h-[500px] pr-2">
+          <ClothingGrid
+            category={currentCategory}
             model={model}
-            clothingKey={previewItem}
-            drawableId={drawableId}
-            textureId={textureId}
+            selectedDrawable={drawableId}
+            selectedTexture={textureId}
+            onSelectDrawable={handleDrawableSelect}
+            onSelectTexture={handleTextureSelect}
           />
         </div>
-      </div>
-
-      {/* Sliders section */}
-      <div className="grid grid-cols-2 gap-4">
-        <SliderInput
-          label="Tops"
-          min={0}
-          max={255}
-          value={clothingData.tops}
-          onChange={(value) => onClothingChange('tops', value)}
-          valueLabel="Style"
-        />
-
-        <SliderInput
-          label="Tops Texture"
-          min={0}
-          max={15}
-          value={clothingData.topsTexture}
-          onChange={(value) => onClothingChange('topsTexture', value)}
-          valueLabel="Texture"
-        />
-
-        <SliderInput
-          label="Undershirt"
-          min={0}
-          max={255}
-          value={clothingData.undershirt}
-          onChange={(value) => onClothingChange('undershirt', value)}
-          valueLabel="Style"
-        />
-
-        <SliderInput
-          label="Undershirt Texture"
-          min={0}
-          max={15}
-          value={clothingData.undershirtTexture}
-          onChange={(value) => onClothingChange('undershirtTexture', value)}
-          valueLabel="Texture"
-        />
-
-        <SliderInput
-          label="Legs"
-          min={0}
-          max={255}
-          value={clothingData.legs}
-          onChange={(value) => onClothingChange('legs', value)}
-          valueLabel="Style"
-        />
-
-        <SliderInput
-          label="Legs Texture"
-          min={0}
-          max={15}
-          value={clothingData.legsTexture}
-          onChange={(value) => onClothingChange('legsTexture', value)}
-          valueLabel="Texture"
-        />
-
-        <SliderInput
-          label="Shoes"
-          min={0}
-          max={255}
-          value={clothingData.shoes}
-          onChange={(value) => onClothingChange('shoes', value)}
-          valueLabel="Style"
-        />
-
-        <SliderInput
-          label="Shoes Texture"
-          min={0}
-          max={15}
-          value={clothingData.shoesTexture}
-          onChange={(value) => onClothingChange('shoesTexture', value)}
-          valueLabel="Texture"
-        />
       </div>
     </div>
   );
