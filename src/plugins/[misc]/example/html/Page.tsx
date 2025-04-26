@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../utils/fetchNui';
-import { isEnvBrowser } from '../../../../utils/misc';
 
 // Constants
 const NUI_EVENT = 'example:toggle-ui';
 
 export default function Page() {
-  const [isOpen, setIsOpen] = useState(isEnvBrowser());
+  const [isOpen, setIsOpen] = useState(false);
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data) => {
