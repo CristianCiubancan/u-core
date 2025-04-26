@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
-import { fetchNui } from '../../../../../utils/fetchNui';
-import { isEnvBrowser } from '../../../../../utils/misc';
+import { fetchNui } from '../../../../../webview/utils/fetchNui';
+import { isEnvBrowser } from '../../../../../webview/utils/misc';
 import {
   Layout,
   TabNavigation,
