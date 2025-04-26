@@ -25,7 +25,7 @@ export function createScrollbarStyles(
 ): ScrollbarStyles {
   return {
     '&::-webkit-scrollbar': {
-      width: '12px',  // Decreased from 18px for more subtle scrollbars
+      width: '12px', // Decreased from 18px for more subtle scrollbars
       height: '12px', // Decreased from 18px for more subtle scrollbars
     },
     '&::-webkit-scrollbar-track': {
