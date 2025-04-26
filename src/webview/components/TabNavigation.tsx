@@ -16,20 +16,17 @@ interface TabNavigationProps {
 
 const TabNavigation: React.FC<TabNavigationProps> = ({
   tabs,
-  activeTab,
   onTabChange,
   orientation = 'vertical',
   className = '',
 }) => {
   const isVertical = orientation === 'vertical';
-  
+
   const containerClasses = isVertical
     ? `h-full glass-brand-dark p-3 ${className}`
     : `w-full glass-brand-dark p-3 ${className}`;
-    
-  const navClasses = isVertical
-    ? 'space-y-2'
-    : 'flex space-x-2';
+
+  const navClasses = isVertical ? 'space-y-2' : 'flex space-x-2';
 
   return (
     <div className={containerClasses}>
