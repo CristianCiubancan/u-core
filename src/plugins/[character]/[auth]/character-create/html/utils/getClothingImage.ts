@@ -1,17 +1,20 @@
 /**
  * Utility function to get the clothing image path based on the character model, component ID, and drawable ID
+ * Uses the asset server to retrieve optimized images
  *
  * @param model The character model (male/female)
  * @param componentId The clothing component ID
  * @param drawableId The drawable ID (style)
  * @param textureId The texture ID
+ * @param quality The image quality level (high, medium, low, tiny)
  * @returns The path to the clothing image
  */
 export const getClothingImage = (
   model: string,
   componentId: number,
   drawableId: number,
-  textureId: number
+  textureId: number,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
 ): string => {
   // Determine if male or female
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
@@ -30,29 +33,41 @@ export const getClothingImage = (
   // 10: Decals
   // 11: Tops
 
-  try {
-    // Create the image path using import.meta.url for proper asset referencing
-    // First try with the texture ID included
-    const imagePath = new URL(
-      `../assets/images/clothing/${gender}_${componentId}_${drawableId}_${textureId}.png`,
-      import.meta.url
-    ).href;
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
 
-    // The component will handle fallback if the image doesn't exist
-    return imagePath;
-  } catch (error) {
-    // If there's an error with the URL construction, try a fallback without texture
-    try {
-      const fallbackPath = new URL(
-        `../assets/images/clothing/${gender}_${componentId}_${drawableId}.png`,
-        import.meta.url
-      ).href;
-      return fallbackPath;
-    } catch (fallbackError) {
-      console.error('Error loading clothing image:', fallbackError);
-      return '';
-    }
-  }
+  // Create the image path with texture ID
+  const imagePath = `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}_${textureId}.png`;
+
+  // Return the primary path - the component will handle fallback if needed
+  return imagePath;
+};
+
+/**
+ * Get the fallback clothing image path (without texture ID)
+ *
+ * @param model The character model (male/female)
+ * @param componentId The clothing component ID
+ * @param drawableId The drawable ID (style)
+ * @param quality The image quality level (high, medium, low, tiny)
+ * @returns The fallback path to the clothing image
+ */
+export const getClothingImageFallback = (
+  model: string,
+  componentId: number,
+  drawableId: number,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
+): string => {
+  // Determine if male or female
+  const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
+
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+
+  // Create a fallback path without texture ID
+  return `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}.png`;
 };
 
 /**

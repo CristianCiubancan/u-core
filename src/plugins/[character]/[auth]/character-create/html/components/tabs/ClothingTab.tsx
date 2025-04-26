@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterData } from '../../types';
 import { ClothingPreview } from '../ClothingPreview';
-import { getClothingImage } from '../../utils/getClothingImage';
+import {
+  getClothingImage,
+  getClothingImageFallback,
+} from '../../utils/getClothingImage';
 
 interface ClothingTabProps {
   clothingData: CharacterData['clothing'];
@@ -53,19 +56,39 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
   const [imagePath, setImagePath] = useState('');
 
   useEffect(() => {
-    try {
-      const path = getClothingImage(model, componentId, drawableId, textureId);
-      setImagePath(path);
+    // Define the quality level - using 'tiny' for grid items to improve performance
+    const quality = 'tiny';
 
-      // Preload the image
-      const img = new Image();
-      img.onload = () => setImageLoaded(true);
-      img.onerror = () => setImageLoaded(false);
-      img.src = path;
-    } catch (error) {
-      console.error('Error loading clothing image:', error);
-      setImageLoaded(false);
-    }
+    // Get the image path from the asset server
+    const path = getClothingImage(
+      model,
+      componentId,
+      drawableId,
+      textureId,
+      quality
+    );
+    setImagePath(path);
+
+    // Preload the image
+    const img = new Image();
+    img.onload = () => setImageLoaded(true);
+    img.onerror = () => {
+      // Try fallback without texture
+      const fallbackPath = getClothingImageFallback(
+        model,
+        componentId,
+        drawableId,
+        quality
+      );
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
+        setImageLoaded(true);
+        setImagePath(fallbackPath);
+      };
+      fallbackImg.onerror = () => setImageLoaded(false);
+      fallbackImg.src = fallbackPath;
+    };
+    img.src = path;
   }, [model, componentId, drawableId, textureId]);
 
   return (
