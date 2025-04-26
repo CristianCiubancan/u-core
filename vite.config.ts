@@ -6,6 +6,22 @@ export default defineConfig({
   root: 'src/',
   base: './',
   plugins: [react()],
+  environments: {
+    production: {
+      define: {
+        'process.env': {
+          ASSET_SERVER_URL: 'http://localhost:3000',
+        },
+      },
+    },
+    development: {
+      define: {
+        'process.env': {
+          ASSET_SERVER_URL: 'http://localhost:3000',
+        },
+      },
+    },
+  },
   build: {
     // Output build to dist/web relative to project root (src is Vite root)
     // Ensure dist/web is emptied prior to building, even if outside root

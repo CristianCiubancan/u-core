@@ -173,18 +173,37 @@ namespace CharacterCreate {
       cameraHeight += 0.2;
     }
 
-    // Calculate camera position
+    // Calculate camera position (this stays the same)
     const cameraCoords = {
       x: coords[0] + Math.sin(angleRad) * cameraZoom,
       y: coords[1] + Math.cos(angleRad) * cameraZoom,
       z: cameraHeight,
     };
 
+    // Calculate the direct vector from camera to ped
+    const dirVector = {
+      x: coords[0] - cameraCoords.x,
+      y: coords[1] - cameraCoords.y,
+      z: cameraHeight - cameraCoords.z,
+    };
+
+    const pitch =
+      Math.atan2(dirVector.z, Math.sqrt(dirVector.x ** 2 + dirVector.y ** 2)) *
+      (180 / Math.PI);
+    let yaw = Math.atan2(dirVector.x, dirVector.y) * (180 / Math.PI);
+
+    // Add our left-looking offset (adjust this value as needed)
+    const leftAngleOffset = 30; // 15 degrees offset
+    yaw += leftAngleOffset;
+
     // Create or update the camera
     if (!characterCreationCamera) {
       const camera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true);
       SetCamCoord(camera, cameraCoords.x, cameraCoords.y, cameraCoords.z);
-      PointCamAtCoord(camera, coords[0], coords[1], cameraHeight);
+
+      // Use our calculated rotation with the offset
+      SetCamRot(camera, pitch, 0.0, yaw, 2);
+
       SetCamActive(camera, true);
       RenderScriptCams(true, false, 0, true, true);
 
@@ -197,12 +216,9 @@ namespace CharacterCreate {
         cameraCoords.y,
         cameraCoords.z
       );
-      PointCamAtCoord(
-        characterCreationCamera,
-        coords[0],
-        coords[1],
-        cameraHeight
-      );
+
+      // Use our calculated rotation with the offset
+      SetCamRot(characterCreationCamera, pitch, 0.0, yaw, 2);
     }
   }
 

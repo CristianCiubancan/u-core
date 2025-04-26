@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   getClothingImage,
+  getClothingImageFallback,
   getComponentIdFromKey,
 } from '../utils/getClothingImage';
 
@@ -28,49 +29,48 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
     setImageLoaded(false);
     setUsingFallback(false);
 
-    try {
-      // Get the primary image path with texture
-      const primaryPath = getClothingImage(
-        model,
-        componentId,
-        drawableId,
-        textureId
-      );
-      setImagePath(primaryPath);
+    // Define the quality level - could be made configurable via props
+    const quality = 'medium';
 
-      // Also prepare a fallback path without texture
-      const backupPath = new URL(
-        `../assets/images/clothing/${
-          model === 'mp_m_freemode_01' ? 'male' : 'female'
-        }_${componentId}_${drawableId}.png`,
-        import.meta.url
-      ).href;
-      setFallbackPath(backupPath);
+    // Get the primary image path with texture from the asset server
+    const primaryPath = getClothingImage(
+      model,
+      componentId,
+      drawableId,
+      textureId,
+      quality
+    );
+    setImagePath(primaryPath);
 
-      // Preload the image to check if it exists
-      const img = new Image();
-      img.onload = () => {
+    // Also prepare a fallback path without texture from the asset server
+    const backupPath = getClothingImageFallback(
+      model,
+      componentId,
+      drawableId,
+      quality
+    );
+    setFallbackPath(backupPath);
+
+    // Preload the image to check if it exists
+    const img = new Image();
+    img.onload = () => {
+      setImageLoaded(true);
+      setUsingFallback(false);
+    };
+    img.onerror = () => {
+      // Try the fallback image without texture
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
         setImageLoaded(true);
+        setUsingFallback(true);
+      };
+      fallbackImg.onerror = () => {
+        setImageLoaded(false);
         setUsingFallback(false);
       };
-      img.onerror = () => {
-        // Try the fallback image without texture
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => {
-          setImageLoaded(true);
-          setUsingFallback(true);
-        };
-        fallbackImg.onerror = () => {
-          setImageLoaded(false);
-          setUsingFallback(false);
-        };
-        fallbackImg.src = backupPath;
-      };
-      img.src = primaryPath;
-    } catch (error) {
-      console.error('Error loading clothing image:', error);
-      setImageLoaded(false);
-    }
+      fallbackImg.src = backupPath;
+    };
+    img.src = primaryPath;
   }, [model, componentId, drawableId, textureId]);
 
   // Function to handle image loading errors
