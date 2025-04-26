@@ -57,11 +57,11 @@ if (!fs.existsSync(serverCfgPath)) {
 
 // Check for essential resources
 const essentialResources = [
-  'sessionmanager',
-  'mapmanager',
-  'spawnmanager',
-  'basic-gamemode',
-  'hardcap',
+  { name: 'sessionmanager', category: '[system]' },
+  { name: 'mapmanager', category: '[managers]' },
+  { name: 'spawnmanager', category: '[managers]' },
+  { name: 'basic-gamemode', category: '[gamemodes]' },
+  { name: 'hardcap', category: '[system]' },
 ];
 
 // Check if resources directory exists
@@ -90,26 +90,60 @@ try {
   );
 }
 
+// Function to check if a resource exists in any subdirectory
+const resourceExistsInAnySubdir = (resourceName) => {
+  // Check direct path
+  if (fs.existsSync(path.join(resourcesPath, resourceName))) {
+    return true;
+  }
+
+  // Check in subdirectories
+  try {
+    const subdirs = fs
+      .readdirSync(resourcesPath, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
+
+    for (const subdir of subdirs) {
+      if (fs.existsSync(path.join(resourcesPath, subdir, resourceName))) {
+        return true;
+      }
+    }
+  } catch (error) {
+    console.warn(
+      chalk.yellow(`Error checking subdirectories: ${error.message}`)
+    );
+  }
+
+  return false;
+};
+
 // Print warning for missing essential resources
 console.log(chalk.blue('Checking for essential resources...'));
 const missingResources = [];
 
 essentialResources.forEach((resource) => {
-  const resourceExists = fs.existsSync(path.join(resourcesPath, resource));
+  // Check if resource exists in its category or directly
+  const resourceExists =
+    fs.existsSync(path.join(resourcesPath, resource.category, resource.name)) ||
+    resourceExistsInAnySubdir(resource.name);
+
   const isStartedInConfig =
-    serverCfgContent.includes(`ensure ${resource}`) ||
-    serverCfgContent.includes(`start ${resource}`);
+    serverCfgContent.includes(`ensure ${resource.name}`) ||
+    serverCfgContent.includes(`start ${resource.name}`);
 
   if (!resourceExists) {
-    missingResources.push(resource);
+    missingResources.push(resource.name);
   } else if (!isStartedInConfig) {
     console.warn(
       chalk.yellow(
-        `Warning: Resource '${resource}' exists but is not started in server.cfg`
+        `Warning: Resource '${resource.name}' exists but is not started in server.cfg`
       )
     );
     console.warn(
-      chalk.yellow(`         Add 'ensure ${resource}' to your server.cfg file.`)
+      chalk.yellow(
+        `         Add 'ensure ${resource.name}' to your server.cfg file.`
+      )
     );
   }
 });
@@ -153,22 +187,110 @@ const isPortInUse = async (port) => {
   try {
     // Use netstat to check if the port is in use
     const { stdout } = await execPromise(`netstat -ano | findstr :${port}`);
-    return stdout.trim().length > 0;
+    return stdout.trim().length > 0 ? stdout : false;
   } catch (error) {
     // If the command fails, the port is not in use
     return false;
   }
 };
 
+// Function to kill a process by PID
+const killProcessByPid = async (pid) => {
+  const execPromise = promisify(exec);
+  try {
+    await execPromise(`taskkill /F /PID ${pid}`);
+    return true;
+  } catch (error) {
+    console.error(
+      chalk.red(`Failed to kill process with PID ${pid}: ${error.message}`)
+    );
+    return false;
+  }
+};
+
+// Function to check if a process is FXServer
+const isFXServerProcess = async (pid) => {
+  const execPromise = promisify(exec);
+  try {
+    const { stdout } = await execPromise(
+      `wmic process where "ProcessId=${pid}" get CommandLine`
+    );
+    return stdout.includes('FXServer') || stdout.includes('fivem');
+  } catch (error) {
+    return false;
+  }
+};
+
 // Check if the default FiveM port (30120) is in use
 const DEFAULT_PORT = 30120;
-isPortInUse(DEFAULT_PORT).then((inUse) => {
-  if (inUse) {
+const portCheck = await isPortInUse(DEFAULT_PORT);
+
+if (portCheck) {
+  console.warn(
+    chalk.yellow(`Warning: Port ${DEFAULT_PORT} is already in use.`)
+  );
+
+  // Extract PIDs from netstat output
+  const lines = portCheck.split('\n');
+  const pids = new Set();
+
+  for (const line of lines) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length >= 5) {
+      const pid = parts[4];
+      pids.add(pid);
+    }
+  }
+
+  if (pids.size > 0) {
+    // Check if any of the processes are FXServer
+    let fxServerRunning = false;
+    for (const pid of pids) {
+      if (await isFXServerProcess(pid)) {
+        fxServerRunning = true;
+        console.warn(
+          chalk.yellow(`FiveM server is already running with PID ${pid}.`)
+        );
+      }
+    }
+
+    if (fxServerRunning) {
+      const answer = await new Promise((resolve) => {
+        process.stdout.write(
+          chalk.yellow(
+            'Do you want to kill the existing server and start a new one? (y/n): '
+          )
+        );
+        process.stdin.once('data', (data) => {
+          resolve(data.toString().trim().toLowerCase());
+        });
+      });
+
+      if (answer !== 'y') {
+        console.log(chalk.blue('Exiting without starting a new server.'));
+        process.exit(0);
+      }
+    }
+
     console.warn(
-      chalk.yellow(`Warning: Port ${DEFAULT_PORT} is already in use.`)
+      chalk.yellow('Attempting to kill processes using this port...')
     );
-    console.warn(chalk.yellow('This may cause the server to fail to start.'));
-    console.warn(chalk.yellow('Make sure no other FiveM server is running.'));
+
+    for (const pid of pids) {
+      console.warn(chalk.yellow(`Killing process with PID ${pid}...`));
+      const success = await killProcessByPid(pid);
+      if (success) {
+        console.log(chalk.green(`Successfully killed process with PID ${pid}`));
+      }
+    }
+
+    // Wait a moment for the ports to be released
+    console.log(chalk.blue('Waiting for ports to be released...'));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  } else {
+    console.warn(
+      chalk.yellow('Could not identify the processes using this port.')
+    );
     console.warn(
       chalk.yellow('You can change the port in your server.cfg file:')
     );
@@ -183,38 +305,36 @@ isPortInUse(DEFAULT_PORT).then((inUse) => {
       )
     );
   }
+}
 
-  // Start the FiveM server from the server data directory
-  const serverProcess = spawn(fxServerPath, ['+exec', 'server.cfg'], {
-    stdio: 'inherit',
-    shell: true,
-    cwd: serverDataDir,
-  });
+// Start the FiveM server from the server data directory
+const serverProcess = spawn(fxServerPath, ['+exec', 'server.cfg'], {
+  stdio: 'inherit',
+  shell: true,
+  cwd: serverDataDir,
+});
 
-  // Handle server process events
-  serverProcess.on('error', (error) => {
-    console.error(chalk.red(`Failed to start FiveM server: ${error.message}`));
-    process.exit(1);
-  });
+// Handle server process events
+serverProcess.on('error', (error) => {
+  console.error(chalk.red(`Failed to start FiveM server: ${error.message}`));
+  process.exit(1);
+});
 
-  serverProcess.on('close', (code) => {
-    if (code !== 0) {
-      console.error(chalk.red(`FiveM server exited with code ${code}`));
-    } else {
-      console.log(chalk.green('FiveM server shut down gracefully.'));
-    }
-  });
+serverProcess.on('close', (code) => {
+  if (code !== 0) {
+    console.error(chalk.red(`FiveM server exited with code ${code}`));
+  } else {
+    console.log(chalk.green('FiveM server shut down gracefully.'));
+  }
+});
 
-  // Handle process termination signals
-  process.on('SIGINT', () => {
-    console.log(chalk.yellow('Received SIGINT. Shutting down FiveM server...'));
-    serverProcess.kill('SIGINT');
-  });
+// Handle process termination signals
+process.on('SIGINT', () => {
+  console.log(chalk.yellow('Received SIGINT. Shutting down FiveM server...'));
+  serverProcess.kill('SIGINT');
+});
 
-  process.on('SIGTERM', () => {
-    console.log(
-      chalk.yellow('Received SIGTERM. Shutting down FiveM server...')
-    );
-    serverProcess.kill('SIGTERM');
-  });
+process.on('SIGTERM', () => {
+  console.log(chalk.yellow('Received SIGTERM. Shutting down FiveM server...'));
+  serverProcess.kill('SIGTERM');
 });
