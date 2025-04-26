@@ -94,6 +94,54 @@ function generateMergedGlassClasses() {
   };
 }
 
+// Generate scrollbar styles that apply globally or to specific classes
+function generateGlobalScrollbarStyles() {
+  return {
+    // Global default scrollbar styles
+    'html': {
+      ...createScrollbarStyles(
+        `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+        `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+      ),
+    },
+    'body': {
+      ...createScrollbarStyles(
+        `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+        `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+      ),
+    },
+    // Custom scrollbar class for direct application
+    '.custom-scrollbar': {
+      ...createScrollbarStyles(
+        `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+        `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+        `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+      ),
+    },
+    '.custom-scrollbar-dark': {
+      ...createScrollbarStyles(
+        `rgba(${hexToRgb(grayPalette[800])}, 0.4)`,
+        `rgba(${hexToRgb(grayPalette[600])}, 0.6)`,
+        `2px solid rgba(${hexToRgb(grayPalette[700])}, 0.3)`,
+        `rgba(${hexToRgb(grayPalette[500])}, 0.7)`
+      ),
+    },
+    '.custom-scrollbar-brand': {
+      ...createScrollbarStyles(
+        `rgba(${hexToRgb(brandPalette[100])}, 0.3)`,
+        `rgba(${hexToRgb(brandPalette[400])}, 0.5)`,
+        `2px solid rgba(${hexToRgb(brandPalette[300])}, 0.3)`,
+        `rgba(${hexToRgb(brandPalette[500])}, 0.6)`
+      ),
+    },
+  };
+}
+
 // Generate font size configuration with optimized readability
 function generateFontSizes() {
   const sizes = {
@@ -168,6 +216,13 @@ function generateSafelist() {
     'hover:glass-dark',
     'hover:glass-brand',
     'hover:glass-brand-dark',
+  ];
+
+  // Scrollbar classes
+  const scrollbarClasses = [
+    'custom-scrollbar',
+    'custom-scrollbar-dark',
+    'custom-scrollbar-brand',
   ];
 
   // Accessibility classes
@@ -333,6 +388,7 @@ function generateSafelist() {
   return [
     ...colorClasses,
     ...glassClasses,
+    ...scrollbarClasses,
     ...accessibilityClasses,
     ...cursorClasses,
     ...uiBackgroundClasses,
@@ -547,6 +603,74 @@ module.exports = {
     // Merged plugin for glass morphism effects with scrollbars
     function ({ addUtilities }) {
       addUtilities(generateMergedGlassClasses(), ['responsive', 'hover']);
+    },
+
+    // Global scrollbar styles - FiveM/CEF fix
+    function ({ addBase, addUtilities }) {
+      // Add global styles to html and body
+      addBase({
+        'html': {
+          ...createScrollbarStyles(
+            `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+            `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+          ),
+        },
+        'body': {
+          ...createScrollbarStyles(
+            `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+            `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+          ),
+        },
+        // Direct global scrollbar styles that generally work better in CEF environments
+        '::-webkit-scrollbar': {
+          width: '12px',
+          height: '12px',
+        },
+        '::-webkit-scrollbar-track': {
+          background: `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+          borderRadius: '8px',
+        },
+        '::-webkit-scrollbar-thumb': {
+          background: `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+          borderRadius: '8px',
+          border: `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+        },
+        '::-webkit-scrollbar-thumb:hover': {
+          background: `rgba(${hexToRgb(grayPalette[400])}, 0.4)`,
+        },
+      });
+
+      // Add custom scrollbar utility classes
+      addUtilities({
+        '.custom-scrollbar': {
+          ...createScrollbarStyles(
+            `rgba(${hexToRgb(grayPalette[100])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[300])}, 0.3)`,
+            `2px solid rgba(${hexToRgb(grayPalette[200])}, 0.2)`,
+            `rgba(${hexToRgb(grayPalette[400])}, 0.4)`
+          ),
+        },
+        '.custom-scrollbar-dark': {
+          ...createScrollbarStyles(
+            `rgba(${hexToRgb(grayPalette[800])}, 0.4)`,
+            `rgba(${hexToRgb(grayPalette[600])}, 0.6)`,
+            `2px solid rgba(${hexToRgb(grayPalette[700])}, 0.3)`,
+            `rgba(${hexToRgb(grayPalette[500])}, 0.7)`
+          ),
+        },
+        '.custom-scrollbar-brand': {
+          ...createScrollbarStyles(
+            `rgba(${hexToRgb(brandPalette[100])}, 0.3)`,
+            `rgba(${hexToRgb(brandPalette[400])}, 0.5)`,
+            `2px solid rgba(${hexToRgb(brandPalette[300])}, 0.3)`,
+            `rgba(${hexToRgb(brandPalette[500])}, 0.6)`
+          ),
+        },
+      });
     },
 
     // New plugin for accessible text utilities
