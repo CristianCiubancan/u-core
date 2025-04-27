@@ -2,10 +2,26 @@
  * Main theme configuration for Tailwind CSS
  * Centralizes all theme extensions and design tokens
  */
-const { colorPalettes, grayPalettes, semanticColors } = require('../colors');
-const { resolveColorReference } = require('../colors');
-const { hexToRgb } = require('../utils/colorUtils');
-const typography = require('./typography');
+
+import {
+  colorPalettes,
+  grayPalettes,
+  resolveColorReference,
+  semanticColors,
+} from '../colors';
+import { hexToRgb } from './colorUtils';
+import { generateFontSizes } from './typography';
+
+// Define interfaces for theme configuration
+interface ThemeConfig {
+  fontSize: Record<string, [string, Record<string, string>]>;
+  colors: Record<string, any>;
+  boxShadow: Record<string, string>;
+  borderRadius: Record<string, string>;
+  spacing: Record<string, string>;
+  lineHeight: Record<string, string>;
+  transitionTimingFunction: Record<string, string>;
+}
 
 // Configuration settings
 const config = {
@@ -19,7 +35,7 @@ const config = {
  * @param {string} colorName - Name of the color to retrieve
  * @returns {Object} Color palette object
  */
-function getColorPalette(colorName: string) {
+function getColorPalette(colorName: string): any {
   // First check in colorPalettes
   if (colorPalettes[colorName]) {
     return colorPalettes[colorName];
@@ -41,15 +57,16 @@ function getColorPalette(colorName: string) {
 const brandPalette = getColorPalette(config.brandColor);
 const grayPalette = getColorPalette(config.grayColor);
 
-module.exports = {
+// Create the theme configuration with proper typing
+const themeConfig: ThemeConfig = {
   // Typography
-  fontSize: typography.generateFontSizes(config.fontSizeMultiplier),
+  fontSize: generateFontSizes(config.fontSizeMultiplier),
 
   // Colors
   colors: {
     // Core color palettes
     brand: brandPalette,
-    gray: grayPalette,
+    customGray: grayPalette,
 
     // Add all color palettes directly
     ...colorPalettes,
@@ -244,6 +261,6 @@ module.exports = {
 };
 
 // Export configuration for use in other modules
-module.exports.config = config;
-module.exports.brandPalette = brandPalette;
-module.exports.grayPalette = grayPalette;
+export { config };
+export { brandPalette, grayPalette };
+export default themeConfig;

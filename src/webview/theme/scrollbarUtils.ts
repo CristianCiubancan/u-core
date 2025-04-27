@@ -111,7 +111,4 @@ function getScrollbarVariants(
   };
 }
 
-module.exports = {
-  createScrollbarStyles,
-  getScrollbarVariants,
-};
+export { createScrollbarStyles, getScrollbarVariants };

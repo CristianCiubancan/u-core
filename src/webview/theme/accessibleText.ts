@@ -2,8 +2,8 @@
  * Accessible text utilities for Tailwind CSS
  * Ensures text has proper contrast and readability across contexts
  */
-const { getContrastRatio, hexToRgb } = require('./colorUtils');
-const { semanticColors, resolveColorReference } = require('../colors');
+import { getContrastRatio, hexToRgb } from './colorUtils';
+import { semanticColors, resolveColorReference } from '../colors';
 
 /**
  * Generate accessible text utilities for various contexts
@@ -115,6 +115,4 @@ function generateAccessibleTextUtilities(
   };
 }
 
-module.exports = {
-  generateAccessibleTextUtilities,
-};
+export { generateAccessibleTextUtilities };

@@ -2,8 +2,8 @@
  * Glass effect styles for Tailwind CSS
  * Creates customizable glass morphism effects with scrollbar integration
  */
-const { createScrollbarStyles } = require('./scrollbarUtils');
-const { hexToRgb } = require('./colorUtils');
+import { createScrollbarStyles } from './scrollbarUtils';
+import { hexToRgb } from './colorUtils';
 
 /**
  * Create glass effect styles with matching scrollbars
@@ -186,7 +186,4 @@ function generateGlassStyles(
   };
 }
 
-module.exports = {
-  createGlassStyles,
-  generateGlassStyles,
-};
+export { createGlassStyles, generateGlassStyles };

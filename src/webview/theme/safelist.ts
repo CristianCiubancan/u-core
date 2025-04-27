@@ -2,7 +2,7 @@
  * Safelist configuration for Tailwind CSS
  * Ensures critical classes are not purged during production builds
  */
-const { colorPalettes, grayPalettes } = require('../colors');
+import { colorPalettes, grayPalettes } from '../colors';
 
 /**
  * Generate safelist for Tailwind CSS
@@ -227,4 +227,4 @@ function generateSafelist() {
   ];
 }
 
-module.exports = generateSafelist();
+export default generateSafelist();

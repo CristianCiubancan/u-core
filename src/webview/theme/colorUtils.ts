@@ -101,7 +101,7 @@ function getAccessibleTextColor(bgColor: string): string {
   return isDarkColor(bgColor) ? '#ffffff' : '#000000';
 }
 
-module.exports = {
+export {
   hexToRgb,
   getLuminance,
   getContrastRatio,
