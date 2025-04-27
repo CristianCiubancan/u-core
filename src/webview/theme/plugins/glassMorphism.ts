@@ -186,8 +186,6 @@ export function createGlassStyles(config: GlassConfig) {
   };
 }
 
-// Updated typography.ts - removed modern CSS text-wrap properties
-
 // Responsive typography generator
 export function generateResponsiveTypography() {
   return {
@@ -242,9 +240,6 @@ export function generateResponsiveTypography() {
       'word-spacing': '0.05em',
       // Removed 'hyphens': 'auto' as it might not be well supported
     },
-
-    // Removed modern CSS properties for typography
-    // Removed '.text-balance' and '.text-pretty'
   };
 }
 

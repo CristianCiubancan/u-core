@@ -1,0 +1,2130 @@
+# .\plugins\accessibleText.ts
+
+// src/theme/plugins/accessibleText.ts
+
+import { getContrastRatio, hexToRgb } from '../utils/colorUtils';
+import { typography, defaultColors } from '../tokens/constants';
+
+/**
+ * Plugin parameter types
+ */
+interface AccessibleTextPluginParams {
+  addComponents: (components: Record<string, any>, variants?: string[]) => void;
+  theme: (path: string) => any;
+}
+
+/**
+ * Creates accessible text utilities for various backgrounds
+ */
+export function accessibleTextPlugin({
+  addComponents,
+  theme,
+}: AccessibleTextPluginParams) {
+  const colors = theme('colors');
+
+  // Get color references
+  const gray = colors.gray || {};
+  const primary = colors.primary || {};
+
+  // Base text colors
+  const darkText = gray[900] || defaultColors.darkText;
+  const lightText = gray[50] || defaultColors.lightText;
+
+  // Calculate contrast information for primary brand color
+  const primaryIsDark =
+    getContrastRatio(
+      primary[600] || defaultColors.primaryDefault[600],
+      lightText
+    ) < 4.5;
+
+  // Create accessible text utilities
+  const accessibleTextComponents = {
+    // For light backgrounds - use dark text
+    '.text-on-light': {
+      'color': darkText,
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // For dark backgrounds - use light text
+    '.text-on-dark': {
+      'color': lightText,
+      'font-weight': typography.fontWeight.normal,
+      'letter-spacing': typography.letterSpacing.wide,
+    },
+
+    // For the brand color as background - dynamically choose text color
+    '.text-on-brand': {
+      'color': primaryIsDark ? darkText : lightText,
+      'font-weight': primaryIsDark
+        ? typography.fontWeight.medium
+        : typography.fontWeight.normal,
+      'letter-spacing': primaryIsDark
+        ? typography.letterSpacing.normal
+        : typography.letterSpacing.wide,
+    },
+
+    // For glass elements with dark backdrop
+    '.text-on-glass-dark': {
+      'color': lightText,
+      'text-shadow': `0 1px 2px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.3)`,
+      'letter-spacing': typography.letterSpacing.wide,
+    },
+
+    // For glass elements with light backdrop
+    '.text-on-glass-light': {
+      'color': darkText,
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // Semantic text styles that are already WCAG AA compliant
+    '.text-primary': {
+      'color': theme('colors.text.primary'),
+      'font-weight': typography.fontWeight.semibold,
+    },
+
+    '.text-secondary': {
+      'color': theme('colors.text.secondary'),
+      'font-weight': typography.fontWeight.normal,
+    },
+
+    '.text-tertiary': {
+      'color': theme('colors.text.tertiary'),
+      'font-weight': typography.fontWeight.normal,
+    },
+
+    '.text-inverted': {
+      'color': theme('colors.text.inverted'),
+      'font-weight': typography.fontWeight.normal,
+    },
+
+    '.text-link': {
+      'color': theme('colors.text.link'),
+      'font-weight': typography.fontWeight.semibold,
+      'text-decoration': 'none',
+      '&:hover': {
+        'text-decoration': 'underline',
+      },
+    },
+
+    '.text-success': {
+      'color': theme('colors.text.success'),
+      'font-weight': typography.fontWeight.semibold,
+    },
+
+    '.text-error': {
+      'color': theme('colors.text.error'),
+      'font-weight': typography.fontWeight.semibold,
+    },
+
+    '.text-warning': {
+      'color': theme('colors.text.warning'),
+      'font-weight': typography.fontWeight.semibold,
+    },
+
+    '.text-info': {
+      'color': theme('colors.text.info'),
+      'font-weight': typography.fontWeight.semibold,
+    },
+
+    // Additional contrast-ensuring utilities
+    '.high-contrast': {
+      'font-weight': typography.fontWeight.semibold,
+      'letter-spacing': typography.letterSpacing.wide,
+    },
+
+    '.text-shadow-light': {
+      'text-shadow': `0 1px 2px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.2)`,
+    },
+
+    '.text-shadow-dark': {
+      'text-shadow': `0 1px 3px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.4)`,
+    },
+  };
+
+  addComponents(accessibleTextComponents, ['responsive', 'hover']);
+}
+
+
+================================================================================
+
+# .\plugins\glassMorphism.ts
+
+// Modified glassMorphism.ts for FiveM compatibility
+// Removed backdrop-filter and -webkit-backdrop-filter
+
+import { hexToRgb } from '../utils/colorUtils';
+import {
+  borders,
+  opacityLevels,
+  shadowOpacity,
+  elements,
+} from '../tokens/constants';
+
+/**
+ * Plugin parameter types
+ */
+interface GlassMorphismPluginParams {
+  addComponents: (components: Record<string, any>, variants?: string[]) => void;
+  theme: (path: string) => any;
+}
+
+/**
+ * Glass morphism plugin for Tailwind CSS - FiveM compatible version
+ * Removed backdrop-filter properties that aren't supported
+ */
+export function glassMorphismPlugin({
+  addComponents,
+  theme,
+}: GlassMorphismPluginParams) {
+  // Get color palette references
+  const colors = theme('colors');
+  const gray = colors.gray || {};
+  const primary = colors.primary || {};
+
+  // Define glass variants
+  const glassVariants = {
+    // Standard light glass effect
+    '.glass': createGlassStyles({
+      background: `rgba(255, 255, 255, ${opacityLevels.light.high})`,
+      border: `rgba(255, 255, 255, ${opacityLevels.light.medium})`,
+      shadowColor: gray[900],
+      shadowOpacity: shadowOpacity.light,
+      borderRadius: theme('borderRadius.xl'),
+      // Removed backdropBlur
+    }),
+
+    // Dark glass effect
+    '.glass-dark': createGlassStyles({
+      background: `rgba(15, 23, 42, ${opacityLevels.dark.medium})`,
+      border: `rgba(30, 41, 59, ${opacityLevels.light.medium})`,
+      shadowColor: gray[900],
+      shadowOpacity: shadowOpacity.medium,
+      borderRadius: theme('borderRadius.xl'),
+      // Removed backdropBlur
+    }),
+
+    // Brand-colored glass effect
+    '.glass-brand': createGlassStyles({
+      background: `rgba(${hexToRgb(primary[500])}, ${opacityLevels.brand.low})`,
+      border: `rgba(${hexToRgb(primary[400])}, ${opacityLevels.brand.medium})`,
+      shadowColor: primary[700],
+      shadowOpacity: shadowOpacity.medium,
+      borderRadius: theme('borderRadius.xl'),
+      // Removed backdropBlur
+    }),
+
+    // Dark brand-colored glass effect
+    '.glass-brand-dark': createGlassStyles({
+      background: `rgba(${hexToRgb(primary[800])}, ${
+        opacityLevels.dark.medium
+      })`,
+      border: `rgba(${hexToRgb(primary[700])}, ${opacityLevels.light.medium})`,
+      shadowColor: primary[900],
+      shadowOpacity: shadowOpacity.strong,
+      borderRadius: theme('borderRadius.xl'),
+      // Removed backdropBlur
+    }),
+
+    // Just background effect without borders/shadows
+    '.glass-bg': {
+      'background': `rgba(255, 255, 255, ${opacityLevels.light.high})`,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+    },
+
+    '.glass-bg-dark': {
+      'background': `rgba(15, 23, 42, ${opacityLevels.dark.medium})`,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+    },
+
+    // Special subtle glass variants
+    '.glass-subtle': {
+      'background': `rgba(255, 255, 255, ${opacityLevels.light.medium})`,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border': `${borders.width.thin} solid rgba(255, 255, 255, ${opacityLevels.light.low})`,
+      'border-radius': theme('borderRadius.xl'),
+    },
+
+    '.glass-subtle-dark': {
+      'background': `rgba(15, 23, 42, ${opacityLevels.dark.low})`,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border': `${borders.width.thin} solid rgba(30, 41, 59, ${opacityLevels.light.low})`,
+      'border-radius': theme('borderRadius.xl'),
+    },
+
+    // Gaming UI specific glass styles
+    '.glass-gaming': {
+      'background': elements.gaming.background.medium,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border': `${borders.width.thin} solid ${elements.gaming.border.light}`,
+      'border-radius': theme('borderRadius.DEFAULT'),
+      'box-shadow': elements.gaming.shadow.default,
+    },
+
+    // Gaming UI button glass effect
+    '.glass-button': {
+      'background': elements.gaming.background.dark,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border': `${borders.width.thin} solid ${elements.gaming.border.light}`,
+      'border-radius': theme('borderRadius.DEFAULT'),
+      'transition': theme('transitionProperty.DEFAULT'),
+      '&:hover': {
+        'background': elements.gaming.background.light,
+        'box-shadow': elements.gaming.shadow.hover,
+      },
+    },
+
+    // Gaming UI header glass effect
+    '.glass-header': {
+      'background': elements.gaming.background.dark,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border-bottom': `${borders.width.thin} solid ${elements.gaming.border.dark}`,
+      'box-shadow': elements.gaming.shadow.header,
+    },
+
+    // Gaming UI sidebar glass effect
+    '.glass-sidebar': {
+      'background': elements.gaming.background.dark,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border-right': `${borders.width.thin} solid ${elements.gaming.border.dark}`,
+      'box-shadow': elements.gaming.shadow.sidebar,
+    },
+
+    // Gaming UI active/selected item
+    '.glass-active': {
+      'background': `rgba(${hexToRgb(primary[600])}, ${
+        opacityLevels.light.high
+      })`,
+      // Removed backdrop-filter and -webkit-backdrop-filter
+      'border': `${borders.width.thin} solid rgba(${hexToRgb(primary[400])}, ${
+        opacityLevels.light.high
+      })`,
+      'box-shadow': `0 2px 8px rgba(${hexToRgb(primary[900])}, ${
+        shadowOpacity.intense
+      })`,
+    },
+  };
+
+  addComponents(glassVariants, ['responsive', 'hover']);
+}
+
+// Modified styleUtils.ts for FiveM compatibility
+// Removed backdrop-filter from glass styles
+
+/**
+ * Creates glass effect styles with optimized properties for FiveM
+ * Removed backdrop blur properties
+ * @param config - Glass effect configuration
+ * @returns Object with CSS properties for glass effect
+ */
+export function createGlassStyles(config: GlassConfig) {
+  const {
+    background,
+    border,
+    shadowColor,
+    shadowOpacity,
+    borderRadius,
+    // Removed backdropBlur parameter
+  } = config;
+
+  const rgbShadowColor = hexToRgb(shadowColor);
+
+  return {
+    'background': background,
+    // Removed backdrop-filter and -webkit-backdrop-filter properties
+    'border': `${borders.width.thin} solid ${border}`,
+    'border-radius': borderRadius,
+    'box-shadow': `0 8px 32px rgba(${rgbShadowColor}, ${shadowOpacity})`,
+  };
+}
+
+// Responsive typography generator
+export function generateResponsiveTypography() {
+  return {
+    // Generate fluid typography utilities
+    '.text-fluid-xs': {
+      'fontSize': 'clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-sm': {
+      'fontSize': 'clamp(0.875rem, 0.8rem + 0.375vw, 1rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-base': {
+      'fontSize': 'clamp(1rem, 0.9rem + 0.5vw, 1.125rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-lg': {
+      'fontSize': 'clamp(1.125rem, 1rem + 0.625vw, 1.25rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-xl': {
+      'fontSize': 'clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem)',
+      'lineHeight': '1.4',
+    },
+    '.text-fluid-2xl': {
+      'fontSize': 'clamp(1.5rem, 1.3rem + 1vw, 1.875rem)',
+      'lineHeight': '1.3',
+    },
+    '.text-fluid-3xl': {
+      'fontSize': 'clamp(1.875rem, 1.6rem + 1.375vw, 2.25rem)',
+      'lineHeight': '1.2',
+    },
+    '.text-fluid-4xl': {
+      'fontSize': 'clamp(2.25rem, 1.9rem + 1.75vw, 3rem)',
+      'lineHeight': '1.1',
+    },
+    '.text-fluid-5xl': {
+      'fontSize': 'clamp(3rem, 2.5rem + 2.5vw, 4rem)',
+      'lineHeight': '1',
+    },
+
+    // Utilities for high-resolution displays
+    '.text-hd': {
+      '-webkit-font-smoothing': 'antialiased',
+      '-moz-osx-font-smoothing': 'grayscale',
+      'font-feature-settings': '"kern" 1, "liga" 1, "calt" 1',
+    },
+
+    // Utilities for maximum readability
+    '.text-readable': {
+      'max-width': '70ch',
+      'word-spacing': '0.05em',
+      // Removed 'hyphens': 'auto' as it might not be well supported
+    },
+  };
+}
+
+// Updated constants.ts - keep blur levels for reference but they won't be used
+
+/**
+ * Blur levels - kept for reference but not used in FiveM
+ */
+export const blurLevels = {
+  none: '0px',
+  sm: '4px',
+  md: '8px',
+  lg: '12px',
+  xl: '16px',
+  '2xl': '24px',
+};
+
+// Updated effects.ts - removed blur references
+
+/**
+ * Effect tokens for consistent visual treatments across the UI
+ */
+export const effects = {
+  /**
+   * Opacity tokens for consistent transparency levels
+   */
+  opacity: opacityLevels,
+
+  /**
+   * Border width tokens
+   */
+  borderWidth: borders.width,
+};
+
+// Updated GlassConfig interface for styleUtils.ts
+
+/**
+ * Glass effect configuration - FiveM compatible
+ * Removed backdropBlur property
+ */
+export interface GlassConfig {
+  background: string;
+  border: string;
+  shadowColor: string;
+  shadowOpacity: number;
+  borderRadius: string;
+}
+
+
+================================================================================
+
+# .\plugins\scrollbar.ts
+
+// src/theme/plugins/scrollbar.ts
+
+import { hexToRgb } from '../utils/colorUtils';
+import { scrollbars, opacityLevels } from '../tokens/constants';
+
+/**
+ * Scrollbar configuration interface
+ */
+interface ScrollbarConfig {
+  trackBg: string;
+  thumbBg: string;
+  thumbBorder: string;
+  thumbHoverBg: string;
+  width?: string;
+  height?: string;
+  borderRadius?: string;
+}
+
+/**
+ * Plugin parameter types
+ */
+interface ScrollbarPluginParams {
+  addBase: (baseStyles: Record<string, any>) => void;
+  addComponents: (components: Record<string, any>, variants?: string[]) => void;
+  theme: (path: string) => any;
+}
+
+/**
+ * Creates consistent scrollbar styles
+ */
+function createScrollbarStyles({
+  trackBg,
+  thumbBg,
+  thumbBorder,
+  thumbHoverBg,
+  width = scrollbars.width.default,
+  height = scrollbars.width.default,
+  borderRadius = scrollbars.borderRadius.default,
+}: ScrollbarConfig) {
+  return {
+    // WebKit-based browsers (Chrome, Safari, newer versions of Edge)
+    '&::-webkit-scrollbar': {
+      width,
+      height,
+    },
+    '&::-webkit-scrollbar-track': {
+      background: trackBg,
+      borderRadius,
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: thumbBg,
+      borderRadius,
+      border: thumbBorder,
+    },
+    '&::-webkit-scrollbar-thumb:hover': {
+      background: thumbHoverBg,
+    },
+
+    // Firefox
+    'scrollbar-width': 'thin',
+    'scrollbar-color': `${thumbBg} ${trackBg}`,
+  };
+}
+
+/**
+ * Scrollbar plugin for Tailwind CSS
+ */
+export function scrollbarPlugin({
+  addBase,
+  addComponents,
+  theme,
+}: ScrollbarPluginParams) {
+  // Get color references
+  const colors = theme('colors');
+  const gray = colors.gray || {};
+  const primary = colors.primary || {};
+
+  // Apply minimal global scrollbar styles
+  addBase({
+    'html': {
+      'scrollbar-width': 'thin',
+      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.low
+      }) transparent`,
+    },
+    'body': {
+      'scrollbar-width': 'thin',
+      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.low
+      }) transparent`,
+    },
+    '::-webkit-scrollbar': {
+      width: scrollbars.width.default,
+      height: scrollbars.width.default,
+    },
+    '::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '::-webkit-scrollbar-thumb': {
+      background: `rgba(${hexToRgb(gray[400])}, ${opacityLevels.light.low})`,
+      borderRadius: scrollbars.borderRadius.default,
+    },
+    '::-webkit-scrollbar-thumb:hover': {
+      background: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.medium})`,
+    },
+  });
+
+  // Define scrollbar variants as components
+  const scrollbarComponents = {
+    // Light theme scrollbars
+    '.scrollbar-light': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
+    }),
+
+    // Dark theme scrollbars
+    '.scrollbar-dark': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
+      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[700])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
+    }),
+
+    // Brand-colored scrollbars
+    '.scrollbar-brand': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(primary[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(primary[400])}, ${opacityLevels.light.medium})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(primary[300])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(primary[500])}, ${
+        opacityLevels.light.high
+      })`,
+    }),
+
+    // Thin scrollbars for compact UI elements
+    '.scrollbar-thin': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `1px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
+      width: scrollbars.width.thin,
+      height: scrollbars.width.thin,
+      borderRadius: scrollbars.borderRadius.sm,
+    }),
+
+    // Thin dark scrollbars
+    '.scrollbar-thin-dark': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
+      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
+      thumbBorder: `1px solid rgba(${hexToRgb(gray[700])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
+      width: scrollbars.width.thin,
+      height: scrollbars.width.thin,
+      borderRadius: scrollbars.borderRadius.sm,
+    }),
+
+    // Hide scrollbars but keep functionality
+    '.scrollbar-hidden': {
+      '-ms-overflow-style': 'none',
+      'scrollbar-width': 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
+    },
+
+    // Rounded scrollbars
+    '.scrollbar-rounded': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
+      borderRadius: scrollbars.borderRadius.rounded,
+    }),
+  };
+
+  addComponents(scrollbarComponents, ['responsive']);
+}
+
+
+================================================================================
+
+# .\tokens\animation.ts
+
+// src/webview/theme/tokens/animation.ts
+
+/**
+ * Animation tokens for consistent motion design
+ */
+export const animation = {
+  // Transition properties
+  transitionProperty: {
+    none: 'none',
+    all: 'all',
+    DEFAULT: 'background-color, border-color, color, fill, stroke, opacity, box-shadow, transform',
+    colors: 'background-color, border-color, color, fill, stroke',
+    opacity: 'opacity',
+    shadow: 'box-shadow',
+    transform: 'transform',
+  },
+  
+  // Timing functions
+  transitionTimingFunction: {
+    DEFAULT: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    linear: 'linear',
+    in: 'cubic-bezier(0.4, 0, 1, 1)',
+    out: 'cubic-bezier(0, 0, 0.2, 1)',
+    'in-out': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    
+    // Custom easing functions
+    'bounce': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    'smooth': 'cubic-bezier(0.645, 0.045, 0.355, 1.000)',
+  },
+  
+  // Duration values
+  transitionDuration: {
+    DEFAULT: '150ms',
+    75: '75ms',
+    100: '100ms',
+    150: '150ms',
+    200: '200ms',
+    300: '300ms',
+    500: '500ms',
+    700: '700ms',
+    1000: '1000ms',
+  },
+};
+
+
+================================================================================
+
+# .\tokens\breakpoints.ts
+
+// src/webview/theme/tokens/breakpoints.ts
+
+/**
+ * Breakpoint tokens for responsive design
+ */
+export const breakpoints = {
+  xs: '320px',
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1280px',
+  '2xl': '1536px',
+};
+
+/**
+ * Creates a media query string for the given breakpoint
+ * @param breakpoint - Breakpoint key from the breakpoints object
+ * @returns Media query string
+ */
+export function createMediaQuery(breakpoint: keyof typeof breakpoints) {
+  return `@media (min-width: ${breakpoints[breakpoint]})`;
+}
+
+
+================================================================================
+
+# .\tokens\colors.ts
+
+// src/theme/tokens/colors.ts
+
+// Type definitions for color scales
+export type ColorShade =
+  | '50'
+  | '100'
+  | '200'
+  | '300'
+  | '400'
+  | '500'
+  | '600'
+  | '700'
+  | '800'
+  | '900'
+  | '950';
+export type ColorScale = Record<ColorShade, string>;
+export type ColorScales = Record<string, ColorScale>;
+
+// Core color scales (primitive tokens)
+export const colorScales: ColorScales = {
+  // Neutral tones
+  gray: {
+    50: '#f9fafb',
+    100: '#f3f4f6',
+    200: '#e5e7eb',
+    300: '#d1d5db',
+    400: '#9ca3af',
+    500: '#6b7280',
+    600: '#4b5563',
+    700: '#374151',
+    800: '#1f2937',
+    900: '#111827',
+    950: '#030712',
+  },
+  // Primary brand colors
+  primary: {
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
+    950: '#1e1b4b',
+  },
+  // Success
+  success: {
+    50: '#f0fdf4',
+    100: '#dcfce7',
+    200: '#bbf7d0',
+    300: '#86efac',
+    400: '#4ade80',
+    500: '#22c55e',
+    600: '#16a34a',
+    700: '#15803d',
+    800: '#166534',
+    900: '#14532d',
+    950: '#052e16',
+  },
+  // Warning
+  warning: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+    950: '#451a03',
+  },
+  // Error
+  error: {
+    50: '#fef2f2',
+    100: '#fee2e2',
+    200: '#fecaca',
+    300: '#fca5a5',
+    400: '#f87171',
+    500: '#ef4444',
+    600: '#dc2626',
+    700: '#b91c1c',
+    800: '#991b1b',
+    900: '#7f1d1d',
+    950: '#450a0a',
+  },
+  // Info
+  info: {
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#3b82f6',
+    600: '#2563eb',
+    700: '#1d4ed8',
+    800: '#1e40af',
+    900: '#1e3a8a',
+    950: '#172554',
+  },
+};
+
+// Semantic color tokens (semantic tokens)
+export const semanticColors = {
+  background: {
+    page: { light: 'white', dark: 'gray.950' },
+    card: { light: 'white', dark: 'gray.900' },
+    subtle: { light: 'gray.50', dark: 'gray.800' },
+    muted: { light: 'gray.100', dark: 'gray.800' },
+    elevated: { light: 'white', dark: 'gray.800' },
+  },
+  surface: {
+    primary: { light: 'primary.600', dark: 'primary.500' },
+    success: { light: 'success.600', dark: 'success.500' },
+    warning: { light: 'warning.500', dark: 'warning.400' },
+    error: { light: 'error.600', dark: 'error.500' },
+    info: { light: 'info.600', dark: 'info.500' },
+  },
+  border: {
+    subtle: { light: 'gray.200', dark: 'gray.700' },
+    moderate: { light: 'gray.300', dark: 'gray.600' },
+    strong: { light: 'gray.400', dark: 'gray.500' },
+    focus: { light: 'primary.500', dark: 'primary.400' },
+    error: { light: 'error.500', dark: 'error.400' },
+  },
+  text: {
+    primary: { light: 'gray.900', dark: 'gray.50' },
+    secondary: { light: 'gray.600', dark: 'gray.300' },
+    tertiary: { light: 'gray.500', dark: 'gray.400' },
+    disabled: { light: 'gray.400', dark: 'gray.500' },
+    inverted: { light: 'white', dark: 'gray.950' },
+    link: { light: 'primary.600', dark: 'primary.400' },
+    success: { light: 'success.700', dark: 'success.400' },
+    error: { light: 'error.700', dark: 'error.400' },
+    warning: { light: 'warning.700', dark: 'warning.400' },
+    info: { light: 'info.700', dark: 'info.400' },
+  },
+  icon: {
+    primary: { light: 'gray.900', dark: 'gray.50' },
+    secondary: { light: 'gray.600', dark: 'gray.300' },
+    tertiary: { light: 'gray.500', dark: 'gray.400' },
+    inverted: { light: 'white', dark: 'gray.950' },
+  },
+  glass: {
+    light: {
+      background: {
+        light: 'rgba(255, 255, 255, 0.7)',
+        dark: 'rgba(255, 255, 255, 0.1)',
+      },
+      border: {
+        light: 'rgba(255, 255, 255, 0.5)',
+        dark: 'rgba(255, 255, 255, 0.1)',
+      },
+    },
+    dark: {
+      background: {
+        light: 'rgba(15, 23, 42, 0.75)',
+        dark: 'rgba(15, 23, 42, 0.85)',
+      },
+      border: { light: 'rgba(30, 41, 59, 0.5)', dark: 'rgba(30, 41, 59, 0.7)' },
+    },
+    brand: {
+      background: {
+        light: 'rgba(79, 70, 229, 0.15)',
+        dark: 'rgba(79, 70, 229, 0.25)',
+      },
+      border: {
+        light: 'rgba(79, 70, 229, 0.3)',
+        dark: 'rgba(79, 70, 229, 0.4)',
+      },
+    },
+  },
+};
+
+// Token resolver function
+export function resolveColorToken(
+  token: string,
+  mode: 'light' | 'dark' = 'light'
+): string {
+  if (!token || typeof token !== 'string') return '';
+
+  // If it's already a direct color value (hex, rgb, etc.)
+  if (
+    token.startsWith('#') ||
+    token.startsWith('rgb') ||
+    token.startsWith('hsl')
+  ) {
+    return token;
+  }
+
+  // For semantic tokens with light/dark variants
+  const parts = token.split('.');
+
+  // Handle deep nesting with traversal
+  let result: any = semanticColors;
+  for (const part of parts) {
+    if (!result) break;
+    result = result[part];
+  }
+
+  // If we have a light/dark object, select the appropriate mode
+  if (result && typeof result === 'object' && (result.light || result.dark)) {
+    const colorRef = result[mode] || '';
+    // If this is a reference to a color scale, resolve it recursively
+    if (typeof colorRef === 'string' && colorRef.includes('.')) {
+      return resolveColorToken(colorRef, mode);
+    }
+    // If this is a direct reference to a color scale
+    if (typeof colorRef === 'string') {
+      const [scale, shade] = colorRef.split('.');
+      // Type assertion to handle string indexing
+      return colorScales[scale]?.[shade as ColorShade] || colorRef;
+    }
+    return colorRef;
+  }
+
+  // Direct reference to a color scale (e.g. "primary.500")
+  if (parts.length === 2) {
+    const [scale, shade] = parts;
+    // Type assertion to handle string indexing
+    return colorScales[scale]?.[shade as ColorShade] || token;
+  }
+
+  return token;
+}
+
+
+================================================================================
+
+# .\tokens\constants.ts
+
+// src/theme/tokens/constants.ts
+// Centralized constants for the design system
+
+/**
+ * Default color values used when no theme colors are available
+ */
+export const defaultColors = {
+  // Base neutral colors
+  darkText: '#111827',
+  lightText: '#f9fafb',
+
+  // Default gray scale colors
+  grayDark: {
+    900: '#111827',
+    800: '#1f2937',
+    700: '#374151',
+    600: '#4b5563',
+    500: '#6b7280',
+    400: '#9ca3af',
+  },
+  grayLight: {
+    50: '#f9fafb',
+    100: '#f3f4f6',
+    200: '#e5e7eb',
+    300: '#d1d5db',
+  },
+
+  // Default primary colors
+  primaryDefault: {
+    900: '#312e81',
+    800: '#3730a3',
+    700: '#4338ca',
+    600: '#4f46e5',
+    500: '#6366f1',
+    400: '#818cf8',
+  },
+};
+
+/**
+ * Border dimensions
+ */
+export const borders = {
+  width: {
+    none: '0',
+    hairline: '0.5px',
+    thin: '1px',
+    medium: '2px',
+    thick: '3px',
+    heavy: '4px',
+  },
+  radius: {
+    none: '0',
+    sm: '0.125rem', // 2px
+    base: '0.25rem', // 4px
+    md: '0.375rem', // 6px
+    lg: '0.5rem', // 8px
+    xl: '0.75rem', // 12px
+    '2xl': '1rem', // 16px
+    '3xl': '1.5rem', // 24px
+    full: '9999px',
+  },
+};
+
+/**
+ * Scrollbar dimensions
+ */
+export const scrollbars = {
+  width: {
+    thin: '6px',
+    default: '8px',
+    medium: '10px',
+    thick: '12px',
+  },
+  borderRadius: {
+    sm: '3px',
+    default: '4px',
+    md: '6px',
+    lg: '8px',
+    rounded: '999px',
+  },
+};
+
+/**
+ * Opacity levels
+ */
+export const opacityLevels = {
+  transparent: 0,
+  subtle: 0.1,
+  light: {
+    low: 0.3,
+    medium: 0.5,
+    high: 0.7,
+    opaque: 0.9,
+  },
+  dark: {
+    low: 0.4,
+    medium: 0.75,
+    high: 0.85,
+    opaque: 0.95,
+  },
+  brand: {
+    low: 0.15,
+    medium: 0.3,
+    high: 0.5,
+    opaque: 0.8,
+  },
+};
+
+/**
+ * Blur levels
+ */
+export const blurLevels = {
+  none: '0px',
+  sm: '4px',
+  md: '8px',
+  lg: '12px',
+  xl: '16px',
+  '2xl': '24px',
+};
+
+/**
+ * Shadow opacity levels
+ */
+export const shadowOpacity = {
+  subtle: 0.05,
+  light: 0.15,
+  medium: 0.25,
+  strong: 0.3,
+  intense: 0.4,
+};
+
+/**
+ * Default background color values for different UI contexts
+ */
+export const backgroundDefaults = {
+  glass: {
+    light: 'rgba(255, 255, 255, 0.7)',
+    dark: 'rgba(15, 23, 42, 0.75)',
+    brand: 'rgba(79, 70, 229, 0.15)',
+  },
+};
+
+/**
+ * Typography configuration
+ */
+export const typography = {
+  fontWeight: {
+    light: '300',
+    normal: '400',
+    medium: '450',
+    semibold: '500',
+    bold: '700',
+  },
+  letterSpacing: {
+    tighter: '-0.05em',
+    tight: '-0.025em',
+    normal: '0em',
+    wide: '0.01em',
+    wider: '0.025em',
+    widest: '0.05em',
+  },
+};
+
+/**
+ * Error fallback values
+ */
+export const fallbacks = {
+  color: {
+    rgb: '0, 0, 0',
+    hex: '#000000',
+  },
+  opacity: 0.5,
+};
+
+/**
+ * Common UI element styles
+ */
+export const elements = {
+  gaming: {
+    background: {
+      dark: 'rgba(15, 23, 42, 0.85)',
+      medium: 'rgba(30, 41, 59, 0.9)',
+      light: 'rgba(51, 65, 85, 0.9)',
+    },
+    border: {
+      dark: 'rgba(30, 41, 59, 0.7)',
+      light: 'rgba(100, 116, 139, 0.3)',
+    },
+    shadow: {
+      default: '0 4px 16px rgba(0, 0, 0, 0.25)',
+      hover: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      header: '0 4px 6px rgba(0, 0, 0, 0.1)',
+      sidebar: '4px 0 16px rgba(0, 0, 0, 0.2)',
+    },
+  },
+};
+
+
+================================================================================
+
+# .\tokens\effects.ts
+
+// src/webview/theme/tokens/effects.ts
+
+import { blurLevels, opacityLevels, borders } from './constants';
+
+/**
+ * Effect tokens for consistent visual treatments across the UI
+ */
+export const effects = {
+  /**
+   * Blur effect tokens for consistent backdrop-filter blur values
+   */
+  blur: blurLevels,
+
+  /**
+   * Opacity tokens for consistent transparency levels
+   */
+  opacity: opacityLevels,
+
+  /**
+   * Border width tokens
+   */
+  borderWidth: borders.width,
+};
+
+
+================================================================================
+
+# .\tokens\elevation.ts
+
+// src/webview/theme/tokens/elevation.ts
+
+/**
+ * Elevation tokens for consistent shadow effects
+ * These create a sense of depth and hierarchy in the UI
+ */
+export const elevation = {
+  none: 'none',
+  xs: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+  sm: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+  '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+  inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+  
+  // Glass-specific shadows
+  'glass-light': '0 4px 12px 0 rgba(31, 38, 135, 0.07)',
+  'glass-dark': '0 4px 12px 0 rgba(0, 0, 0, 0.25)',
+  'glass-brand': '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+};
+
+
+================================================================================
+
+# .\tokens\index.ts
+
+// src/theme/tokens/index.ts
+// The root file that exports all design tokens
+
+export * from './colors';
+export * from './typography';
+export * from './spacing';
+export * from './elevation';
+export * from './radius';
+export * from './animation';
+export * from './effects';
+export * from './breakpoints';
+
+// Re-export the theme resolver for convenience
+export { resolveTokens } from './resolver';
+
+
+================================================================================
+
+# .\tokens\radius.ts
+
+// src/webview/theme/tokens/radius.ts
+
+import { borders } from './constants';
+
+/**
+ * Border radius tokens for consistent rounding of UI elements
+ */
+export const borderRadius = borders.radius;
+
+
+================================================================================
+
+# .\tokens\resolver.ts
+
+// src/theme/tokens/resolver.ts
+
+import { colorScales, semanticColors, resolveColorToken } from './colors';
+import {
+  fontFamily,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  lineHeight,
+  textStyles,
+} from './typography';
+import { spacing } from './spacing';
+import { borderRadius } from './radius';
+import { elevation } from './elevation';
+import { animation } from './animation';
+import { effects } from './effects';
+import { breakpoints } from './breakpoints';
+
+export type ThemeMode = 'light' | 'dark';
+
+/**
+ * Resolves all design tokens into a Tailwind-compatible theme configuration
+ * @param mode - The theme mode (light or dark)
+ * @returns Fully resolved theme configuration
+ */
+export function resolveTokens(mode: ThemeMode = 'light') {
+  // Create semantic color references with correct mode
+  const resolvedColors = {
+    // Add all color scales directly
+    ...colorScales,
+
+    // Also add semantic color tokens with mode-specific values
+    bg: {
+      page: resolveColorToken('background.page', mode),
+      card: resolveColorToken('background.card', mode),
+      subtle: resolveColorToken('background.subtle', mode),
+      muted: resolveColorToken('background.muted', mode),
+      elevated: resolveColorToken('background.elevated', mode),
+    },
+    surface: {
+      primary: resolveColorToken('surface.primary', mode),
+      success: resolveColorToken('surface.success', mode),
+      warning: resolveColorToken('surface.warning', mode),
+      error: resolveColorToken('surface.error', mode),
+      info: resolveColorToken('surface.info', mode),
+    },
+    border: {
+      subtle: resolveColorToken('border.subtle', mode),
+      moderate: resolveColorToken('border.moderate', mode),
+      strong: resolveColorToken('border.strong', mode),
+      focus: resolveColorToken('border.focus', mode),
+      error: resolveColorToken('border.error', mode),
+    },
+    text: {
+      primary: resolveColorToken('text.primary', mode),
+      secondary: resolveColorToken('text.secondary', mode),
+      tertiary: resolveColorToken('text.tertiary', mode),
+      disabled: resolveColorToken('text.disabled', mode),
+      inverted: resolveColorToken('text.inverted', mode),
+      link: resolveColorToken('text.link', mode),
+      success: resolveColorToken('text.success', mode),
+      error: resolveColorToken('text.error', mode),
+      warning: resolveColorToken('text.warning', mode),
+      info: resolveColorToken('text.info', mode),
+    },
+    icon: {
+      primary: resolveColorToken('icon.primary', mode),
+      secondary: resolveColorToken('icon.secondary', mode),
+      tertiary: resolveColorToken('icon.tertiary', mode),
+      inverted: resolveColorToken('icon.inverted', mode),
+    },
+    glass: {
+      light: {
+        background: resolveColorToken('glass.light.background', mode),
+        border: resolveColorToken('glass.light.border', mode),
+      },
+      dark: {
+        background: resolveColorToken('glass.dark.background', mode),
+        border: resolveColorToken('glass.dark.border', mode),
+      },
+      brand: {
+        background: resolveColorToken('glass.brand.background', mode),
+        border: resolveColorToken('glass.brand.border', mode),
+      },
+    },
+  };
+
+  // Return the full theme configuration
+  return {
+    colors: resolvedColors,
+    fontFamily,
+    fontSize,
+    fontWeight,
+    letterSpacing,
+    lineHeight,
+    spacing,
+    borderRadius,
+    boxShadow: elevation,
+    transitionProperty: animation.transitionProperty,
+    transitionTimingFunction: animation.transitionTimingFunction,
+    transitionDuration: animation.transitionDuration,
+    screens: breakpoints,
+    blur: effects.blur,
+  };
+}
+
+// Export a utility to get design tokens with resolved values
+export function getDesignTokens(mode: ThemeMode = 'light') {
+  return {
+    colors: {
+      scales: colorScales,
+      semantic: Object.entries(semanticColors).reduce(
+        (acc: Record<string, Record<string, any>>, [category, values]) => {
+          acc[category] = Object.entries(values).reduce(
+            (catAcc: Record<string, any>, [key, value]) => {
+              if (typeof value === 'object' && (value.light || value.dark)) {
+                catAcc[key] = value[mode];
+              } else {
+                catAcc[key] = value;
+              }
+              return catAcc;
+            },
+            {}
+          );
+          return acc;
+        },
+        {}
+      ),
+    },
+    typography: {
+      fontFamily,
+      fontSize,
+      fontWeight,
+      letterSpacing,
+      lineHeight,
+      textStyles,
+    },
+    spacing,
+    borderRadius,
+    elevation,
+    animation,
+    effects,
+    breakpoints,
+  };
+}
+
+
+================================================================================
+
+# .\tokens\spacing.ts
+
+// src/webview/theme/tokens/spacing.ts
+
+/**
+ * Spacing scale for consistent layout spacing
+ * Uses a 4px base unit (0.25rem) with consistent scaling
+ */
+export const spacing = {
+  px: '1px',
+  0: '0',
+  0.5: '0.125rem', // 2px
+  1: '0.25rem', // 4px
+  1.5: '0.375rem', // 6px
+  2: '0.5rem', // 8px
+  2.5: '0.625rem', // 10px
+  3: '0.75rem', // 12px
+  3.5: '0.875rem', // 14px
+  4: '1rem', // 16px
+  5: '1.25rem', // 20px
+  6: '1.5rem', // 24px
+  7: '1.75rem', // 28px
+  8: '2rem', // 32px
+  9: '2.25rem', // 36px
+  10: '2.5rem', // 40px
+  11: '2.75rem', // 44px
+  12: '3rem', // 48px
+  14: '3.5rem', // 56px
+  16: '4rem', // 64px
+  20: '5rem', // 80px
+  24: '6rem', // 96px
+  28: '7rem', // 112px
+  32: '8rem', // 128px
+  36: '9rem', // 144px
+  40: '10rem', // 160px
+  44: '11rem', // 176px
+  48: '12rem', // 192px
+  52: '13rem', // 208px
+  56: '14rem', // 224px
+  60: '15rem', // 240px
+  64: '16rem', // 256px
+  72: '18rem', // 288px
+  80: '20rem', // 320px
+  96: '24rem', // 384px
+};
+
+
+================================================================================
+
+# .\tokens\typography.ts
+
+// src/theme/tokens/typography.ts
+
+// Font family tokens
+export const fontFamily = {
+  sans: [
+    'Inter var',
+    'Inter',
+    'ui-sans-serif',
+    'system-ui',
+    '-apple-system',
+    'sans-serif',
+  ],
+  serif: ['ui-serif', 'Georgia', 'Cambria', 'serif'],
+  mono: [
+    'Fira Code',
+    'ui-monospace',
+    'SFMono-Regular',
+    'Menlo',
+    'Monaco',
+    'monospace',
+  ],
+  display: ['Manrope', 'Inter', 'system-ui', 'sans-serif'],
+};
+
+// Font size scale with consistent progression
+export const fontSize = {
+  '2xs': ['0.625rem', { lineHeight: '1rem' }], // 10px
+  'xs': ['0.75rem', { lineHeight: '1rem' }], // 12px
+  'sm': ['0.875rem', { lineHeight: '1.25rem' }], // 14px
+  'base': ['1rem', { lineHeight: '1.5rem' }], // 16px
+  'lg': ['1.125rem', { lineHeight: '1.75rem' }], // 18px
+  'xl': ['1.25rem', { lineHeight: '1.75rem' }], // 20px
+  '2xl': ['1.5rem', { lineHeight: '2rem' }], // 24px
+  '3xl': ['1.875rem', { lineHeight: '2.25rem' }], // 30px
+  '4xl': ['2.25rem', { lineHeight: '2.5rem' }], // 36px
+  '5xl': ['3rem', { lineHeight: '1.16' }], // 48px
+  '6xl': ['3.75rem', { lineHeight: '1.08' }], // 60px
+  '7xl': ['4.5rem', { lineHeight: '1.05' }], // 72px
+  '8xl': ['6rem', { lineHeight: '1' }], // 96px
+  '9xl': ['8rem', { lineHeight: '1' }], // 128px
+};
+
+// Font weight tokens
+export const fontWeight = {
+  thin: '100',
+  extralight: '200',
+  light: '300',
+  normal: '400',
+  medium: '500',
+  semibold: '600',
+  bold: '700',
+  extrabold: '800',
+  black: '900',
+};
+
+// Letter spacing tokens
+export const letterSpacing = {
+  tighter: '-0.05em',
+  tight: '-0.025em',
+  normal: '0em',
+  wide: '0.025em',
+  wider: '0.05em',
+  widest: '0.1em',
+};
+
+// Line height tokens
+export const lineHeight = {
+  none: '1',
+  tight: '1.25',
+  snug: '1.375',
+  normal: '1.5',
+  relaxed: '1.625',
+  loose: '2',
+  // Absolute values for precise control
+  '3': '.75rem',
+  '4': '1rem',
+  '5': '1.25rem',
+  '6': '1.5rem',
+  '7': '1.75rem',
+  '8': '2rem',
+  '9': '2.25rem',
+  '10': '2.5rem',
+};
+
+// Text style presets for reusable combinations
+export const textStyles = {
+  // Heading styles
+  h1: {
+    fontSize: fontSize['5xl'],
+    fontWeight: fontWeight.bold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.tight,
+  },
+  h2: {
+    fontSize: fontSize['4xl'],
+    fontWeight: fontWeight.bold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.tight,
+  },
+  h3: {
+    fontSize: fontSize['3xl'],
+    fontWeight: fontWeight.semibold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.tight,
+  },
+  h4: {
+    fontSize: fontSize['2xl'],
+    fontWeight: fontWeight.semibold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.tight,
+  },
+  h5: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.tight,
+  },
+  h6: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: letterSpacing.tight,
+    lineHeight: lineHeight.normal,
+  },
+
+  // Body text styles
+  bodyLarge: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.normal,
+    letterSpacing: letterSpacing.normal,
+    lineHeight: lineHeight.relaxed,
+  },
+  bodyBase: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.normal,
+    letterSpacing: letterSpacing.normal,
+    lineHeight: lineHeight.relaxed,
+  },
+  bodySmall: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.normal,
+    letterSpacing: letterSpacing.normal,
+    lineHeight: lineHeight.relaxed,
+  },
+
+  // UI element text styles
+  button: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    letterSpacing: letterSpacing.wide,
+    lineHeight: lineHeight.none,
+  },
+  caption: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.normal,
+    letterSpacing: letterSpacing.wide,
+    lineHeight: lineHeight.normal,
+  },
+  overline: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    letterSpacing: letterSpacing.widest,
+    lineHeight: lineHeight.normal,
+    textTransform: 'uppercase',
+  },
+  label: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    letterSpacing: letterSpacing.normal,
+    lineHeight: lineHeight.none,
+  },
+  code: {
+    fontFamily: fontFamily.mono,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.normal,
+    letterSpacing: letterSpacing.normal,
+    lineHeight: lineHeight.normal,
+  },
+};
+
+// Responsive typography generator
+export function generateResponsiveTypography() {
+  return {
+    // Generate fluid typography utilities
+    '.text-fluid-xs': {
+      'fontSize': 'clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-sm': {
+      'fontSize': 'clamp(0.875rem, 0.8rem + 0.375vw, 1rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-base': {
+      'fontSize': 'clamp(1rem, 0.9rem + 0.5vw, 1.125rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-lg': {
+      'fontSize': 'clamp(1.125rem, 1rem + 0.625vw, 1.25rem)',
+      'lineHeight': '1.5',
+    },
+    '.text-fluid-xl': {
+      'fontSize': 'clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem)',
+      'lineHeight': '1.4',
+    },
+    '.text-fluid-2xl': {
+      'fontSize': 'clamp(1.5rem, 1.3rem + 1vw, 1.875rem)',
+      'lineHeight': '1.3',
+    },
+    '.text-fluid-3xl': {
+      'fontSize': 'clamp(1.875rem, 1.6rem + 1.375vw, 2.25rem)',
+      'lineHeight': '1.2',
+    },
+    '.text-fluid-4xl': {
+      'fontSize': 'clamp(2.25rem, 1.9rem + 1.75vw, 3rem)',
+      'lineHeight': '1.1',
+    },
+    '.text-fluid-5xl': {
+      'fontSize': 'clamp(3rem, 2.5rem + 2.5vw, 4rem)',
+      'lineHeight': '1',
+    },
+
+    // Utilities for high-resolution displays
+    '.text-hd': {
+      '-webkit-font-smoothing': 'antialiased',
+      '-moz-osx-font-smoothing': 'grayscale',
+      'font-feature-settings': '"kern" 1, "liga" 1, "calt" 1',
+    },
+
+    // Utilities for maximum readability
+    '.text-readable': {
+      'max-width': '70ch',
+      'word-spacing': '0.05em',
+      'hyphens': 'auto',
+    },
+  };
+}
+
+
+================================================================================
+
+# .\utils\colorUtils.ts
+
+// src/theme/utils/colorUtils.ts
+
+import { handleThemeError, ErrorType } from './errorUtils';
+import { fallbacks } from '../tokens/constants';
+
+/**
+ * Convert hex color to RGB values
+ * @param hex - Hex color code (with or without #)
+ * @returns RGB values as a comma-separated string
+ */
+export function hexToRgb(hex: string): string {
+  // Safety check for undefined or invalid values
+  if (!hex || typeof hex !== 'string') {
+    return handleThemeError(
+      ErrorType.COLOR,
+      `Invalid hex color provided: ${hex}`,
+      fallbacks.color.rgb
+    );
+  }
+
+  try {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+
+    // Validate hex format
+    if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
+      return handleThemeError(
+        ErrorType.COLOR,
+        `Invalid hex format: ${hex}`,
+        fallbacks.color.rgb
+      );
+    }
+
+    // Handle 3-digit hex codes by duplicating each digit
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+
+    // Parse hex values
+    const bigint = parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+
+    return `${r}, ${g}, ${b}`;
+  } catch (error) {
+    return handleThemeError(
+      ErrorType.COLOR,
+      'Error converting hex to RGB',
+      fallbacks.color.rgb,
+      error
+    );
+  }
+}
+
+/**
+ * Convert HEX color to RGBA string
+ * @param hex - Hex color code
+ * @param alpha - Alpha/opacity value (0-1)
+ * @returns RGBA string suitable for CSS
+ */
+export function hexToRgba(hex: string, alpha: number = 1): string {
+  const rgb = hexToRgb(hex);
+  return `rgba(${rgb}, ${alpha})`;
+}
+
+/**
+ * Calculate relative luminance of a color
+ * @param hex - Hex color code
+ * @returns Relative luminance value (0-1)
+ */
+export function getLuminance(hex: string): number {
+  try {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+
+    // Parse hex values
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+    // Calculate relative luminance using the formula from WCAG 2.0
+    const R = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    const G = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    const B = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  } catch (error) {
+    console.error(`Error calculating luminance: ${error}`);
+    return fallbacks.opacity; // Return middle luminance as fallback
+  }
+}
+
+/**
+ * Calculate contrast ratio between two colors according to WCAG 2.0
+ * @param color1 - First hex color code
+ * @param color2 - Second hex color code
+ * @returns Contrast ratio (1-21)
+ */
+export function getContrastRatio(color1: string, color2: string): number {
+  try {
+    const luminance1 = getLuminance(color1);
+    const luminance2 = getLuminance(color2);
+
+    // Calculate contrast ratio using the WCAG 2.0 formula
+    const lighter = Math.max(luminance1, luminance2);
+    const darker = Math.min(luminance1, luminance2);
+
+    return (lighter + 0.05) / (darker + 0.05);
+  } catch (error) {
+    console.error(`Error calculating contrast ratio: ${error}`);
+    return 1; // Return minimum contrast as fallback
+  }
+}
+
+/**
+ * Determine if a color is dark (for choosing text color)
+ * @param hex - Hex color code
+ * @returns True if color is dark
+ */
+export function isDarkColor(hex: string): boolean {
+  return getLuminance(hex) < 0.5;
+}
+
+/**
+ * Get appropriate text color for a given background
+ * @param bgColor - Background color hex code
+ * @param darkColor - Custom dark color (default: black)
+ * @param lightColor - Custom light color (default: white)
+ * @returns Either light or dark color depending on contrast
+ */
+export function getAccessibleTextColor(
+  bgColor: string,
+  darkColor: string = fallbacks.color.hex,
+  lightColor: string = '#ffffff'
+): string {
+  return isDarkColor(bgColor) ? lightColor : darkColor;
+}
+
+/**
+ * Adjust color lightness
+ * @param hex - Hex color code
+ * @param amount - Amount to adjust lightness (-1 to 1)
+ * @returns Adjusted hex color
+ */
+export function adjustColorLightness(hex: string, amount: number): string {
+  try {
+    // Remove # if present
+    hex = hex.replace(/^#/, '');
+
+    // Handle shorthand hex
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+
+    // Convert to RGB
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Convert RGB to HSL
+    const rgbToHsl = (r: number, g: number, b: number) => {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0,
+        s = 0,
+        l = (max + min) / 2;
+
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          case b:
+            h = (r - g) / d + 4;
+            break;
+        }
+        h /= 6;
+      }
+
+      return [h, s, l];
+    };
+
+    // Convert HSL to RGB
+    const hslToRgb = (h: number, s: number, l: number) => {
+      let r, g, b;
+
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1 / 3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1 / 3);
+      }
+
+      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    };
+
+    // Convert to HSL, adjust lightness, convert back to RGB
+    const [h, s, l] = rgbToHsl(r, g, b);
+    let newL = l + amount;
+    newL = Math.max(0, Math.min(1, newL)); // Clamp to 0-1
+    const [newR, newG, newB] = hslToRgb(h, s, newL);
+
+    // Convert back to hex
+    const toHex = (c: number) => {
+      const hex = c.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+
+    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
+  } catch (error) {
+    console.error(`Error adjusting color lightness: ${error}`);
+    return hex; // Return original color as fallback
+  }
+}
+
+/**
+ * Generate a color palette from a base color
+ * @param baseColor - Base color in hex format
+ * @returns Object with color palette (50-950)
+ */
+export function generateColorPalette(
+  baseColor: string
+): Record<number, string> {
+  try {
+    const baseLuminance = getLuminance(baseColor);
+    const palette: Record<number, string> = {};
+
+    // Find the closest shade for the base color
+    const baseShade =
+      baseLuminance < 0.2
+        ? 800
+        : baseLuminance < 0.3
+        ? 700
+        : baseLuminance < 0.4
+        ? 600
+        : baseLuminance < 0.5
+        ? 500
+        : baseLuminance < 0.6
+        ? 400
+        : baseLuminance < 0.7
+        ? 300
+        : baseLuminance < 0.8
+        ? 200
+        : baseLuminance < 0.9
+        ? 100
+        : 50;
+
+    palette[baseShade] = baseColor;
+
+    // Generate lighter shades
+    let currentColor = baseColor;
+    for (let i = baseShade - 50; i >= 50; i -= 50) {
+      const amount = i <= 200 ? 0.1 : 0.07;
+      currentColor = adjustColorLightness(currentColor, amount);
+      palette[i] = currentColor;
+    }
+
+    // Reset and generate darker shades
+    currentColor = baseColor;
+    for (let i = baseShade + 50; i <= 950; i += 50) {
+      const amount = i >= 800 ? -0.1 : -0.07;
+      currentColor = adjustColorLightness(currentColor, amount);
+      palette[i] = currentColor;
+    }
+
+    return palette;
+  } catch (error) {
+    console.error(`Error generating color palette: ${error}`);
+    return {}; // Return empty object as fallback
+  }
+}
+
+
+================================================================================
+
+# .\utils\errorUtils.ts
+
+// src/webview/theme/utils/errorUtils.ts
+
+/**
+ * Error types for theme system
+ */
+export enum ErrorType {
+  COLOR = 'COLOR',
+  TOKEN = 'TOKEN',
+  STYLE = 'STYLE',
+  COMPONENT = 'COMPONENT',
+}
+
+/**
+ * Standardized error handler for theme system
+ * @param type - Type of error
+ * @param message - Error message
+ * @param fallback - Fallback value to return
+ * @param errorDetails - Additional error details (optional)
+ * @returns Fallback value
+ */
+export function handleThemeError<T>(
+  type: ErrorType,
+  message: string,
+  fallback: T,
+  errorDetails?: any
+): T {
+  // Log with consistent formatting
+  console.error(`[Theme System] ${type} Error: ${message}`, errorDetails || '');
+  
+  // Return fallback value
+  return fallback;
+}
+
+
+================================================================================
+
+# .\utils\styleUtils.ts
+
+// src/webview/theme/utils/styleUtils.ts
+
+import { hexToRgb } from './colorUtils';
+import { scrollbars, borders } from '../tokens/constants';
+
+/**
+ * Glass effect configuration
+ */
+export interface GlassConfig {
+  background: string;
+  border: string;
+  shadowColor: string;
+  shadowOpacity: number;
+  borderRadius: string;
+  backdropBlur?: string;
+}
+
+/**
+ * Creates glass effect styles with optimized properties
+ * @param config - Glass effect configuration
+ * @returns Object with CSS properties for glass effect
+ */
+export function createGlassStyles(config: GlassConfig) {
+  const {
+    background,
+    border,
+    shadowColor,
+    shadowOpacity,
+    borderRadius,
+    backdropBlur = '12px',
+  } = config;
+
+  const rgbShadowColor = hexToRgb(shadowColor);
+
+  return {
+    'background': background,
+    'backdrop-filter': `blur(${backdropBlur})`,
+    '-webkit-backdrop-filter': `blur(${backdropBlur})`,
+    'border': `${borders.width.thin} solid ${border}`,
+    'border-radius': borderRadius,
+    'box-shadow': `0 8px 32px rgba(${rgbShadowColor}, ${shadowOpacity})`,
+  };
+}
+
+/**
+ * Scrollbar configuration
+ */
+export interface ScrollbarConfig {
+  width?: string;
+  trackColor?: string;
+  thumbColor?: string;
+  thumbHoverColor?: string;
+  borderRadius?: string;
+}
+
+/**
+ * Creates custom scrollbar styles
+ * @param config - Scrollbar configuration
+ * @returns Object with CSS properties for custom scrollbar
+ */
+export function createScrollbarStyles(config: ScrollbarConfig) {
+  const {
+    width = scrollbars.width.default,
+    trackColor = 'transparent',
+    thumbColor = 'rgba(100, 116, 139, 0.5)',
+    thumbHoverColor = 'rgba(100, 116, 139, 0.7)',
+    borderRadius = scrollbars.borderRadius.default,
+  } = config;
+
+  return {
+    // Firefox
+    'scrollbar-width': 'thin',
+    'scrollbar-color': `${thumbColor} ${trackColor}`,
+
+    // Webkit/Blink
+    '&::-webkit-scrollbar': {
+      width,
+      height: width,
+    },
+    '&::-webkit-scrollbar-track': {
+      background: trackColor,
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: thumbColor,
+      'border-radius': borderRadius,
+    },
+    '&::-webkit-scrollbar-thumb:hover': {
+      background: thumbHoverColor,
+    },
+  };
+}
+
+
+--------------------------------------------------------------------------------
+Total TypeScript files found: 17
