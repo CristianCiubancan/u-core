@@ -116,6 +116,10 @@ function generateSafelist(
     'tracking-tight',
     'tracking-normal',
     'tracking-wide',
+    // Added for dynamic use in Layout.tsx
+    'justify-start',
+    'justify-end',
+    'justify-center',
   ];
 
   return [
