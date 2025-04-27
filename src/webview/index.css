@@ -36,25 +36,6 @@ html {
   }
 }
 
-/* Apply global text scaling to all text elements by default */
-body,
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-button,
-input,
-select,
-textarea,
-a,
-span,
-div {
-  @apply text-scale-with-screen;
-}
-
 body {
   min-height: 100vh;
   max-height: 100vh;

@@ -9,10 +9,10 @@ import {
   lineHeight,
   textStyles,
 } from './typography';
-import { spacing } from './spacing';
-import { borderRadius } from './radius';
-import { elevation } from './elevation';
-import { animation } from './animation';
+import { spacing } from './spacing.js';
+import { borderRadius } from './radius.js';
+import { elevation } from './elevation.js';
+import { animation } from './animation.js';
 
 export type ThemeMode = 'light' | 'dark';
 
