@@ -1,5 +1,8 @@
 // src/theme/utils/colorUtils.ts
 
+import { handleThemeError, ErrorType } from './errorUtils';
+import { fallbacks } from '../tokens/constants';
+
 /**
  * Convert hex color to RGB values
  * @param hex - Hex color code (with or without #)
@@ -8,8 +11,11 @@
 export function hexToRgb(hex: string): string {
   // Safety check for undefined or invalid values
   if (!hex || typeof hex !== 'string') {
-    console.warn(`Invalid hex color provided: ${hex}, using fallback black`);
-    return '0, 0, 0';
+    return handleThemeError(
+      ErrorType.COLOR,
+      `Invalid hex color provided: ${hex}`,
+      fallbacks.color.rgb
+    );
   }
 
   try {
@@ -18,8 +24,11 @@ export function hexToRgb(hex: string): string {
 
     // Validate hex format
     if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
-      console.warn(`Invalid hex format: ${hex}, using fallback black`);
-      return '0, 0, 0';
+      return handleThemeError(
+        ErrorType.COLOR,
+        `Invalid hex format: ${hex}`,
+        fallbacks.color.rgb
+      );
     }
 
     // Handle 3-digit hex codes by duplicating each digit
@@ -35,8 +44,12 @@ export function hexToRgb(hex: string): string {
 
     return `${r}, ${g}, ${b}`;
   } catch (error) {
-    console.error(`Error converting hex to RGB: ${error}`);
-    return '0, 0, 0'; // Return black as fallback
+    return handleThemeError(
+      ErrorType.COLOR,
+      'Error converting hex to RGB',
+      fallbacks.color.rgb,
+      error
+    );
   }
 }
 
@@ -74,7 +87,7 @@ export function getLuminance(hex: string): number {
     return 0.2126 * R + 0.7152 * G + 0.0722 * B;
   } catch (error) {
     console.error(`Error calculating luminance: ${error}`);
-    return 0.5; // Return middle luminance as fallback
+    return fallbacks.opacity; // Return middle luminance as fallback
   }
 }
 
@@ -118,7 +131,7 @@ export function isDarkColor(hex: string): boolean {
  */
 export function getAccessibleTextColor(
   bgColor: string,
-  darkColor: string = '#000000',
+  darkColor: string = fallbacks.color.hex,
   lightColor: string = '#ffffff'
 ): string {
   return isDarkColor(bgColor) ? lightColor : darkColor;

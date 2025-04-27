@@ -1,6 +1,7 @@
 // src/theme/plugins/accessibleText.ts
 
 import { getContrastRatio, hexToRgb } from '../utils/colorUtils';
+import { typography, defaultColors } from '../tokens/constants';
 
 /**
  * Plugin parameter types
@@ -24,72 +25,81 @@ export function accessibleTextPlugin({
   const primary = colors.primary || {};
 
   // Base text colors
-  const darkText = gray[900] || '#111827';
-  const lightText = gray[50] || '#f9fafb';
+  const darkText = gray[900] || defaultColors.darkText;
+  const lightText = gray[50] || defaultColors.lightText;
 
   // Calculate contrast information for primary brand color
   const primaryIsDark =
-    getContrastRatio(primary[600] || '#4f46e5', lightText) < 4.5;
+    getContrastRatio(
+      primary[600] || defaultColors.primaryDefault[600],
+      lightText
+    ) < 4.5;
 
   // Create accessible text utilities
   const accessibleTextComponents = {
     // For light backgrounds - use dark text
     '.text-on-light': {
       'color': darkText,
-      'font-weight': '450',
+      'font-weight': typography.fontWeight.medium,
     },
 
     // For dark backgrounds - use light text
     '.text-on-dark': {
       'color': lightText,
-      'font-weight': '400',
-      'letter-spacing': '0.01em',
+      'font-weight': typography.fontWeight.normal,
+      'letter-spacing': typography.letterSpacing.wide,
     },
 
     // For the brand color as background - dynamically choose text color
     '.text-on-brand': {
       'color': primaryIsDark ? darkText : lightText,
-      'font-weight': primaryIsDark ? '450' : '400',
-      'letter-spacing': primaryIsDark ? 'normal' : '0.01em',
+      'font-weight': primaryIsDark
+        ? typography.fontWeight.medium
+        : typography.fontWeight.normal,
+      'letter-spacing': primaryIsDark
+        ? typography.letterSpacing.normal
+        : typography.letterSpacing.wide,
     },
 
     // For glass elements with dark backdrop
     '.text-on-glass-dark': {
       'color': lightText,
-      'text-shadow': `0 1px 2px rgba(${hexToRgb(gray[900])}, 0.3)`,
-      'letter-spacing': '0.01em',
+      'text-shadow': `0 1px 2px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.3)`,
+      'letter-spacing': typography.letterSpacing.wide,
     },
 
     // For glass elements with light backdrop
     '.text-on-glass-light': {
       'color': darkText,
-      'font-weight': '450',
+      'font-weight': typography.fontWeight.medium,
     },
 
     // Semantic text styles that are already WCAG AA compliant
     '.text-primary': {
       'color': theme('colors.text.primary'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
     },
 
     '.text-secondary': {
       'color': theme('colors.text.secondary'),
-      'font-weight': '400',
+      'font-weight': typography.fontWeight.normal,
     },
 
     '.text-tertiary': {
       'color': theme('colors.text.tertiary'),
-      'font-weight': '400',
+      'font-weight': typography.fontWeight.normal,
     },
 
     '.text-inverted': {
       'color': theme('colors.text.inverted'),
-      'font-weight': '400',
+      'font-weight': typography.fontWeight.normal,
     },
 
     '.text-link': {
       'color': theme('colors.text.link'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
       'text-decoration': 'none',
       '&:hover': {
         'text-decoration': 'underline',
@@ -98,36 +108,40 @@ export function accessibleTextPlugin({
 
     '.text-success': {
       'color': theme('colors.text.success'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
     },
 
     '.text-error': {
       'color': theme('colors.text.error'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
     },
 
     '.text-warning': {
       'color': theme('colors.text.warning'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
     },
 
     '.text-info': {
       'color': theme('colors.text.info'),
-      'font-weight': '500',
+      'font-weight': typography.fontWeight.semibold,
     },
 
     // Additional contrast-ensuring utilities
     '.high-contrast': {
-      'font-weight': '500',
-      'letter-spacing': '0.01em',
+      'font-weight': typography.fontWeight.semibold,
+      'letter-spacing': typography.letterSpacing.wide,
     },
 
     '.text-shadow-light': {
-      'text-shadow': `0 1px 2px rgba(${hexToRgb(gray[900])}, 0.2)`,
+      'text-shadow': `0 1px 2px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.2)`,
     },
 
     '.text-shadow-dark': {
-      'text-shadow': `0 1px 3px rgba(${hexToRgb(gray[900])}, 0.4)`,
+      'text-shadow': `0 1px 3px rgba(${hexToRgb(
+        gray[900] || defaultColors.grayDark[900]
+      )}, 0.4)`,
     },
   };
 
