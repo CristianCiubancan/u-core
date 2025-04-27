@@ -1,6 +1,9 @@
-// a minimal tailwindcss config
+// tailwind.config.ts
+
+// Define the structure of our color palette more precisely
+
 export default {
-  content: ['./src/webview/**/*.tsx'],
+  content: ['./src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {},
   },
