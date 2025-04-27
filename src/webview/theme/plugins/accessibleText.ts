@@ -23,6 +23,10 @@ export function accessibleTextPlugin({
   // Get color references
   const gray = colors.gray || {};
   const primary = colors.primary || {};
+  const error = colors.error || {};
+  const success = colors.success || {};
+  const warning = colors.warning || {};
+  const info = colors.info || {};
 
   // Base text colors
   const darkText = gray[900] || defaultColors.darkText;
@@ -142,6 +146,43 @@ export function accessibleTextPlugin({
       'text-shadow': `0 1px 3px rgba(${hexToRgb(
         gray[900] || defaultColors.grayDark[900]
       )}, 0.4)`,
+    },
+
+    // NEW: Text on primary surface
+    '.text-on-primary-surface': {
+      'color': primary[800],
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // NEW: Text on success surface
+    '.text-on-success-surface': {
+      'color': success[800],
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // NEW: Text on error surface
+    '.text-on-error-surface': {
+      'color': error[800],
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // NEW: Text on warning surface
+    '.text-on-warning-surface': {
+      'color': warning[800],
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // NEW: Text on info surface
+    '.text-on-info-surface': {
+      'color': info[800],
+      'font-weight': typography.fontWeight.medium,
+    },
+
+    // NEW: Text with auto-contrast (computed at runtime via CSS variables)
+    '.text-auto-contrast': {
+      'color': 'var(--auto-contrast-text-color, inherit)',
+      'font-weight': 'var(--auto-contrast-font-weight, inherit)',
+      'letter-spacing': 'var(--auto-contrast-letter-spacing, inherit)',
     },
   };
 

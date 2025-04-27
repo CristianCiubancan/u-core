@@ -59,9 +59,21 @@ export function hexToRgb(hex: string): string {
  * @param alpha - Alpha/opacity value (0-1)
  * @returns RGBA string suitable for CSS
  */
-export function hexToRgba(hex: string, alpha: number = 1): string {
-  const rgb = hexToRgb(hex);
-  return `rgba(${rgb}, ${alpha})`;
+export /**
+ * Helper function to convert hex to rgba string
+ * Convenience function for constants.ts
+ */
+function hexToRgba(hex: string, alpha: number): string {
+  // Remove # if present
+  hex = hex.replace(/^#/, '');
+
+  // Parse the hex values
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Return rgba string
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /**

@@ -2,12 +2,7 @@
 // Removed backdrop-filter and -webkit-backdrop-filter
 
 import { hexToRgb } from '../utils/colorUtils';
-import {
-  borders,
-  opacityLevels,
-  shadowOpacity,
-  elements,
-} from '../tokens/constants';
+import { borders, opacityLevels, shadowOpacity } from '../tokens/constants';
 
 /**
  * Plugin parameter types
@@ -100,50 +95,63 @@ export function glassMorphismPlugin({
       'border-radius': theme('borderRadius.xl'),
     },
 
-    // Gaming UI specific glass styles
+    // Gaming UI specific glass styles - UPDATED to use theme tokens
     '.glass-gaming': {
-      'background': elements.gaming.background.medium,
-      // Removed backdrop-filter and -webkit-backdrop-filter
-      'border': `${borders.width.thin} solid ${elements.gaming.border.light}`,
+      'background': `rgba(${hexToRgb(gray[900])}, ${opacityLevels.dark.high})`,
+      'border': `${borders.width.thin} solid rgba(${hexToRgb(gray[700])}, ${
+        opacityLevels.light.low
+      })`,
       'border-radius': theme('borderRadius.DEFAULT'),
-      'box-shadow': elements.gaming.shadow.default,
+      'box-shadow': `0 4px 16px rgba(${hexToRgb(gray[950] || gray[900])}, ${
+        shadowOpacity.medium
+      })`,
     },
 
-    // Gaming UI button glass effect
+    // Gaming UI button glass effect - UPDATED to use theme tokens
     '.glass-button': {
-      'background': elements.gaming.background.dark,
-      // Removed backdrop-filter and -webkit-backdrop-filter
-      'border': `${borders.width.thin} solid ${elements.gaming.border.light}`,
+      'background': `rgba(${hexToRgb(gray[800])}, ${opacityLevels.dark.high})`,
+      'border': `${borders.width.thin} solid rgba(${hexToRgb(gray[600])}, ${
+        opacityLevels.light.low
+      })`,
       'border-radius': theme('borderRadius.DEFAULT'),
       'transition': theme('transitionProperty.DEFAULT'),
       '&:hover': {
-        'background': elements.gaming.background.light,
-        'box-shadow': elements.gaming.shadow.hover,
+        'background': `rgba(${hexToRgb(gray[700])}, ${
+          opacityLevels.dark.high
+        })`,
+        'box-shadow': `0 4px 12px rgba(${hexToRgb(gray[950] || gray[900])}, ${
+          shadowOpacity.medium
+        })`,
       },
     },
 
-    // Gaming UI header glass effect
+    // Gaming UI header glass effect - UPDATED to use theme tokens
     '.glass-header': {
-      'background': elements.gaming.background.dark,
-      // Removed backdrop-filter and -webkit-backdrop-filter
-      'border-bottom': `${borders.width.thin} solid ${elements.gaming.border.dark}`,
-      'box-shadow': elements.gaming.shadow.header,
+      'background': `rgba(${hexToRgb(gray[900])}, ${opacityLevels.dark.high})`,
+      'border-bottom': `${borders.width.thin} solid rgba(${hexToRgb(
+        gray[800]
+      )}, ${opacityLevels.light.low})`,
+      'box-shadow': `0 4px 6px rgba(${hexToRgb(gray[950] || gray[900])}, ${
+        shadowOpacity.light
+      })`,
     },
 
-    // Gaming UI sidebar glass effect
+    // Gaming UI sidebar glass effect - UPDATED to use theme tokens
     '.glass-sidebar': {
-      'background': elements.gaming.background.dark,
-      // Removed backdrop-filter and -webkit-backdrop-filter
-      'border-right': `${borders.width.thin} solid ${elements.gaming.border.dark}`,
-      'box-shadow': elements.gaming.shadow.sidebar,
+      'background': `rgba(${hexToRgb(gray[900])}, ${opacityLevels.dark.high})`,
+      'border-right': `${borders.width.thin} solid rgba(${hexToRgb(
+        gray[800]
+      )}, ${opacityLevels.light.low})`,
+      'box-shadow': `4px 0 16px rgba(${hexToRgb(gray[950] || gray[900])}, ${
+        shadowOpacity.medium
+      })`,
     },
 
-    // Gaming UI active/selected item
+    // Gaming UI active/selected item - UPDATED to use theme tokens
     '.glass-active': {
       'background': `rgba(${hexToRgb(primary[600])}, ${
         opacityLevels.light.high
       })`,
-      // Removed backdrop-filter and -webkit-backdrop-filter
       'border': `${borders.width.thin} solid rgba(${hexToRgb(primary[400])}, ${
         opacityLevels.light.high
       })`,
