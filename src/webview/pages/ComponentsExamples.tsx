@@ -234,7 +234,7 @@ const ComponentsExamples: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-base">Regular paragraph text</p>
+                <p>Regular paragraph text</p>
               </div>
 
               <div>

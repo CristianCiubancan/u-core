@@ -16,10 +16,10 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
     <div className="text-sm w-full">
       <div className="flex flex-col">
         <div className="mb-2 md:mb-0">
-          <h3 className="text-primary font-semibold mb-2 text-center md:text-left text-xs">
+          <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
             Camera Controls
           </h3>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 flex-col">
             <Button
               onClick={() => onRotate('right')}
               className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
@@ -47,10 +47,10 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           </div>
 
           <div>
-            <h3 className="text-primary font-semibold mb-2 text-center md:text-left text-xs">
+            <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
               Focus
             </h3>
-            <div className="flex space-x-2">
+            <div className="space-x-2 flex flex-col">
               <Button
                 onClick={() => onFocus('head')}
                 className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
