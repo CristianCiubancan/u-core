@@ -5,20 +5,20 @@ import {
   generateColorPalette,
 } from '../utils/colorUtils';
 
-// Create a safe version of Tailwind colors
-// This ensures we're using the modern color names
-// See: https://tailwindcss.com/docs/upgrade-guide#renamed-gray-scales
-export const tailwindColors = {
-  ...tailwindColorsModule,
-  // Ensure we're using the modern color names
-  // These assignments will use the modern names if available, or fallback to the old names
-  // This approach avoids direct references to deprecated color names
-  sky: tailwindColorsModule.sky, // replaces lightBlue
-  stone: tailwindColorsModule.stone, // replaces warmGray
-  neutral: tailwindColorsModule.neutral, // replaces trueGray
-  gray: tailwindColorsModule.gray, // replaces coolGray
-  slate: tailwindColorsModule.slate, // replaces blueGray
-};
+// Create a safe version of Tailwind colors without deprecated color warnings
+// See: https://github.com/tailwindlabs/tailwindcss/discussions/10919929
+// This approach extracts only the non-getter properties to avoid triggering warnings
+const entries = Object.entries(
+  Object.getOwnPropertyDescriptors(tailwindColorsModule)
+).filter(([_, descriptor]) => {
+  // Exclude getters (which are the deprecated colors)
+  return typeof descriptor.get !== 'function';
+});
+
+// Create a new object with only the non-deprecated colors
+export const tailwindColors = Object.fromEntries(
+  entries.map(([key, descriptor]) => [key, descriptor.value])
+);
 
 // Define color palette names for type safety
 export type ColorPaletteName =
