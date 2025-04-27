@@ -2,15 +2,17 @@
  * Custom plugins for Tailwind CSS
  * Centralizes all plugin definitions for easier management
  */
-const { generateGlassStyles } = require('./glassStyles');
-const { createScrollbarStyles } = require('./scrollbarUtils');
-const { generateAccessibleTextUtilities } = require('./accessibleText');
-const { generateResponsiveTypography } = require('./typography');
-const { hexToRgb } = require('./colorUtils');
-const themeConfig = require('./theme');
+import { generateGlassStyles } from './glassStyles';
+import { createScrollbarStyles } from './scrollbarUtils';
+import { generateAccessibleTextUtilities } from './accessibleText';
+import { generateResponsiveTypography } from './typography';
+import { hexToRgb } from './colorUtils';
+import themeConfig from './theme';
+import { semanticColors } from '../colors';
 
-// Get active palette references
-const { brandPalette, grayPalette } = themeConfig;
+// Get active palette references from imported modules
+const brandPalette = themeConfig.colors.brand;
+const grayPalette = themeConfig.colors.customGray;
 
 // Define plugins array
 const plugins = [
@@ -30,6 +32,7 @@ const plugins = [
       }
 
       const glassStyles = generateGlassStyles(
+        semanticColors,
         grayPalette || {},
         brandPalette || grayPalette || {}
       );
@@ -179,4 +182,4 @@ const plugins = [
   },
 ];
 
-module.exports = plugins;
+export default plugins;

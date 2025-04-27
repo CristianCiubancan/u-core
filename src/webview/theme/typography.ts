@@ -192,7 +192,4 @@ function generateResponsiveTypography(): Record<
   };
 }
 
-module.exports = {
-  generateFontSizes,
-  generateResponsiveTypography,
-};
+export { generateFontSizes, generateResponsiveTypography };
