@@ -3,9 +3,20 @@
 import { getContrastRatio, hexToRgb } from '../utils/colorUtils';
 
 /**
+ * Plugin parameter types
+ */
+interface AccessibleTextPluginParams {
+  addComponents: (components: Record<string, any>, variants?: string[]) => void;
+  theme: (path: string) => any;
+}
+
+/**
  * Creates accessible text utilities for various backgrounds
  */
-export function accessibleTextPlugin({ addComponents, theme }) {
+export function accessibleTextPlugin({
+  addComponents,
+  theme,
+}: AccessibleTextPluginParams) {
   const colors = theme('colors');
 
   // Get color references

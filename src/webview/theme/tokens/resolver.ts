@@ -106,9 +106,9 @@ export function getDesignTokens(mode: ThemeMode = 'light') {
     colors: {
       scales: colorScales,
       semantic: Object.entries(semanticColors).reduce(
-        (acc, [category, values]) => {
+        (acc: Record<string, Record<string, any>>, [category, values]) => {
           acc[category] = Object.entries(values).reduce(
-            (catAcc, [key, value]) => {
+            (catAcc: Record<string, any>, [key, value]) => {
               if (typeof value === 'object' && (value.light || value.dark)) {
                 catAcc[key] = value[mode];
               } else {

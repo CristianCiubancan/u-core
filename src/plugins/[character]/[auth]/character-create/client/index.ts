@@ -8,7 +8,6 @@ namespace CharacterCreate {
 
   // Variable to track UI state
   let uiVisible = false;
-  let firstTimeOpened = true;
 
   // Camera variables
   let cameraRotation = 0;
@@ -135,8 +134,6 @@ namespace CharacterCreate {
         error
       );
     }
-
-    firstTimeOpened = false;
 
     // Set up camera
     setupCamera();

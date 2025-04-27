@@ -1,7 +1,23 @@
 // src/theme/tokens/colors.ts
 
+// Type definitions for color scales
+export type ColorShade =
+  | '50'
+  | '100'
+  | '200'
+  | '300'
+  | '400'
+  | '500'
+  | '600'
+  | '700'
+  | '800'
+  | '900'
+  | '950';
+export type ColorScale = Record<ColorShade, string>;
+export type ColorScales = Record<string, ColorScale>;
+
 // Core color scales (primitive tokens)
-export const colorScales = {
+export const colorScales: ColorScales = {
   // Neutral tones
   gray: {
     50: '#f9fafb',
@@ -196,7 +212,8 @@ export function resolveColorToken(
     // If this is a direct reference to a color scale
     if (typeof colorRef === 'string') {
       const [scale, shade] = colorRef.split('.');
-      return colorScales[scale]?.[shade] || colorRef;
+      // Type assertion to handle string indexing
+      return colorScales[scale]?.[shade as ColorShade] || colorRef;
     }
     return colorRef;
   }
@@ -204,7 +221,8 @@ export function resolveColorToken(
   // Direct reference to a color scale (e.g. "primary.500")
   if (parts.length === 2) {
     const [scale, shade] = parts;
-    return colorScales[scale]?.[shade] || token;
+    // Type assertion to handle string indexing
+    return colorScales[scale]?.[shade as ColorShade] || token;
   }
 
   return token;
