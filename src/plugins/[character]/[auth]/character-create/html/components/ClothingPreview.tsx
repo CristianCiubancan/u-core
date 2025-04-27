@@ -90,7 +90,7 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center p-2 bg-black/20 rounded-lg h-48 overflow-hidden">
+    <div className="flex justify-center items-center p-2 glass-dark rounded-lg h-48 overflow-hidden">
       {imageLoaded ? (
         <img
           src={usingFallback ? fallbackPath : imagePath}

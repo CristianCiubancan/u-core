@@ -14,62 +14,62 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
 }) => {
   return (
     <div className="text-sm w-full">
-      <div className="flex flex-col">
-        <div className="mb-2 md:mb-0">
+      <div className="flex flex-col gap-4">
+        <div>
           <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
             Camera Controls
           </h3>
-          <div className="flex space-x-2 flex-col">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               onClick={() => onRotate('right')}
-              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
+              className="py-1 px-2 text-xs flex justify-center items-center"
             >
               ← Rotate
             </Button>
             <Button
               onClick={() => onRotate('left')}
-              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
+              className="py-1 px-2 text-xs flex justify-center items-center"
             >
               Rotate →
             </Button>
             <Button
               onClick={() => onZoom('in')}
-              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
+              className="py-1 px-2 text-xs flex justify-center items-center"
             >
               Zoom In
             </Button>
             <Button
               onClick={() => onZoom('out')}
-              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
+              className="py-1 px-2 text-xs flex justify-center items-center"
             >
               Zoom Out
             </Button>
           </div>
+        </div>
 
-          <div>
-            <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
-              Focus
-            </h3>
-            <div className="space-x-2 flex flex-col">
-              <Button
-                onClick={() => onFocus('head')}
-                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
-              >
-                Head
-              </Button>
-              <Button
-                onClick={() => onFocus('body')}
-                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
-              >
-                Body
-              </Button>
-              <Button
-                onClick={() => onFocus('legs')}
-                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
-              >
-                Legs
-              </Button>
-            </div>
+        <div>
+          <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
+            Focus
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              onClick={() => onFocus('head')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Head
+            </Button>
+            <Button
+              onClick={() => onFocus('body')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Body
+            </Button>
+            <Button
+              onClick={() => onFocus('legs')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Legs
+            </Button>
           </div>
         </div>
       </div>
