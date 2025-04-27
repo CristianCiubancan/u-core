@@ -1,6 +1,5 @@
 // src/theme/tokens/resolver.ts
 
-import { colorScales, semanticColors, resolveColorToken } from './colors';
 import {
   fontFamily,
   fontSize,
@@ -15,15 +14,51 @@ import { elevation } from './elevation';
 import { animation } from './animation';
 import { effects } from './effects';
 import { breakpoints } from './breakpoints';
+import { createColorScales, ThemeOptions, defaultThemeOptions } from './colors';
+import { semanticColors } from '../../colors';
 
 export type ThemeMode = 'light' | 'dark';
 
 /**
+ * Helper function to resolve a color token based on theme mode
+ * @param path - Dot notation path to the color token (e.g., 'text.primary')
+ * @param mode - Theme mode (light or dark)
+ */
+function resolveColorToken(path: string, mode: ThemeMode): string {
+  const parts = path.split('.');
+  let current: any = semanticColors;
+
+  // Navigate through the path
+  for (const part of parts) {
+    if (!current[part]) {
+      console.warn(`Color token path "${path}" not found`);
+      return mode === 'light' ? '#000000' : '#ffffff'; // Fallback
+    }
+    current = current[part];
+  }
+
+  // Check if we have a mode-specific value
+  if (typeof current === 'object' && (current.light || current.dark)) {
+    return current[mode];
+  }
+
+  // Return the value directly if it's not mode-specific
+  return current;
+}
+
+/**
  * Resolves all design tokens into a Tailwind-compatible theme configuration
  * @param mode - The theme mode (light or dark)
+ * @param options - Theme color options
  * @returns Fully resolved theme configuration
  */
-export function resolveTokens(mode: ThemeMode = 'light') {
+export function resolveTokens(
+  mode: ThemeMode = 'light',
+  options: ThemeOptions = defaultThemeOptions
+) {
+  // Get color scales from our theme options
+  const colorScales = createColorScales(options);
+
   // Create semantic color references with correct mode
   const resolvedColors = {
     // Add all color scales directly
@@ -70,18 +105,12 @@ export function resolveTokens(mode: ThemeMode = 'light') {
       inverted: resolveColorToken('icon.inverted', mode),
     },
     glass: {
-      light: {
-        background: resolveColorToken('glass.light.background', mode),
-        border: resolveColorToken('glass.light.border', mode),
-      },
-      dark: {
-        background: resolveColorToken('glass.dark.background', mode),
-        border: resolveColorToken('glass.dark.border', mode),
-      },
-      brand: {
-        background: resolveColorToken('glass.brand.background', mode),
-        border: resolveColorToken('glass.brand.border', mode),
-      },
+      'light-bg': resolveColorToken('glass.light.background', mode),
+      'light-border': resolveColorToken('glass.light.border', mode),
+      'dark-bg': resolveColorToken('glass.dark.background', mode),
+      'dark-border': resolveColorToken('glass.dark.border', mode),
+      'brand-bg': resolveColorToken('glass.brand.background', mode),
+      'brand-border': resolveColorToken('glass.brand.border', mode),
     },
   };
 
@@ -105,7 +134,12 @@ export function resolveTokens(mode: ThemeMode = 'light') {
 }
 
 // Export a utility to get design tokens with resolved values
-export function getDesignTokens(mode: ThemeMode = 'light') {
+export function getDesignTokens(
+  mode: ThemeMode = 'light',
+  options: ThemeOptions = defaultThemeOptions
+) {
+  const colorScales = createColorScales(options);
+
   return {
     colors: {
       scales: colorScales,
