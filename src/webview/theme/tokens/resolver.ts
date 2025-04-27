@@ -9,10 +9,12 @@ import {
   lineHeight,
   textStyles,
 } from './typography';
-import { spacing } from './spacing.js';
-import { borderRadius } from './radius.js';
-import { elevation } from './elevation.js';
-import { animation } from './animation.js';
+import { spacing } from './spacing';
+import { borderRadius } from './radius';
+import { elevation } from './elevation';
+import { animation } from './animation';
+import { effects } from './effects';
+import { breakpoints } from './breakpoints';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -97,6 +99,8 @@ export function resolveTokens(mode: ThemeMode = 'light') {
     transitionProperty: animation.transitionProperty,
     transitionTimingFunction: animation.transitionTimingFunction,
     transitionDuration: animation.transitionDuration,
+    screens: breakpoints,
+    blur: effects.blur,
   };
 }
 
@@ -135,5 +139,7 @@ export function getDesignTokens(mode: ThemeMode = 'light') {
     borderRadius,
     elevation,
     animation,
+    effects,
+    breakpoints,
   };
 }

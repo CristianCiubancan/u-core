@@ -1,6 +1,7 @@
 // src/theme/plugins/scrollbar.ts
 
 import { hexToRgb } from '../utils/colorUtils';
+import { scrollbars, opacityLevels } from '../tokens/constants';
 
 /**
  * Scrollbar configuration interface
@@ -32,9 +33,9 @@ function createScrollbarStyles({
   thumbBg,
   thumbBorder,
   thumbHoverBg,
-  width = '12px',
-  height = '12px',
-  borderRadius = '8px',
+  width = scrollbars.width.default,
+  height = scrollbars.width.default,
+  borderRadius = scrollbars.borderRadius.default,
 }: ScrollbarConfig) {
   return {
     // WebKit-based browsers (Chrome, Safari, newer versions of Edge)
@@ -78,25 +79,29 @@ export function scrollbarPlugin({
   addBase({
     'html': {
       'scrollbar-width': 'thin',
-      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, 0.3) transparent`,
+      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.low
+      }) transparent`,
     },
     'body': {
       'scrollbar-width': 'thin',
-      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, 0.3) transparent`,
+      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.low
+      }) transparent`,
     },
     '::-webkit-scrollbar': {
-      width: '8px',
-      height: '8px',
+      width: scrollbars.width.default,
+      height: scrollbars.width.default,
     },
     '::-webkit-scrollbar-track': {
       background: 'transparent',
     },
     '::-webkit-scrollbar-thumb': {
-      background: `rgba(${hexToRgb(gray[400])}, 0.3)`,
-      borderRadius: '8px',
+      background: `rgba(${hexToRgb(gray[400])}, ${opacityLevels.light.low})`,
+      borderRadius: scrollbars.borderRadius.default,
     },
     '::-webkit-scrollbar-thumb:hover': {
-      background: `rgba(${hexToRgb(gray[500])}, 0.4)`,
+      background: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.medium})`,
     },
   });
 
@@ -104,48 +109,64 @@ export function scrollbarPlugin({
   const scrollbarComponents = {
     // Light theme scrollbars
     '.scrollbar-light': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, 0.2)`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, 0.3)`,
-      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, 0.2)`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, 0.4)`,
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
     }),
 
     // Dark theme scrollbars
     '.scrollbar-dark': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[800])}, 0.4)`,
-      thumbBg: `rgba(${hexToRgb(gray[600])}, 0.6)`,
-      thumbBorder: `2px solid rgba(${hexToRgb(gray[700])}, 0.3)`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, 0.7)`,
+      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
+      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[700])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
     }),
 
     // Brand-colored scrollbars
     '.scrollbar-brand': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(primary[100])}, 0.3)`,
-      thumbBg: `rgba(${hexToRgb(primary[400])}, 0.5)`,
-      thumbBorder: `2px solid rgba(${hexToRgb(primary[300])}, 0.3)`,
-      thumbHoverBg: `rgba(${hexToRgb(primary[500])}, 0.6)`,
+      trackBg: `rgba(${hexToRgb(primary[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(primary[400])}, ${opacityLevels.light.medium})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(primary[300])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(primary[500])}, ${
+        opacityLevels.light.high
+      })`,
     }),
 
     // Thin scrollbars for compact UI elements
     '.scrollbar-thin': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, 0.2)`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, 0.3)`,
-      thumbBorder: `1px solid rgba(${hexToRgb(gray[200])}, 0.2)`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, 0.4)`,
-      width: '6px',
-      height: '6px',
-      borderRadius: '3px',
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `1px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
+      width: scrollbars.width.thin,
+      height: scrollbars.width.thin,
+      borderRadius: scrollbars.borderRadius.sm,
     }),
 
     // Thin dark scrollbars
     '.scrollbar-thin-dark': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[800])}, 0.4)`,
-      thumbBg: `rgba(${hexToRgb(gray[600])}, 0.6)`,
-      thumbBorder: `1px solid rgba(${hexToRgb(gray[700])}, 0.3)`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, 0.7)`,
-      width: '6px',
-      height: '6px',
-      borderRadius: '3px',
+      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
+      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
+      thumbBorder: `1px solid rgba(${hexToRgb(gray[700])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
+      width: scrollbars.width.thin,
+      height: scrollbars.width.thin,
+      borderRadius: scrollbars.borderRadius.sm,
     }),
 
     // Hide scrollbars but keep functionality
@@ -159,11 +180,15 @@ export function scrollbarPlugin({
 
     // Rounded scrollbars
     '.scrollbar-rounded': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, 0.2)`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, 0.3)`,
-      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, 0.2)`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, 0.4)`,
-      borderRadius: '999px',
+      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
+      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
+      borderRadius: scrollbars.borderRadius.rounded,
     }),
   };
 

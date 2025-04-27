@@ -1,12 +1,14 @@
 // src/theme/tokens/index.ts
 // The root file that exports all design tokens
 
-export * from './colors.js';
-export * from './typography.js';
-export * from './spacing.js';
-export * from './elevation.js';
-export * from './radius.js';
-export * from './animation.js';
+export * from './colors';
+export * from './typography';
+export * from './spacing';
+export * from './elevation';
+export * from './radius';
+export * from './animation';
+export * from './effects';
+export * from './breakpoints';
 
 // Re-export the theme resolver for convenience
-export { resolveTokens } from './resolver.js';
+export { resolveTokens } from './resolver';
