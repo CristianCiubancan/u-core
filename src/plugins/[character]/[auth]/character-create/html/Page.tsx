@@ -236,7 +236,7 @@ export default function Page() {
             onModelChange={handleModelChange}
           />
           {/* Title */}
-          <div className="flex flex-col space-y-2 mt-4">
+          <div className="flex flex-row space-x-2 mt-4">
             <Button
               onClick={() => setActiveTab('face')}
               fullWidth
