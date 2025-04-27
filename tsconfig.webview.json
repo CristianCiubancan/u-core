@@ -29,6 +29,6 @@
     "src/webview/**/*",
     "src/plugins/**/html/**/*",
     "src/webview/utils/**/*",
-    "src/webview/tailwind.config.ts"
+    "src/webview/theme/tailwind.config.ts"
   ]
 }
