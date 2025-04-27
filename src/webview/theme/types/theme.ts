@@ -1,6 +1,7 @@
+// types/theme.ts (expanded)
 import { ColorName } from './colors';
 
-// Semantic color roles that make up our theme
+// Extended semantic color roles
 export interface ThemeColors {
   // Backgrounds
   background: string;
@@ -16,16 +17,24 @@ export interface ThemeColors {
   primary: string;
   primaryHover: string;
   primaryActive: string;
+  primarySubtle: string; // New - for subtle primary backgrounds
+  primaryOutline: string; // New - for outlined variants
 
   secondary: string;
   secondaryHover: string;
   secondaryActive: string;
+  secondarySubtle: string; // New - for subtle secondary backgrounds
+  secondaryOutline: string; // New - for outlined variants
 
   // Feedback colors
   success: string;
+  successSubtle: string; // New
   error: string;
+  errorSubtle: string; // New
   warning: string;
+  warningSubtle: string; // New
   info: string;
+  infoSubtle: string; // New
 
   // Border colors
   border: string;
@@ -52,6 +61,8 @@ export interface Theme {
   name: string;
   palette: ThemePalette;
   colors: ThemeColors;
+  category?: string; // Optional category for grouping themes
+  description?: string; // Optional description
 }
 
 // Theme mode (light, dark, system, etc.)
