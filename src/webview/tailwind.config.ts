@@ -30,10 +30,16 @@ import { breakpoints } from './theme/tokens/breakpoints';
 
 // Create plugin wrappers with correct interface
 const createAccessibleTextPlugin = () => {
-  return ({ addComponents, theme }: PluginAPI) => {
+  return (api: PluginAPI) => {
+    const { addComponents, theme } = api;
     accessibleTextPlugin({
       addComponents: (components, _variants) => {
-        addComponents(components);
+        // The second parameter should be an options object, not an array
+        addComponents(components, {
+          // Optional properties you can set:
+          // respectPrefix: true,
+          // respectImportant: true
+        });
       },
       theme,
     });
@@ -174,8 +180,8 @@ const config: Config = {
   darkMode: 'class', // Use class-based dark mode
   important: false, // Don't use !important for utility classes
   future: {
-    hoverOnlyWhenSupported: true, // Only apply hover styles on devices that support hover
-    respectDefaultRingColorOpacity: true, // Respect opacity of default ring color
+    hoverOnlyWhenSupported: true,
+    respectDefaultRingColorOpacity: true,
   },
   // Safelist specific utility classes that might be used dynamically
   safelist: [
@@ -183,20 +189,64 @@ const config: Config = {
     'glass',
     'glass-dark',
     'glass-brand',
+    'glass-brand-dark',
+    'glass-bg',
+    'glass-bg-dark',
     'glass-subtle',
+    'glass-subtle-dark',
     'glass-gaming',
+    'glass-button',
+    'glass-header',
+    'glass-sidebar',
+    'glass-active',
 
     // Text accessibility classes
     'text-on-light',
     'text-on-dark',
     'text-on-brand',
+    'text-on-glass-dark',
+    'text-on-glass-light',
+    'text-primary',
+    'text-secondary',
+    'text-tertiary',
+    'text-inverted',
+    'text-link',
+    'text-success',
+    'text-error',
+    'text-warning',
+    'text-info',
+    'high-contrast',
+    'text-shadow-light',
+    'text-shadow-dark',
 
     // Scrollbar variants
     'scrollbar-light',
     'scrollbar-dark',
     'scrollbar-brand',
     'scrollbar-thin',
+    'scrollbar-thin-dark',
     'scrollbar-hidden',
+    'scrollbar-rounded',
+
+    // Responsive typography
+    'text-fluid-xs',
+    'text-fluid-sm',
+    'text-fluid-base',
+    'text-fluid-lg',
+    'text-fluid-xl',
+    'text-fluid-2xl',
+    'text-fluid-3xl',
+    'text-fluid-4xl',
+    'text-fluid-5xl',
+    'text-hd',
+    'text-readable',
+
+    // Custom utilities
+    'truncate-1',
+    'truncate-2',
+    'truncate-3',
+    'rendering-crisp',
+    'rendering-auto',
   ],
 };
 

@@ -231,13 +231,5 @@ export function generateResponsiveTypography() {
       'word-spacing': '0.05em',
       'hyphens': 'auto',
     },
-
-    // Modern CSS properties for typography
-    '.text-balance': {
-      'text-wrap': 'balance',
-    },
-    '.text-pretty': {
-      'text-wrap': 'pretty',
-    },
   };
 }
