@@ -1,13 +1,35 @@
-// src/components/menu/MenuSystem.tsx
-import React, { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { useMenuSystem } from "../../context/MenuContext";
+// src/components/menus/MenuSystem.tsx
+import React from 'react';
+import { createPortal } from 'react-dom';
+import { useMenuSystem } from '../../hooks/useMenuSystem';
+
+interface CloseButtonProps {
+  onClose: () => void;
+  position?: 'left' | 'right';
+}
+
+const CloseButton: React.FC<CloseButtonProps> = ({
+  onClose,
+  position = 'right',
+}) => {
+  return (
+    <button
+      onClick={onClose}
+      className={`absolute ${
+        position === 'right' ? 'right-4' : 'left-4'
+      } top-4 w-8 h-8 flex items-center justify-center glass-brand hover:bg-brand-500/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 active:scale-90 rounded-full shadow-sm hover:shadow transition-all-fast text-xl`}
+      aria-label="Close menu"
+    >
+      ✕
+    </button>
+  );
+};
 
 interface SideMenuProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  position: "left" | "right";
+  position: 'left' | 'right';
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({
@@ -16,49 +38,28 @@ const SideMenu: React.FC<SideMenuProps> = ({
   children,
   position,
 }) => {
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleEsc);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      {/* <div
-        className="fixed inset-0 z-10 transition-opacity"
-        onClick={onClose}
-      /> */}
-
       {/* Menu */}
       <div
         className={`p-8 fixed top-0 bottom-0 ${
-          position === "left" ? "left-0" : "right-0"
+          position === 'left' ? 'left-0' : 'right-0'
         } w-2/5 z-20 transform transition-transform duration-300 ease-in-out ${
           isOpen
-            ? "translate-x-0"
-            : position === "left"
-            ? "-translate-x-full"
-            : "translate-x-full"
+            ? 'translate-x-0'
+            : position === 'left'
+            ? '-translate-x-full'
+            : 'translate-x-full'
         }`}
       >
-        <div className="glass-brand-dark h-full overflow-y-auto p-4">
-          {/* <button className="absolute top-10 right-16" onClick={onClose}>
-            ✕
-          </button> */}
-          <div className="mt-8">{children}</div>
+        <div className="glass-brand-dark h-full overflow-y-auto p-4 relative">
+          <CloseButton
+            onClose={onClose}
+            position={position === 'left' ? 'right' : 'left'}
+          />
+          <div className="mt-12">{children}</div>
         </div>
       </div>
     </>
@@ -73,42 +74,25 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
-  // Close on escape key
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleEsc);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   return createPortal(
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-brand-200 bg-opacity-50 z-30 transition-opacity"
-        onClick={onClose}
-      />
+      {/* Backdrop - now just visual, doesn't close on click */}
+      <div className="fixed inset-0 bg-brand-900/70 z-30 transition-opacity" />
 
       {/* Modal */}
       <div
-        className={`p-8 fixed top-1/2 left-1/2 w-2/5 z-40 transform transition-transform duration-300 ease-in-out max-h-[90vh] ${
-          isOpen ? "translate-x-[-50%] translate-y-[-50%]" : "-translate-x-full"
+        className={`p-8 fixed top-1/2 left-1/2 w-2/5 z-40 transform transition-all duration-300 ease-in-out max-h-[90vh] ${
+          isOpen
+            ? 'translate-x-[-50%] translate-y-[-50%] scale-100 opacity-100'
+            : 'translate-x-[-50%] translate-y-[-50%] scale-95 opacity-0'
         }`}
       >
         {/* Inner container with full height and scroll */}
-        <div className="glass-brand-dark overflow-y-auto p-4 h-full">
-          {children}
+        <div className="glass-brand-dark overflow-y-auto p-4 h-full rounded-lg shadow-xl relative">
+          <CloseButton onClose={onClose} />
+          <div className="mt-8 pr-8">{children}</div>
         </div>
       </div>
     </>,
@@ -131,7 +115,7 @@ const Toast: React.FC<ToastProps> = ({
   duration = 3000,
 }) => {
   // Auto close after duration
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen && duration > 0) {
       const timer = setTimeout(() => {
         onClose();
@@ -144,11 +128,19 @@ const Toast: React.FC<ToastProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed top-4 right-4 left-4 z-50 flex justify-center pointer-events-none">
-      <div className="bg-gray-800 px-6 py-3 rounded-lg shadow-lg pointer-events-auto max-w-md">
+    <div className="fixed bottom-8 right-8 z-50 pointer-events-none">
+      <div
+        className={`glass-brand-dark px-6 py-4 rounded-lg shadow-lg pointer-events-auto max-w-md border border-brand-500/30 transition-all duration-300 ${
+          isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
+      >
         <div className="flex items-center justify-between">
-          <div>{children}</div>
-          <button className="ml-4" onClick={onClose}>
+          <div className="text-shadow-sm mr-4">{children}</div>
+          <button
+            className="ml-4 w-6 h-6 flex items-center justify-center hover:bg-brand-500/40 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-400 active:scale-90 rounded-full transition-all-fast"
+            onClick={onClose}
+            aria-label="Close notification"
+          >
             ✕
           </button>
         </div>
@@ -167,7 +159,7 @@ export const MenuSystem: React.FC = () => {
       {/* Left Menu */}
       <SideMenu
         isOpen={state.left.isOpen}
-        onClose={() => closeMenu("left")}
+        onClose={() => closeMenu('left')}
         position="left"
       >
         {state.left.content}
@@ -176,14 +168,14 @@ export const MenuSystem: React.FC = () => {
       {/* Right Menu */}
       <SideMenu
         isOpen={state.right.isOpen}
-        onClose={() => closeMenu("right")}
+        onClose={() => closeMenu('right')}
         position="right"
       >
         {state.right.content}
       </SideMenu>
 
       {/* Central Modal */}
-      <Modal isOpen={state.central.isOpen} onClose={() => closeMenu("central")}>
+      <Modal isOpen={state.central.isOpen} onClose={() => closeMenu('central')}>
         {state.central.content}
       </Modal>
 

@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
 
-const GlassContainer = ({ children }: { children: ReactNode }) => {
+const Container = ({ children }: { children: ReactNode }) => {
   return (
     <div
       className={`w-full glass-brand max-h-screen overflow-y-auto rounded-2xl p-6`}
@@ -10,4 +10,4 @@ const GlassContainer = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export default GlassContainer;
+export default Container;
