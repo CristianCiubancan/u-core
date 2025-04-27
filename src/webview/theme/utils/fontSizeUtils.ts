@@ -1,4 +1,4 @@
-const fontSizeMultiplier: number = 1.15; // Optimized for readability
+const fontSizeMultiplier: number = 1.55; // Optimized for readability
 
 interface FontSizeConfig {
   [key: string]: [string, { lineHeight: string; letterSpacing: string }];
