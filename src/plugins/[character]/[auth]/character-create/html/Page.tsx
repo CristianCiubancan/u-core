@@ -220,8 +220,8 @@ export default function Page() {
 
   // Render UI
   return isOpen ? (
-    <div className="flex p-6 h-screen">
-      <div className="flex-col w-80 glass-dark text-on-dark rounded-lg shadow-lg">
+    <div className="flex p-6 gap-4 h-screen">
+      <div className="flex-col w-[50vw] glass-dark text-on-dark rounded-lg shadow-lg">
         {' '}
         {/* Main container */}
         {/* Left sidebar - Tabs */}
@@ -305,7 +305,7 @@ export default function Page() {
           )}
         </div>
       </div>
-      <div className="glass-brand-dark p-2 border-t border-brand-700 mt-auto rounded-b-lg">
+      <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
         {/* Footer content */}
         <CameraControls
           onRotate={handleRotateCamera}
