@@ -220,15 +220,15 @@ export default function Page() {
 
   // Render UI
   return isOpen ? (
-    <div className="flex p-4 h-screen">
-      <div className="flex-col w-[50vw] glass-dark text-on-dark">
+    <div className="flex p-6 h-screen">
+      <div className="flex-col w-80 glass-dark text-on-dark rounded-lg shadow-lg">
         {' '}
         {/* Main container */}
         {/* Left sidebar - Tabs */}
-        <div className="border-r border-brand-800 flex flex-col">
+        <div className="border-r border-brand-800 flex flex-col p-4">
           {' '}
           {/* Sidebar container */}
-          <div className="p-4 text-center text-xl font-bold text-white text-shadow">
+          <div className="text-center text-xl font-bold text-white text-shadow mb-4">
             Character Creation
           </div>{' '}
           <ModelPicker
@@ -236,7 +236,7 @@ export default function Page() {
             onModelChange={handleModelChange}
           />
           {/* Title */}
-          <div className="flex space-y-2 p-4">
+          <div className="flex flex-col space-y-2 mt-4">
             <Button
               onClick={() => setActiveTab('face')}
               fullWidth
@@ -305,7 +305,7 @@ export default function Page() {
           )}
         </div>
       </div>
-      <div className="glass-brand-dark p-2 border-t border-brand-700 mt-auto">
+      <div className="glass-brand-dark p-2 border-t border-brand-700 mt-auto rounded-b-lg">
         {/* Footer content */}
         <CameraControls
           onRotate={handleRotateCamera}

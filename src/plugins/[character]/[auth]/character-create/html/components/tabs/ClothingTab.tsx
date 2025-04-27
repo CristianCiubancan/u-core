@@ -277,8 +277,8 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
                 key={category.id}
                 className={`px-3 py-2 rounded w-full text-left ${
                   activeCategory === category.id
-                    ? 'bg-brand-600'
-                    : 'bg-brand-800 hover:bg-brand-700'
+                    ? 'glass-brand'
+                    : 'glass-brand-dark'
                 }`}
                 onClick={() => handleCategorySelect(category.id)}
               >

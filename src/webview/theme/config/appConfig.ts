@@ -7,7 +7,7 @@ interface AppConfig {
 }
 
 const config: AppConfig = {
-  brandColor: 'violet', // Changed to indigo for better visual appeal and readability
+  brandColor: 'indigo', // Changed to indigo for better visual appeal and readability
   grayColor: 'slate', // Changed to slate for better contrast with indigo
 };
 
