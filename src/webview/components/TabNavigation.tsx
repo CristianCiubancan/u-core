@@ -1,48 +1,91 @@
 import React from 'react';
-import Button from './Button';
 
-interface Tab {
-  id: string;
-  label: string;
-}
+type ButtonSize = 'sm' | 'base' | 'lg';
+type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'tab';
 
-interface TabNavigationProps {
-  tabs: Tab[];
-  activeTab: string;
-  onTabChange: (tabId: string) => void;
-  orientation?: 'vertical' | 'horizontal';
+interface ButtonProps {
+  children?: React.ReactNode;
+  type?: 'button' | 'submit' | 'reset';
+  text?: string;
+  fullWidth?: boolean;
+  onClick?: () => void;
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+  disabled?: boolean;
   className?: string;
+  active?: boolean;
+  // Add these accessibility properties
+  role?: string;
+  id?: string;
+  'aria-selected'?: boolean;
+  'aria-controls'?: string;
+  // Allow any other HTML button attributes
+  [x: string]: any;
 }
 
-const TabNavigation: React.FC<TabNavigationProps> = ({
-  tabs,
-  onTabChange,
-  orientation = 'vertical',
+const Button = ({
+  children,
+  type = 'button',
+  text,
+  fullWidth = false,
+  onClick,
+  size = 'base',
+  variant = 'primary',
+  disabled = false,
   className = '',
-}) => {
-  const isVertical = orientation === 'vertical';
+  active = false,
+  // Extract other props to pass to the button element
+  ...rest
+}: ButtonProps) => {
+  // Map size prop to fluid typography classes from our theme
+  const sizeMap: Record<ButtonSize, string> = {
+    'sm': 'text-fluid-sm py-1.5 px-2.5',
+    'base': 'text-fluid-base py-2 px-3',
+    'lg': 'text-fluid-lg py-2.5 px-4',
+  };
 
-  const containerClasses = isVertical
-    ? `h-full glass-brand-dark p-3 ${className}`
-    : `w-full glass-brand-dark p-3 ${className}`;
+  const sizeClass = sizeMap[size] || 'text-fluid-base py-2 px-3';
 
-  const navClasses = isVertical ? 'space-y-2' : 'flex space-x-2';
+  // Base classes using our theme tokens
+  const baseClasses =
+    'transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-opacity-50 border border-transparent rounded';
+
+  // Variant-specific classes using our theme tokens
+  const variantClasses: Record<ButtonVariant, string> = {
+    primary:
+      'bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 text-on-dark shadow-subtle hover:shadow-medium',
+    secondary:
+      'bg-gray-700 hover:bg-gray-600 focus:ring-gray-500 text-on-dark shadow-subtle hover:shadow-medium',
+    success:
+      'bg-success-600 hover:bg-success-700 focus:ring-success-500 text-on-dark shadow-subtle hover:shadow-medium',
+    danger:
+      'bg-error-600 hover:bg-error-700 focus:ring-error-500 text-on-dark shadow-subtle hover:shadow-medium',
+    tab: active
+      ? 'glass-active text-on-brand-surface high-contrast shadow-medium'
+      : 'hover:glass-dark text-on-dark hover:text-on-glass-dark w-full text-left p-2',
+  };
+
+  // Combine all classes
+  const buttonClasses = `
+    ${baseClasses}
+    ${variantClasses[variant]}
+    ${sizeClass}
+    ${fullWidth ? 'w-full' : ''}
+    ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+    ${className}
+  `;
 
   return (
-    <div className={containerClasses}>
-      <nav className={navClasses}>
-        {tabs.map((tab) => (
-          <Button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            size="base"
-            fullWidth={isVertical}
-            text={tab.label}
-          />
-        ))}
-      </nav>
-    </div>
+    <button
+      type={type}
+      className={buttonClasses.trim()}
+      onClick={onClick}
+      disabled={disabled}
+      {...rest} // Pass through all other props including ARIA attributes
+    >
+      {children || text}
+    </button>
   );
 };
 
-export default TabNavigation;
+export default Button;
