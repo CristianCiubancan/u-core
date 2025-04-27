@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../webview/utils/fetchNui';
-import {
-  Button,
-  Card,
-  FormInput,
-  FormSelect,
-  FormTextarea,
-  GlassContainer,
-} from '../../../../webview/components';
+import Container from '../../../../webview/components/ui/Container';
 
 // Constants
 const NUI_EVENT = 'example:toggle-ui';
@@ -62,7 +55,7 @@ export default function Page() {
   // Render UI
   return isOpen ? (
     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1/3 max-w-md">
-      <GlassContainer>
+      <Container>
         <Card
           title="Example UI"
           footerContent={
@@ -107,7 +100,7 @@ export default function Page() {
             />
           </div>
         </Card>
-      </GlassContainer>
+      </Container>
     </div>
   ) : null;
 }
