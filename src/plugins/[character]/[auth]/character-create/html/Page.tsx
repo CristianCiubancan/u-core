@@ -3,7 +3,6 @@ import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../../webview/utils/fetchNui';
 import { isEnvBrowser } from '../../../../../webview/utils/misc';
 import Button from '../../../../../webview/components/ui/Button';
-import Container from '../../../../../webview/components/ui/Container';
 import {
   ModelTab,
   FaceTab,
@@ -19,6 +18,7 @@ import {
   TabType,
   AppearanceOverlay,
 } from './types';
+import Container from '../../../../../webview/components/ui/Container';
 
 export default function Page() {
   const [isOpen, setIsOpen] = useState(isEnvBrowser());
@@ -221,7 +221,7 @@ export default function Page() {
 
   // Render UI
   return isOpen ? (
-    <div className="flex h-screen w-screen bg-brand-900/70">
+    <div className="flex w-[50vw] glass-dark text-on-dark">
       {' '}
       {/* Main container */}
       {/* Left sidebar - Tabs */}
