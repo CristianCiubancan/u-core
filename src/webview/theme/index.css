@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Hide default arrows in Firefox */
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  /* Hide default arrows in WebKit browsers (Chrome, Safari, Edge, Opera) */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0; /* Optional: Remove margin */
+  }
+}
+
+@layer base {
+  body {
+    @apply text-base;
+  }
+}
+
+body {
+  font-family: 'Libre Baskerville', serif;
+  font-weight: 400;
+  font-style: normal;
+}
