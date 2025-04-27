@@ -1,7 +1,8 @@
 // src/theme/plugins/scrollbar.ts
+// Refactored to use theme tokens and reduce hardcoded values
 
 import { hexToRgb } from '../utils/colorUtils';
-import { scrollbars, opacityLevels } from '../tokens/constants';
+import { scrollbars, opacityLevels, borders } from '../tokens/constants';
 
 /**
  * Scrollbar configuration interface
@@ -70,24 +71,29 @@ export function scrollbarPlugin({
   addComponents,
   theme,
 }: ScrollbarPluginParams) {
-  // Get color references
+  // Get color references from theme
   const colors = theme('colors');
   const gray = colors.gray || {};
   const primary = colors.primary || {};
 
-  // Apply minimal global scrollbar styles
+  // Get semantic color tokens if available
+  const surfaceSubtle = theme('colors.bg.subtle');
+  const borderSubtle = theme('colors.border.subtle');
+  const borderModerate = theme('colors.border.moderate');
+
+  // Apply minimal global scrollbar styles with theme tokens
   addBase({
     'html': {
       'scrollbar-width': 'thin',
-      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
-        opacityLevels.light.low
-      }) transparent`,
+      'scrollbar-color': `rgba(${hexToRgb(
+        theme('colors.gray.400') || gray[400]
+      )}, ${opacityLevels.light.low}) transparent`,
     },
     'body': {
       'scrollbar-width': 'thin',
-      'scrollbar-color': `rgba(${hexToRgb(gray[400])}, ${
-        opacityLevels.light.low
-      }) transparent`,
+      'scrollbar-color': `rgba(${hexToRgb(
+        theme('colors.gray.400') || gray[400]
+      )}, ${opacityLevels.light.low}) transparent`,
     },
     '::-webkit-scrollbar': {
       width: scrollbars.width.default,
@@ -97,58 +103,89 @@ export function scrollbarPlugin({
       background: 'transparent',
     },
     '::-webkit-scrollbar-thumb': {
-      background: `rgba(${hexToRgb(gray[400])}, ${opacityLevels.light.low})`,
+      background: `rgba(${hexToRgb(theme('colors.gray.400') || gray[400])}, ${
+        opacityLevels.light.low
+      })`,
       borderRadius: scrollbars.borderRadius.default,
     },
     '::-webkit-scrollbar-thumb:hover': {
-      background: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.medium})`,
+      background: `rgba(${hexToRgb(theme('colors.gray.500') || gray[500])}, ${
+        opacityLevels.light.medium
+      })`,
     },
   });
 
-  // Define scrollbar variants as components
+  // Define scrollbar variants as components using theme tokens
   const scrollbarComponents = {
     // Light theme scrollbars
     '.scrollbar-light': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
-      thumbBorder: `2px solid rgba(${hexToRgb(gray[200])}, ${
-        opacityLevels.light.low
-      })`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
-        opacityLevels.light.medium
-      })`,
+      trackBg:
+        surfaceSubtle ||
+        `rgba(${hexToRgb(theme('colors.gray.100') || gray[100])}, ${
+          opacityLevels.light.low
+        })`,
+      thumbBg:
+        borderSubtle ||
+        `rgba(${hexToRgb(theme('colors.gray.300') || gray[300])}, ${
+          opacityLevels.light.low
+        })`,
+      thumbBorder: `${borders.width.medium} solid ${
+        borderSubtle ||
+        `rgba(${hexToRgb(theme('colors.gray.200') || gray[200])}, ${
+          opacityLevels.light.low
+        })`
+      }`,
+      thumbHoverBg:
+        borderModerate ||
+        `rgba(${hexToRgb(theme('colors.gray.400') || gray[400])}, ${
+          opacityLevels.light.medium
+        })`,
     }),
 
     // Dark theme scrollbars
     '.scrollbar-dark': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
-      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
-      thumbBorder: `2px solid rgba(${hexToRgb(gray[700])}, ${
-        opacityLevels.light.low
+      trackBg: `rgba(${hexToRgb(theme('colors.gray.800') || gray[800])}, ${
+        opacityLevels.light.medium
       })`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
-    }),
-
-    // Brand-colored scrollbars
-    '.scrollbar-brand': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(primary[100])}, ${opacityLevels.light.low})`,
-      thumbBg: `rgba(${hexToRgb(primary[400])}, ${opacityLevels.light.medium})`,
-      thumbBorder: `2px solid rgba(${hexToRgb(primary[300])}, ${
-        opacityLevels.light.low
+      thumbBg: `rgba(${hexToRgb(theme('colors.gray.600') || gray[600])}, ${
+        opacityLevels.light.high
       })`,
-      thumbHoverBg: `rgba(${hexToRgb(primary[500])}, ${
+      thumbBorder: `${borders.width.medium} solid rgba(${hexToRgb(
+        theme('colors.gray.700') || gray[700]
+      )}, ${opacityLevels.light.low})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.500') || gray[500])}, ${
         opacityLevels.light.high
       })`,
     }),
 
+    // Brand-colored scrollbars
+    '.scrollbar-brand': createScrollbarStyles({
+      trackBg: `rgba(${hexToRgb(
+        theme('colors.primary.100') || primary[100]
+      )}, ${opacityLevels.light.low})`,
+      thumbBg: `rgba(${hexToRgb(
+        theme('colors.primary.400') || primary[400]
+      )}, ${opacityLevels.light.medium})`,
+      thumbBorder: `${borders.width.medium} solid rgba(${hexToRgb(
+        theme('colors.primary.300') || primary[300]
+      )}, ${opacityLevels.light.low})`,
+      thumbHoverBg: `rgba(${hexToRgb(
+        theme('colors.primary.500') || primary[500]
+      )}, ${opacityLevels.light.high})`,
+    }),
+
     // Thin scrollbars for compact UI elements - use border tokens
     '.scrollbar-thin': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
-      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(gray[200])}, ${
+      trackBg: `rgba(${hexToRgb(theme('colors.gray.100') || gray[100])}, ${
         opacityLevels.light.low
       })`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+      thumbBg: `rgba(${hexToRgb(theme('colors.gray.300') || gray[300])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(
+        theme('colors.gray.200') || gray[200]
+      )}, ${opacityLevels.light.low})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.400') || gray[400])}, ${
         opacityLevels.light.medium
       })`,
       width: scrollbars.width.thin,
@@ -158,12 +195,18 @@ export function scrollbarPlugin({
 
     // Thin dark scrollbars - use border tokens
     '.scrollbar-thin-dark': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[800])}, ${opacityLevels.light.medium})`,
-      thumbBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
-      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(gray[700])}, ${
-        opacityLevels.light.low
+      trackBg: `rgba(${hexToRgb(theme('colors.gray.800') || gray[800])}, ${
+        opacityLevels.light.medium
       })`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
+      thumbBg: `rgba(${hexToRgb(theme('colors.gray.600') || gray[600])}, ${
+        opacityLevels.light.high
+      })`,
+      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(
+        theme('colors.gray.700') || gray[700]
+      )}, ${opacityLevels.light.low})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.500') || gray[500])}, ${
+        opacityLevels.light.high
+      })`,
       width: scrollbars.width.thin,
       height: scrollbars.width.thin,
       borderRadius: scrollbars.borderRadius.sm,
@@ -180,43 +223,63 @@ export function scrollbarPlugin({
 
     // Rounded scrollbars - use border and shadow tokens
     '.scrollbar-rounded': createScrollbarStyles({
-      trackBg: `rgba(${hexToRgb(gray[100])}, ${opacityLevels.light.low})`,
-      thumbBg: `rgba(${hexToRgb(gray[300])}, ${opacityLevels.light.low})`,
-      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(gray[200])}, ${
+      trackBg: `rgba(${hexToRgb(theme('colors.gray.100') || gray[100])}, ${
         opacityLevels.light.low
       })`,
-      thumbHoverBg: `rgba(${hexToRgb(gray[400])}, ${
+      thumbBg: `rgba(${hexToRgb(theme('colors.gray.300') || gray[300])}, ${
+        opacityLevels.light.low
+      })`,
+      thumbBorder: `${borders.width.thin} solid rgba(${hexToRgb(
+        theme('colors.gray.200') || gray[200]
+      )}, ${opacityLevels.light.low})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.400') || gray[400])}, ${
         opacityLevels.light.medium
       })`,
       borderRadius: scrollbars.borderRadius.rounded,
     }),
 
-    // NEW: Subtle scrollbars with shadow
+    // NEW: Subtle scrollbars with shadow - theme token powered
     '.scrollbar-subtle': createScrollbarStyles({
       trackBg: 'transparent',
-      thumbBg: `rgba(${hexToRgb(gray[400])}, ${opacityLevels.light.medium})`,
+      thumbBg: `rgba(${hexToRgb(theme('colors.gray.400') || gray[400])}, ${
+        opacityLevels.light.medium
+      })`,
       thumbBorder: 'none',
-      thumbHoverBg: `rgba(${hexToRgb(gray[500])}, ${opacityLevels.light.high})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.500') || gray[500])}, ${
+        opacityLevels.light.high
+      })`,
       width: scrollbars.width.thin,
       borderRadius: scrollbars.borderRadius.rounded,
     }),
 
-    // NEW: Glass-style scrollbars for glass UI elements
+    // NEW: Glass-style scrollbars for glass UI elements - theme token powered
     '.scrollbar-glass': createScrollbarStyles({
-      trackBg: `rgba(255, 255, 255, ${opacityLevels.subtle})`,
-      thumbBg: `rgba(255, 255, 255, ${opacityLevels.light.medium})`,
+      trackBg:
+        theme('colors.glass.light-bg') ||
+        `rgba(255, 255, 255, ${opacityLevels.subtle})`,
+      thumbBg:
+        theme('colors.glass.light-border') ||
+        `rgba(255, 255, 255, ${opacityLevels.light.medium})`,
       thumbBorder: 'none',
       thumbHoverBg: `rgba(255, 255, 255, ${opacityLevels.light.high})`,
       width: scrollbars.width.thin,
       borderRadius: scrollbars.borderRadius.rounded,
     }),
 
-    // NEW: Glass-dark scrollbars
+    // NEW: Glass-dark scrollbars - theme token powered
     '.scrollbar-glass-dark': createScrollbarStyles({
-      trackBg: `rgba(0, 0, 0, ${opacityLevels.subtle})`,
-      thumbBg: `rgba(${hexToRgb(gray[700])}, ${opacityLevels.light.medium})`,
+      trackBg:
+        theme('colors.glass.dark-bg') ||
+        `rgba(0, 0, 0, ${opacityLevels.subtle})`,
+      thumbBg:
+        theme('colors.glass.dark-border') ||
+        `rgba(${hexToRgb(theme('colors.gray.700') || gray[700])}, ${
+          opacityLevels.light.medium
+        })`,
       thumbBorder: 'none',
-      thumbHoverBg: `rgba(${hexToRgb(gray[600])}, ${opacityLevels.light.high})`,
+      thumbHoverBg: `rgba(${hexToRgb(theme('colors.gray.600') || gray[600])}, ${
+        opacityLevels.light.high
+      })`,
       width: scrollbars.width.thin,
       borderRadius: scrollbars.borderRadius.rounded,
     }),
@@ -224,6 +287,3 @@ export function scrollbarPlugin({
 
   addComponents(scrollbarComponents, ['responsive']);
 }
-
-// Add the missing imports
-import { borders } from '../tokens/constants';
