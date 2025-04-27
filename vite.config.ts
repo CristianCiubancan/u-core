@@ -10,14 +10,14 @@ export default defineConfig({
     production: {
       define: {
         'process.env': {
-          ASSET_SERVER_URL: 'http://localhost:3000',
+          ASSET_SERVER_URL: 'https://localhost:3000',
         },
       },
     },
     development: {
       define: {
         'process.env': {
-          ASSET_SERVER_URL: 'http://localhost:3000',
+          ASSET_SERVER_URL: 'https://localhost:3000',
         },
       },
     },
