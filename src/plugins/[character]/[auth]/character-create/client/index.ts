@@ -22,6 +22,9 @@ namespace CharacterCreate {
    * @param {boolean} state - The state to set the UI to (true = visible, false = hidden)
    */
   function toggleUI(state: boolean) {
+    console.log(
+      `[Character Create] Toggling UI to ${state ? 'visible' : 'hidden'}`
+    );
     uiVisible = state;
 
     // Send message to NUI
@@ -29,14 +32,24 @@ namespace CharacterCreate {
       action: NUI_EVENT,
       data: state,
     });
+    console.log(
+      `[Character Create] Sent NUI message with action: ${NUI_EVENT}, data: ${state}`
+    );
 
     // Set focus to UI when visible
     SetNuiFocus(state, state);
+    console.log(`[Character Create] Set NUI focus: ${state}`);
 
     // If showing UI, set up the character creation environment
     if (state) {
+      console.log(
+        '[Character Create] Setting up character creation environment'
+      );
       setupCharacterCreation();
     } else {
+      console.log(
+        '[Character Create] Cleaning up character creation environment'
+      );
       cleanupCharacterCreation();
     }
   }
@@ -277,32 +290,44 @@ namespace CharacterCreate {
    * @param {string} model - The model to set
    */
   async function updateModel(model: string) {
+    console.log(`[Character Create] Updating player model to: ${model}`);
+
     // Request the model
-    RequestModel(GetHashKey(model));
+    const modelHash = GetHashKey(model);
+    console.log(`[Character Create] Model hash: ${modelHash}`);
+    RequestModel(modelHash);
 
     // Wait for the model to load
     const startTime = GetGameTimer();
-    while (!HasModelLoaded(GetHashKey(model))) {
+    while (!HasModelLoaded(modelHash)) {
       await Delay(100);
 
       // Timeout after 5 seconds
       if (GetGameTimer() - startTime > 5000) {
-        console.error('Failed to load character model');
+        console.error('[Character Create] Failed to load character model');
         return;
       }
     }
 
+    console.log(`[Character Create] Model loaded successfully: ${model}`);
+
     // Set the player model
-    SetPlayerModel(PlayerId(), GetHashKey(model));
-    SetModelAsNoLongerNeeded(GetHashKey(model));
+    const playerId = PlayerId();
+    console.log(`[Character Create] Setting model for player ID: ${playerId}`);
+    SetPlayerModel(playerId, modelHash);
+    SetModelAsNoLongerNeeded(modelHash);
 
     // Set default appearance
     const playerPed = PlayerPedId();
+    console.log(
+      `[Character Create] Setting default appearance for ped: ${playerPed}`
+    );
     SetPedDefaultComponentVariation(playerPed);
     ClearAllPedProps(playerPed);
 
     // Ensure player is still facing forward after model change
     SetEntityHeading(playerPed, 0.0);
+    console.log('[Character Create] Model update complete');
   }
 
   /**
@@ -311,7 +336,9 @@ namespace CharacterCreate {
    * @param {number} value - The value to set
    */
   function updateFace(key: string, value: number) {
+    console.log(`[Character Create] Updating face property: ${key} = ${value}`);
     const playerPed = PlayerPedId();
+    console.log(`[Character Create] Player ped ID: ${playerPed}`);
 
     if (
       key === 'fatherIndex' ||
@@ -324,6 +351,10 @@ namespace CharacterCreate {
       const motherIndex = key === 'motherIndex' ? value : 0; // Default value, should be from state
       const shapeMix = key === 'shapeMix' ? value : 0.5; // Default value, should be from state
       const skinMix = key === 'skinMix' ? value : 0.5; // Default value, should be from state
+
+      console.log(
+        `[Character Create] Setting head blend - Father: ${fatherIndex}, Mother: ${motherIndex}, Shape Mix: ${shapeMix}, Skin Mix: ${skinMix}`
+      );
 
       // Set head blend
       SetPedHeadBlendData(
@@ -343,6 +374,7 @@ namespace CharacterCreate {
 
     // Ensure player is still facing forward
     SetEntityHeading(playerPed, 0.0);
+    console.log('[Character Create] Face update complete');
   }
 
   /**
@@ -351,19 +383,26 @@ namespace CharacterCreate {
    * @param {number} value - The value to set
    */
   function updateHair(key: string, value: number) {
+    console.log(`[Character Create] Updating hair property: ${key} = ${value}`);
     const playerPed = PlayerPedId();
+    console.log(`[Character Create] Player ped ID: ${playerPed}`);
 
     if (key === 'style') {
+      console.log(`[Character Create] Setting hair style to: ${value}`);
       SetPedComponentVariation(playerPed, 2, value, 0, 0);
     } else if (key === 'color' || key === 'highlight') {
       const colorId = key === 'color' ? value : 0; // Default value, should be from state
       const highlightId = key === 'highlight' ? value : 0; // Default value, should be from state
 
+      console.log(
+        `[Character Create] Setting hair color: primary=${colorId}, highlight=${highlightId}`
+      );
       SetPedHairColor(playerPed, colorId, highlightId);
     }
 
     // Ensure player is still facing forward
     SetEntityHeading(playerPed, 0.0);
+    console.log('[Character Create] Hair update complete');
   }
 
   /**
@@ -373,26 +412,36 @@ namespace CharacterCreate {
    * @param {number} value - The value to set
    */
   function updateAppearance(category: string, key: string, value: number) {
+    console.log(
+      `[Character Create] Updating appearance: category=${category}, key=${key}, value=${value}`
+    );
     const playerPed = PlayerPedId();
+    console.log(`[Character Create] Player ped ID: ${playerPed}`);
 
     if (category === 'eyebrows') {
       if (key === 'style') {
+        console.log(`[Character Create] Setting eyebrows style to: ${value}`);
         SetPedHeadOverlay(playerPed, 2, value, 1.0);
       } else if (key === 'color') {
+        console.log(`[Character Create] Setting eyebrows color to: ${value}`);
         SetPedHeadOverlayColor(playerPed, 2, 1, value, 0);
       }
     } else if (category === 'beard') {
       if (key === 'style') {
+        console.log(`[Character Create] Setting beard style to: ${value}`);
         SetPedHeadOverlay(playerPed, 1, value, 1.0);
       } else if (key === 'color') {
+        console.log(`[Character Create] Setting beard color to: ${value}`);
         SetPedHeadOverlayColor(playerPed, 1, 1, value, 0);
       }
     } else if (category === 'eyeColor') {
+      console.log(`[Character Create] Setting eye color to: ${value}`);
       SetPedEyeColor(playerPed, value);
     }
 
     // Ensure player is still facing forward
     SetEntityHeading(playerPed, 0.0);
+    console.log('[Character Create] Appearance update complete');
   }
 
   /**
@@ -402,7 +451,11 @@ namespace CharacterCreate {
    */
   function updateClothing(key: string, value: number) {
     try {
+      console.log(
+        `[Character Create] Starting clothing update: ${key} = ${value}`
+      );
       const playerPed = PlayerPedId();
+      console.log(`[Character Create] Player ped ID: ${playerPed}`);
 
       // Ensure the ped exists and is valid
       if (!DoesEntityExist(playerPed)) {
@@ -411,8 +464,6 @@ namespace CharacterCreate {
         );
         return;
       }
-
-      console.log(`[Character Create] Updating clothing: ${key} = ${value}`);
 
       // Component IDs:
       // 0: Face
@@ -438,20 +489,51 @@ namespace CharacterCreate {
         'accessories': 7,
       };
 
+      console.log(
+        `[Character Create] Component map keys: ${Object.keys(
+          componentMap
+        ).join(', ')}`
+      );
+
       // Handle style changes (drawable IDs)
       if (Object.keys(componentMap).includes(key)) {
         const componentId = componentMap[key];
-        SetPedComponentVariation(playerPed, componentId, value, 0, 0);
         console.log(
-          `[Character Create] Set component ${componentId} to drawable ${value}`
+          `[Character Create] Setting component ${componentId} (${key}) to drawable ${value}`
+        );
+
+        // Get current texture to maintain it
+        const currentTexture = GetPedTextureVariation(playerPed, componentId);
+        console.log(
+          `[Character Create] Current texture for component ${componentId}: ${currentTexture}`
+        );
+
+        SetPedComponentVariation(
+          playerPed,
+          componentId,
+          value,
+          currentTexture,
+          0
+        );
+
+        // Verify the change was applied
+        const newDrawable = GetPedDrawableVariation(playerPed, componentId);
+        console.log(
+          `[Character Create] New drawable for component ${componentId}: ${newDrawable}`
         );
       }
       // Handle texture changes
       else if (key.endsWith('Texture')) {
         const baseKey = key.replace('Texture', '');
+        console.log(`[Character Create] Texture change - Base key: ${baseKey}`);
+
         if (Object.keys(componentMap).includes(baseKey)) {
           const componentId = componentMap[baseKey];
           const drawableId = GetPedDrawableVariation(playerPed, componentId);
+          console.log(
+            `[Character Create] Setting component ${componentId} (${baseKey}) drawable ${drawableId} texture to ${value}`
+          );
+
           SetPedComponentVariation(
             playerPed,
             componentId,
@@ -459,10 +541,21 @@ namespace CharacterCreate {
             value,
             0
           );
+
+          // Verify the change was applied
+          const newTexture = GetPedTextureVariation(playerPed, componentId);
           console.log(
-            `[Character Create] Set component ${componentId} texture to ${value}`
+            `[Character Create] New texture for component ${componentId}: ${newTexture}`
+          );
+        } else {
+          console.log(
+            `[Character Create] Base key ${baseKey} not found in component map`
           );
         }
+      } else {
+        console.log(
+          `[Character Create] Key ${key} not recognized as a valid clothing property`
+        );
       }
 
       // Ensure the character is visible
@@ -470,6 +563,7 @@ namespace CharacterCreate {
 
       // Ensure player is still facing forward
       SetEntityHeading(playerPed, 0.0);
+      console.log('[Character Create] Clothing update complete');
     } catch (error) {
       console.error('[Character Create] Error updating clothing:', error);
     }
@@ -497,12 +591,22 @@ namespace CharacterCreate {
 
   // Handle NUI callback when UI is closed from the interface
   RegisterNuiCallback(NUI_EVENT, (data: any, cb: (data: any) => void) => {
+    console.log(
+      '[Character Create] Received NUI event with data:',
+      JSON.stringify(data)
+    );
+
     if (data.close) {
+      console.log('[Character Create] Closing UI from NUI request');
       toggleUI(false);
     }
 
     // If saving character data
     if (data.save) {
+      console.log(
+        '[Character Create] Saving character data:',
+        JSON.stringify(data.characterData)
+      );
       // Save character data to server
       emitNet('character-create:save', data.characterData);
     }
@@ -515,6 +619,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:update-model',
     async (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Update model request:',
+        JSON.stringify(data)
+      );
       await updateModel(data.model);
       cb({ status: 'ok' });
     }
@@ -524,6 +632,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:update-face',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Update face request:',
+        JSON.stringify(data)
+      );
       updateFace(data.key, data.value);
       cb({ status: 'ok' });
     }
@@ -533,6 +645,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:update-hair',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Update hair request:',
+        JSON.stringify(data)
+      );
       updateHair(data.key, data.value);
       cb({ status: 'ok' });
     }
@@ -542,6 +658,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:update-appearance',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Update appearance request:',
+        JSON.stringify(data)
+      );
       updateAppearance(data.category, data.key, data.value);
       cb({ status: 'ok' });
     }
@@ -551,6 +671,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:update-clothing',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Update clothing request:',
+        JSON.stringify(data)
+      );
       updateClothing(data.key, data.value);
       cb({ status: 'ok' });
     }
@@ -560,6 +684,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:rotate-camera',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Camera rotation request:',
+        JSON.stringify(data)
+      );
       rotateCamera(data.direction);
       cb({ status: 'ok' });
     }
@@ -569,6 +697,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:zoom-camera',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Camera zoom request:',
+        JSON.stringify(data)
+      );
       zoomCamera(data.direction);
       cb({ status: 'ok' });
     }
@@ -578,6 +710,10 @@ namespace CharacterCreate {
   RegisterNuiCallback(
     'character-create:focus-camera',
     (data: any, cb: (data: any) => void) => {
+      console.log(
+        '[Character Create] Camera focus request:',
+        JSON.stringify(data)
+      );
       focusCamera(data.focus);
       cb({ status: 'ok' });
     }
@@ -585,11 +721,18 @@ namespace CharacterCreate {
 
   // Handle save result from server
   onNet('character-create:save-result', (result: any) => {
+    console.log(
+      '[Character Create] Save result from server:',
+      JSON.stringify(result)
+    );
     if (result.success) {
-      console.log('Character saved successfully');
+      console.log('[Character Create] Character saved successfully');
       // You could add additional logic here, like teleporting the player to a spawn point
     } else {
-      console.error('Failed to save character:', result.error);
+      console.error(
+        '[Character Create] Failed to save character:',
+        result.error
+      );
     }
   });
 
