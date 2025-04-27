@@ -16,6 +16,15 @@ interface ScrollbarConfig {
 }
 
 /**
+ * Plugin parameter types
+ */
+interface ScrollbarPluginParams {
+  addBase: (baseStyles: Record<string, any>) => void;
+  addComponents: (components: Record<string, any>, variants?: string[]) => void;
+  theme: (path: string) => any;
+}
+
+/**
  * Creates consistent scrollbar styles
  */
 function createScrollbarStyles({
@@ -55,7 +64,11 @@ function createScrollbarStyles({
 /**
  * Scrollbar plugin for Tailwind CSS
  */
-export function scrollbarPlugin({ addBase, addComponents, theme }) {
+export function scrollbarPlugin({
+  addBase,
+  addComponents,
+  theme,
+}: ScrollbarPluginParams) {
   // Get color references
   const colors = theme('colors');
   const gray = colors.gray || {};
