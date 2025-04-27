@@ -11,7 +11,11 @@ import { scrollbarPlugin } from './theme/plugins/scrollbar';
 
 // Import token resolvers
 import { generateResponsiveTypography } from './theme/tokens/typography';
-import { colorScales } from './theme/tokens/colors';
+import {
+  createColorScales,
+  generateColorCssVariables,
+  ThemeOptions,
+} from './theme/tokens/colors';
 import {
   spacing,
   fontFamily,
@@ -25,16 +29,12 @@ import { effects } from './theme/tokens/effects';
 import { animation } from './theme/tokens/animation';
 import { breakpoints } from './theme/tokens/breakpoints';
 
-// Font size configuration is now defined directly in the theme object
-// This helps avoid TypeScript issues with font size array types
-
 // Create plugin wrappers with correct interface
 const createAccessibleTextPlugin = () => {
   return (api: PluginAPI) => {
     const { addComponents, theme } = api;
     accessibleTextPlugin({
       addComponents: (components, _variants) => {
-        // The second parameter should be an options object, not an array
         addComponents(components, {
           // Optional properties you can set:
           // respectPrefix: true,
@@ -69,6 +69,15 @@ const createScrollbarPlugin = () => {
   };
 };
 
+// Define theme configuration using our ThemeOptions interface
+const themeOptions: ThemeOptions = {
+  brandColor: 'indigo', // Change to any Tailwind color palette
+  grayColor: 'gray', // Change to any gray variant (slate, zinc, gray, etc.)
+};
+
+// Create color scales using CSS variables
+const variableBasedColorScales = createColorScales(themeOptions);
+
 /**
  * Tailwind CSS configuration with custom theming system
  */
@@ -78,9 +87,9 @@ const config: Config = {
     './pages/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
   ],
-  // Specify theme configuration directly with tailwind-compatible formats
+  // Theme configuration using CSS variables
   theme: {
-    colors: colorScales,
+    colors: variableBasedColorScales,
     fontFamily,
     fontSize: {
       '2xs': ['0.625rem', { lineHeight: '1rem' }],
@@ -110,7 +119,57 @@ const config: Config = {
     screens: breakpoints,
     blur: effects.blur,
     extend: {
-      // Additional theme extensions can go here
+      // Semantic colors as CSS variables
+      colors: {
+        bg: {
+          page: 'var(--color-background-page-light)',
+          card: 'var(--color-background-card-light)',
+          subtle: 'var(--color-background-subtle-light)',
+          muted: 'var(--color-background-muted-light)',
+          elevated: 'var(--color-background-elevated-light)',
+        },
+        surface: {
+          primary: 'var(--color-surface-primary-light)',
+          success: 'var(--color-surface-success-light)',
+          warning: 'var(--color-surface-warning-light)',
+          error: 'var(--color-surface-error-light)',
+          info: 'var(--color-surface-info-light)',
+        },
+        border: {
+          subtle: 'var(--color-border-subtle-light)',
+          moderate: 'var(--color-border-moderate-light)',
+          strong: 'var(--color-border-strong-light)',
+          focus: 'var(--color-border-focus-light)',
+          error: 'var(--color-border-error-light)',
+        },
+        text: {
+          primary: 'var(--color-text-primary-light)',
+          secondary: 'var(--color-text-secondary-light)',
+          tertiary: 'var(--color-text-tertiary-light)',
+          disabled: 'var(--color-text-disabled-light)',
+          inverted: 'var(--color-text-inverted-light)',
+          link: 'var(--color-text-link-light)',
+          success: 'var(--color-text-success-light)',
+          error: 'var(--color-text-error-light)',
+          warning: 'var(--color-text-warning-light)',
+          info: 'var(--color-text-info-light)',
+        },
+        icon: {
+          primary: 'var(--color-icon-primary-light)',
+          secondary: 'var(--color-icon-secondary-light)',
+          tertiary: 'var(--color-icon-tertiary-light)',
+          inverted: 'var(--color-icon-inverted-light)',
+        },
+        // Glass color variants
+        glass: {
+          'light-bg': 'var(--color-glass-light-background-light)',
+          'light-border': 'var(--color-glass-light-border-light)',
+          'dark-bg': 'var(--color-glass-dark-background-light)',
+          'dark-border': 'var(--color-glass-dark-border-light)',
+          'brand-bg': 'var(--color-glass-brand-background-light)',
+          'brand-border': 'var(--color-glass-brand-border-light)',
+        },
+      },
     },
   },
   // Default variant configuration
@@ -126,6 +185,28 @@ const config: Config = {
   },
   // Plugin configuration
   plugins: [
+    // Theme initialization plugin - this defines CSS variables at build time
+    plugin(({ addBase }) => {
+      // Convert these to CSS variables
+      const cssVariables = generateColorCssVariables(themeOptions);
+
+      // Add CSS variables as base styles
+      addBase({
+        // We can't use the full string directly, so we parse it
+        [':root']: Object.fromEntries(
+          cssVariables
+            .replace(':root {', '')
+            .replace('}', '')
+            .split('\n')
+            .filter((line) => line.trim())
+            .map((line) => {
+              const [name, value] = line.trim().replace(';', '').split(': ');
+              return [name.trim(), value.trim()];
+            })
+        ),
+      });
+    }),
+
     // Register custom plugins with correct interfaces
     plugin(createAccessibleTextPlugin()),
     plugin(createGlassMorphismPlugin()),
@@ -172,6 +253,25 @@ const config: Config = {
         '.rendering-auto': {
           '-webkit-font-smoothing': 'auto',
           '-moz-osx-font-smoothing': 'auto',
+        },
+      });
+
+      // Dark mode selector utilities
+      addUtilities({
+        '.dark-mode': {
+          '.bg-page': {
+            backgroundColor: 'var(--color-background-page-dark)',
+          },
+          '.bg-card': {
+            backgroundColor: 'var(--color-background-card-dark)',
+          },
+          '.text-primary': {
+            color: 'var(--color-text-primary-dark)',
+          },
+          '.text-secondary': {
+            color: 'var(--color-text-secondary-dark)',
+          },
+          // Add more dark mode overrides as needed
         },
       });
     }),
@@ -247,6 +347,9 @@ const config: Config = {
     'truncate-3',
     'rendering-crisp',
     'rendering-auto',
+
+    // Mode classes
+    'dark-mode',
   ],
 };
 
