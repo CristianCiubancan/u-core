@@ -222,97 +222,98 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCloseUi]);
 
+  return <div>savalut</div>;
   // Render UI
-  return isOpen ? (
-    <Layout
-      title="Character Creation"
-      onSave={handleSaveCharacter}
-      onClose={handleCloseUi}
-      position="left"
-      isSaving={isSaving}
-      saveButtonText="Save"
-      cancelButtonText="Cancel"
-      headerContent={
-        <div className="flex space-x-2">
-          <Button
-            variant="success"
-            onClick={handleSaveCharacter}
-            disabled={isSaving}
-            size="sm"
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
-          <Button variant="danger" onClick={handleCloseUi} size="sm">
-            Cancel
-          </Button>
-        </div>
-      }
-      footerContent={
-        <div className="glass-brand-dark p-2 border-t border-brand-700">
-          <CameraControls
-            onRotate={handleRotateCamera}
-            onZoom={handleZoomCamera}
-            onFocus={handleFocusCamera}
-          />
-        </div>
-      }
-    >
-      <div className="flex h-full">
-        {/* Left sidebar - Tabs */}
-        <TabNavigation
-          tabs={[
-            { id: 'model', label: 'Character Model' },
-            { id: 'face', label: 'Face' },
-            { id: 'hair', label: 'Hair' },
-            { id: 'appearance', label: 'Appearance' },
-            { id: 'clothing', label: 'Clothing' },
-          ]}
-          activeTab={activeTab}
-          onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
-          orientation="vertical"
-          className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800"
-        />
+  // return isOpen ? (
+  //   <Layout
+  //     title="Character Creation"
+  //     onSave={handleSaveCharacter}
+  //     onClose={handleCloseUi}
+  //     position="left"
+  //     isSaving={isSaving}
+  //     saveButtonText="Save"
+  //     cancelButtonText="Cancel"
+  //     headerContent={
+  //       <div className="flex space-x-2">
+  //         <Button
+  //           variant="success"
+  //           onClick={handleSaveCharacter}
+  //           disabled={isSaving}
+  //           size="sm"
+  //         >
+  //           {isSaving ? 'Saving...' : 'Save'}
+  //         </Button>
+  //         <Button variant="danger" onClick={handleCloseUi} size="sm">
+  //           Cancel
+  //         </Button>
+  //       </div>
+  //     }
+  //     footerContent={
+  //       <div className="glass-brand-dark p-2 border-t border-brand-700">
+  //         <CameraControls
+  //           onRotate={handleRotateCamera}
+  //           onZoom={handleZoomCamera}
+  //           onFocus={handleFocusCamera}
+  //         />
+  //       </div>
+  //     }
+  //   >
+  //     <div className="flex h-full">
+  //       {/* Left sidebar - Tabs */}
+  //       <TabNavigation
+  //         tabs={[
+  //           { id: 'model', label: 'Character Model' },
+  //           { id: 'face', label: 'Face' },
+  //           { id: 'hair', label: 'Hair' },
+  //           { id: 'appearance', label: 'Appearance' },
+  //           { id: 'clothing', label: 'Clothing' },
+  //         ]}
+  //         activeTab={activeTab}
+  //         onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
+  //         orientation="vertical"
+  //         className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800"
+  //       />
 
-        {/* Right content - Tab content */}
-        <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
-          {activeTab === 'model' && (
-            <ModelTab
-              currentModel={characterData.model}
-              onModelChange={handleModelChange}
-            />
-          )}
+  //       {/* Right content - Tab content */}
+  //       <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
+  //         {activeTab === 'model' && (
+  //           <ModelTab
+  //             currentModel={characterData.model}
+  //             onModelChange={handleModelChange}
+  //           />
+  //         )}
 
-          {activeTab === 'face' && (
-            <FaceTab
-              faceData={characterData.face}
-              onFaceChange={handleFaceChange}
-            />
-          )}
+  //         {activeTab === 'face' && (
+  //           <FaceTab
+  //             faceData={characterData.face}
+  //             onFaceChange={handleFaceChange}
+  //           />
+  //         )}
 
-          {activeTab === 'hair' && (
-            <HairTab
-              hairData={characterData.hair}
-              onHairChange={handleHairChange}
-            />
-          )}
+  //         {activeTab === 'hair' && (
+  //           <HairTab
+  //             hairData={characterData.hair}
+  //             onHairChange={handleHairChange}
+  //           />
+  //         )}
 
-          {activeTab === 'appearance' && (
-            <AppearanceTab
-              appearanceData={characterData.appearance}
-              onAppearanceChange={handleAppearanceChange}
-              onEyeColorChange={handleEyeColorChange}
-            />
-          )}
+  //         {activeTab === 'appearance' && (
+  //           <AppearanceTab
+  //             appearanceData={characterData.appearance}
+  //             onAppearanceChange={handleAppearanceChange}
+  //             onEyeColorChange={handleEyeColorChange}
+  //           />
+  //         )}
 
-          {activeTab === 'clothing' && (
-            <ClothingTab
-              clothingData={characterData.clothing}
-              onClothingChange={handleClothingChange}
-              model={characterData.model}
-            />
-          )}
-        </div>
-      </div>
-    </Layout>
-  ) : null;
+  //         {activeTab === 'clothing' && (
+  //           <ClothingTab
+  //             clothingData={characterData.clothing}
+  //             onClothingChange={handleClothingChange}
+  //             model={characterData.model}
+  //           />
+  //         )}
+  //       </div>
+  //     </div>
+  //   </Layout>
+  // ) : null;
 }
