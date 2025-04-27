@@ -5,7 +5,7 @@ import { fallbacks } from '../tokens/constants';
 
 /**
  * Convert hex color to RGB values
- * @param hex - Hex color code (with or without #)
+ * @param hex - Hex color code (with or without #) or CSS variable
  * @returns RGB values as a comma-separated string
  */
 export function hexToRgb(hex: string): string {
@@ -19,6 +19,13 @@ export function hexToRgb(hex: string): string {
   }
 
   try {
+    // Check if the input is a CSS variable
+    if (hex.startsWith('var(--')) {
+      // For CSS variables, return a fallback that will work in runtime
+      // but won't cause errors during build time
+      return fallbacks.color.rgb;
+    }
+
     // Remove # if present
     hex = hex.replace(/^#/, '');
 
@@ -78,13 +85,29 @@ function hexToRgba(hex: string, alpha: number): string {
 
 /**
  * Calculate relative luminance of a color
- * @param hex - Hex color code
+ * @param hex - Hex color code or CSS variable
  * @returns Relative luminance value (0-1)
  */
 export function getLuminance(hex: string): number {
   try {
+    // Check if the input is a CSS variable
+    if (hex.startsWith('var(--')) {
+      // For CSS variables, return a middle luminance value as fallback
+      return fallbacks.opacity;
+    }
+
     // Remove # if present
     hex = hex.replace(/^#/, '');
+
+    // Validate hex format
+    if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
+      return fallbacks.opacity; // Return middle luminance as fallback
+    }
+
+    // Handle 3-digit hex codes by duplicating each digit
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
 
     // Parse hex values
     const r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -151,14 +174,26 @@ export function getAccessibleTextColor(
 
 /**
  * Adjust color lightness
- * @param hex - Hex color code
+ * @param hex - Hex color code or CSS variable
  * @param amount - Amount to adjust lightness (-1 to 1)
- * @returns Adjusted hex color
+ * @returns Adjusted hex color or original CSS variable
  */
 export function adjustColorLightness(hex: string, amount: number): string {
   try {
+    // Check if the input is a CSS variable
+    if (hex.startsWith('var(--')) {
+      // For CSS variables, return the original variable
+      // This will be handled at runtime when the CSS variable is resolved
+      return hex;
+    }
+
     // Remove # if present
     hex = hex.replace(/^#/, '');
+
+    // Validate hex format
+    if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
+      return `#${hex}`; // Return original value with # prefix
+    }
 
     // Handle shorthand hex
     if (hex.length === 3) {
@@ -242,7 +277,7 @@ export function adjustColorLightness(hex: string, amount: number): string {
     return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
   } catch (error) {
     console.error(`Error adjusting color lightness: ${error}`);
-    return hex; // Return original color as fallback
+    return hex.startsWith('#') ? hex : `#${hex}`; // Return original color as fallback
   }
 }
 

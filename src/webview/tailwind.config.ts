@@ -12,22 +12,19 @@ import { scrollbarPlugin } from './theme/plugins/scrollbar';
 // Import token resolvers
 import { generateResponsiveTypography } from './theme/tokens/typography';
 import {
-  createColorScales,
-  generateColorCssVariables,
-  ThemeOptions,
-} from './theme/tokens/colors';
-import {
   spacing,
   fontFamily,
   lineHeight,
   letterSpacing,
   fontWeight,
+  generateEnhancedCssVariables,
 } from './theme/tokens/index';
 import { borderRadius } from './theme/tokens/radius';
 import { elevation } from './theme/tokens/elevation';
 import { effects } from './theme/tokens/effects';
 import { animation } from './theme/tokens/animation';
 import { breakpoints } from './theme/tokens/breakpoints';
+import { ThemeOptions, createColorScales } from './theme/tokens/tailwindColors'; // Updated to import ThemeOptions from the correct file
 
 // Create plugin wrappers with correct interface
 const createAccessibleTextPlugin = () => {
@@ -71,15 +68,16 @@ const createScrollbarPlugin = () => {
 
 // Define theme configuration using our ThemeOptions interface
 const themeOptions: ThemeOptions = {
-  brandColor: 'indigo', // Change to any Tailwind color palette
-  grayColor: 'gray', // Change to any gray variant (slate, zinc, gray, etc.)
+  // Reverted to ThemeOptions
+  brandColor: 'indigo', // Ensure this matches ThemeOptions
+  grayColor: 'zinc', // Updated from 'gray' to 'zinc' to match modern Tailwind naming
 };
 
 // Create color scales using CSS variables
 const variableBasedColorScales = createColorScales(themeOptions);
 
 /**
- * Tailwind CSS configuration with custom theming system
+ * Tailwind CSS configuration with enhanced theming system
  */
 const config: Config = {
   content: [
@@ -122,52 +120,100 @@ const config: Config = {
       // Semantic colors as CSS variables
       colors: {
         bg: {
-          page: 'var(--color-background-page-light)',
-          card: 'var(--color-background-card-light)',
-          subtle: 'var(--color-background-subtle-light)',
-          muted: 'var(--color-background-muted-light)',
-          elevated: 'var(--color-background-elevated-light)',
+          page: 'var(--color-background-page)',
+          card: 'var(--color-background-card)',
+          subtle: 'var(--color-background-subtle)',
+          muted: 'var(--color-background-muted)',
+          elevated: 'var(--color-background-elevated)',
         },
         surface: {
-          primary: 'var(--color-surface-primary-light)',
-          success: 'var(--color-surface-success-light)',
-          warning: 'var(--color-surface-warning-light)',
-          error: 'var(--color-surface-error-light)',
-          info: 'var(--color-surface-info-light)',
+          primary: 'var(--color-surface-primary)',
+          success: 'var(--color-surface-success)',
+          warning: 'var(--color-surface-warning)',
+          error: 'var(--color-surface-error)',
+          info: 'var(--color-surface-info)',
         },
         border: {
-          subtle: 'var(--color-border-subtle-light)',
-          moderate: 'var(--color-border-moderate-light)',
-          strong: 'var(--color-border-strong-light)',
-          focus: 'var(--color-border-focus-light)',
-          error: 'var(--color-border-error-light)',
+          subtle: 'var(--color-border-subtle)',
+          moderate: 'var(--color-border-moderate)',
+          strong: 'var(--color-border-strong)',
+          focus: 'var(--color-border-focus)',
+          error: 'var(--color-border-error)',
+          // NEW: Use CSS variables
+          light: 'var(--border-light)',
+          medium: 'var(--border-medium)',
+          strongFixed: 'var(--border-strong-fixed)', // Retain to avoid conflicts
         },
         text: {
-          primary: 'var(--color-text-primary-light)',
-          secondary: 'var(--color-text-secondary-light)',
-          tertiary: 'var(--color-text-tertiary-light)',
-          disabled: 'var(--color-text-disabled-light)',
-          inverted: 'var(--color-text-inverted-light)',
-          link: 'var(--color-text-link-light)',
-          success: 'var(--color-text-success-light)',
-          error: 'var(--color-text-error-light)',
-          warning: 'var(--color-text-warning-light)',
-          info: 'var(--color-text-info-light)',
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          tertiary: 'var(--color-text-tertiary)',
+          disabled: 'var(--color-text-disabled)',
+          inverted: 'var(--color-text-inverted)',
+          link: 'var(--color-text-link)',
+          success: 'var(--color-text-success)',
+          error: 'var(--color-text-error)',
+          warning: 'var(--color-text-warning)',
+          info: 'var(--color-text-info)',
         },
         icon: {
-          primary: 'var(--color-icon-primary-light)',
-          secondary: 'var(--color-icon-secondary-light)',
-          tertiary: 'var(--color-icon-tertiary-light)',
-          inverted: 'var(--color-icon-inverted-light)',
+          primary: 'var(--color-icon-primary)',
+          secondary: 'var(--color-icon-secondary)',
+          tertiary: 'var(--color-icon-tertiary)',
+          inverted: 'var(--color-icon-inverted)',
         },
-        // Glass color variants
+        // Glass color variants - updated to use CSS variables
         glass: {
-          'light-bg': 'var(--color-glass-light-background-light)',
-          'light-border': 'var(--color-glass-light-border-light)',
-          'dark-bg': 'var(--color-glass-dark-background-light)',
-          'dark-border': 'var(--color-glass-dark-border-light)',
-          'brand-bg': 'var(--color-glass-brand-background-light)',
-          'brand-border': 'var(--color-glass-brand-border-light)',
+          'light-bg': 'var(--glass-light-bg)',
+          'light-border': 'var(--glass-light-border)',
+          'dark-bg': 'var(--glass-dark-bg)',
+          'dark-border': 'var(--glass-dark-border)',
+          'brand-bg': 'var(--glass-brand-bg)',
+          'brand-border': 'var(--glass-brand-border)',
+        },
+        // NEW: Gaming UI specific colors
+        gaming: {
+          'bg-dark': 'var(--gaming-bg-dark)',
+          'bg-medium': 'var(--gaming-bg-medium)',
+          'bg-light': 'var(--gaming-bg-light)',
+          'border-dark': 'var(--gaming-border-dark)',
+          'border-light': 'var(--gaming-border-light)',
+        },
+      },
+      // NEW: Shadow tokens using CSS variables
+      boxShadow: {
+        'subtle': 'var(--shadow-subtle)',
+        'light': 'var(--shadow-light)',
+        'medium': 'var(--shadow-medium)',
+        'strong': 'var(--shadow-strong)',
+        'intense': 'var(--shadow-intense)',
+        'brand-light': 'var(--shadow-brand-light)',
+        'brand-medium': 'var(--shadow-brand-medium)',
+        'brand-strong': 'var(--shadow-brand-strong)',
+        'gaming': 'var(--gaming-shadow-default)',
+        'gaming-hover': 'var(--gaming-shadow-hover)',
+        'gaming-header': 'var(--gaming-shadow-header)',
+      },
+      // NEW: Typography utilities using CSS variables
+      typography: {
+        DEFAULT: {
+          css: {
+            '--tw-prose-body': 'var(--color-text-primary)',
+            '--tw-prose-headings': 'var(--color-text-primary)',
+            '--tw-prose-lead': 'var(--color-text-secondary)',
+            '--tw-prose-links': 'var(--color-text-link)',
+            '--tw-prose-bold': 'var(--color-text-primary)',
+            '--tw-prose-counters': 'var(--color-text-tertiary)',
+            '--tw-prose-bullets': 'var(--color-text-tertiary)',
+            '--tw-prose-quotes': 'var(--color-text-primary)',
+            '--tw-prose-quote-borders': 'var(--border-light)',
+            '--tw-prose-captions': 'var(--color-text-tertiary)',
+            '--tw-prose-code': 'var(--color-text-primary)',
+            '--tw-prose-pre-code': 'var(--color-text-inverted)',
+            '--tw-prose-pre-bg': 'var(--color-gray-900)',
+            '--tw-prose-th-borders': 'var(--border-medium)',
+            '--tw-prose-td-borders': 'var(--border-light)',
+          },
         },
       },
     },
@@ -187,8 +233,8 @@ const config: Config = {
   plugins: [
     // Theme initialization plugin - this defines CSS variables at build time
     plugin(({ addBase }) => {
-      // Convert these to CSS variables
-      const cssVariables = generateColorCssVariables(themeOptions);
+      // Use the enhanced CSS variables
+      const cssVariables = generateEnhancedCssVariables(themeOptions);
 
       // Add CSS variables as base styles
       addBase({
@@ -200,9 +246,16 @@ const config: Config = {
             .split('\n')
             .filter((line) => line.trim())
             .map((line) => {
-              const [name, value] = line.trim().replace(';', '').split(': ');
-              return [name.trim(), value.trim()];
+              const parts = line.trim().replace(';', '').split(': ');
+              if (parts.length >= 2) {
+                const name = parts[0].trim();
+                const value = parts.slice(1).join(': ').trim();
+                return [name, value];
+              } else {
+                return null;
+              }
             })
+            .filter((entry) => entry !== null) // Filter out null entries
         ),
       });
     }),
@@ -212,9 +265,9 @@ const config: Config = {
     plugin(createGlassMorphismPlugin()),
     plugin(createScrollbarPlugin()),
 
-    // Add responsive typography utilities
+    // Add responsive typography utilities with theme access
     plugin(({ addComponents }: PluginAPI) => {
-      addComponents(generateResponsiveTypography());
+      addComponents(generateResponsiveTypography()); // Adjusted to match expected arguments
     }),
 
     // Add custom utilities
@@ -256,7 +309,71 @@ const config: Config = {
         },
       });
 
-      // Dark mode selector utilities
+      // NEW: Add scrollbar utilities that use CSS variables
+      addUtilities({
+        '.scrollbar-theme-light': {
+          'scrollbar-width': 'thin',
+          'scrollbar-color':
+            'var(--scrollbar-thumb-light) var(--scrollbar-track-light)',
+          '&::-webkit-scrollbar': {
+            width: 'var(--scrollbar-width-default)',
+            height: 'var(--scrollbar-width-default)',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'var(--scrollbar-track-light)',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'var(--scrollbar-thumb-light)',
+            borderRadius: 'var(--scrollbar-radius-default)',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: 'var(--scrollbar-thumb-hover-light)',
+          },
+        },
+        '.scrollbar-theme-dark': {
+          'scrollbar-width': 'thin',
+          'scrollbar-color':
+            'var(--scrollbar-thumb-dark) var(--scrollbar-track-dark)',
+          '&::-webkit-scrollbar': {
+            width: 'var(--scrollbar-width-default)',
+            height: 'var(--scrollbar-width-default)',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'var(--scrollbar-track-dark)',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'var(--scrollbar-thumb-dark)',
+            borderRadius: 'var(--scrollbar-radius-default)',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: 'var(--scrollbar-thumb-hover-dark)',
+          },
+        },
+      });
+
+      // NEW: Add glass utilities that use CSS variables
+      addUtilities({
+        '.glass-theme-light': {
+          background: 'var(--glass-light-bg)',
+          border: `var(--border-width-thin) solid var(--glass-light-border)`,
+          borderRadius: 'var(--border-radius-xl)',
+          boxShadow: 'var(--shadow-light)',
+        },
+        '.glass-theme-dark': {
+          background: 'var(--glass-dark-bg)',
+          border: `var(--border-width-thin) solid var(--glass-dark-border)`,
+          borderRadius: 'var(--border-radius-xl)',
+          boxShadow: 'var(--shadow-medium)',
+        },
+        '.glass-theme-brand': {
+          background: 'var(--glass-brand-bg)',
+          border: `var(--border-width-thin) solid var(--glass-brand-border)`,
+          borderRadius: 'var(--border-radius-xl)',
+          boxShadow: 'var(--shadow-brand-medium)',
+        },
+      });
+
+      // Dark mode selector utilities - using CSS variables
       addUtilities({
         '.dark-mode': {
           '.bg-page': {
@@ -271,7 +388,30 @@ const config: Config = {
           '.text-secondary': {
             color: 'var(--color-text-secondary-dark)',
           },
-          // Add more dark mode overrides as needed
+          '.border': {
+            borderColor: 'var(--border-light-dark)',
+          },
+          '.shadow': {
+            boxShadow: 'var(--shadow-medium-dark)',
+          },
+          // New theme-compatible glass variants
+          '.glass-theme-light': {
+            background: 'var(--glass-dark-bg)',
+            border: `var(--border-width-thin) solid var(--glass-dark-border)`,
+          },
+          '.scrollbar-theme-light': {
+            'scrollbar-color':
+              'var(--scrollbar-thumb-dark) var(--scrollbar-track-dark)',
+            '&::-webkit-scrollbar-track': {
+              background: 'var(--scrollbar-track-dark)',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: 'var(--scrollbar-thumb-dark)',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              background: 'var(--scrollbar-thumb-hover-dark)',
+            },
+          },
         },
       });
     }),
@@ -283,9 +423,9 @@ const config: Config = {
     hoverOnlyWhenSupported: true,
     respectDefaultRingColorOpacity: true,
   },
-  // Safelist specific utility classes that might be used dynamically
+  // Expanded safelist with new theme-aware utilities
   safelist: [
-    // Glass variants
+    // Original safelist
     'glass',
     'glass-dark',
     'glass-brand',
@@ -299,8 +439,6 @@ const config: Config = {
     'glass-header',
     'glass-sidebar',
     'glass-active',
-
-    // Text accessibility classes
     'text-on-light',
     'text-on-dark',
     'text-on-brand',
@@ -318,8 +456,6 @@ const config: Config = {
     'high-contrast',
     'text-shadow-light',
     'text-shadow-dark',
-
-    // Scrollbar variants
     'scrollbar-light',
     'scrollbar-dark',
     'scrollbar-brand',
@@ -328,7 +464,28 @@ const config: Config = {
     'scrollbar-hidden',
     'scrollbar-rounded',
 
-    // Responsive typography
+    // NEW: Theme-aware utilities
+    'glass-theme-light',
+    'glass-theme-dark',
+    'glass-theme-brand',
+    'scrollbar-theme-light',
+    'scrollbar-theme-dark',
+    'shadow-subtle',
+    'shadow-light',
+    'shadow-medium',
+    'shadow-strong',
+    'shadow-intense',
+    'shadow-brand-light',
+    'shadow-brand-medium',
+    'shadow-brand-strong',
+    'text-on-primary-surface',
+    'text-on-success-surface',
+    'text-on-error-surface',
+    'text-on-warning-surface',
+    'text-on-info-surface',
+    'text-auto-contrast',
+
+    // Existing utilities
     'text-fluid-xs',
     'text-fluid-sm',
     'text-fluid-base',
@@ -340,15 +497,11 @@ const config: Config = {
     'text-fluid-5xl',
     'text-hd',
     'text-readable',
-
-    // Custom utilities
     'truncate-1',
     'truncate-2',
     'truncate-3',
     'rendering-crisp',
     'rendering-auto',
-
-    // Mode classes
     'dark-mode',
   ],
 };

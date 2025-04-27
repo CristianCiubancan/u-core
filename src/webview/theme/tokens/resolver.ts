@@ -14,7 +14,11 @@ import { elevation } from './elevation';
 import { animation } from './animation';
 import { effects } from './effects';
 import { breakpoints } from './breakpoints';
-import { createColorScales, ThemeOptions, defaultThemeOptions } from './colors';
+import {
+  createColorScales,
+  ThemeOptions,
+  defaultThemeOptions,
+} from './tailwindColors';
 import { semanticColors } from '../../colors';
 
 export type ThemeMode = 'light' | 'dark';

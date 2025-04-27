@@ -1,7 +1,8 @@
 // src/theme/plugins/accessibleText.ts
+// Refactored to use theme tokens and reduce hardcoded values
 
 import { getContrastRatio, hexToRgb } from '../utils/colorUtils';
-import { typography, defaultColors } from '../tokens/constants';
+import { typography, defaultColors, shadowOpacity } from '../tokens/constants';
 
 /**
  * Plugin parameter types
@@ -28,9 +29,22 @@ export function accessibleTextPlugin({
   const warning = colors.warning || {};
   const info = colors.info || {};
 
-  // Base text colors
-  const darkText = gray[900] || defaultColors.darkText;
-  const lightText = gray[50] || defaultColors.lightText;
+  // Get semantic tokens if available
+  const textPrimary = theme('colors.text.primary');
+  const textInverted = theme('colors.text.inverted');
+  /* Removed unused variable */
+  const fontWeightMedium =
+    theme('fontWeight.medium') || typography.fontWeight.medium;
+  const fontWeightNormal =
+    theme('fontWeight.normal') || typography.fontWeight.normal;
+  const letterSpacingWide =
+    theme('letterSpacing.wide') || typography.letterSpacing.wide;
+  const letterSpacingNormal =
+    theme('letterSpacing.normal') || typography.letterSpacing.normal;
+
+  // Base text colors using semantic tokens when available
+  const darkText = textPrimary || gray[900] || defaultColors.darkText;
+  const lightText = textInverted || gray[50] || defaultColors.lightText;
 
   // Calculate contrast information for primary brand color
   const primaryIsDark =
@@ -39,71 +53,69 @@ export function accessibleTextPlugin({
       lightText
     ) < 4.5;
 
-  // Create accessible text utilities
+  // Create accessible text utilities with semantic tokens
   const accessibleTextComponents = {
     // For light backgrounds - use dark text
     '.text-on-light': {
       'color': darkText,
-      'font-weight': typography.fontWeight.medium,
+      'font-weight': fontWeightMedium,
     },
 
     // For dark backgrounds - use light text
     '.text-on-dark': {
       'color': lightText,
-      'font-weight': typography.fontWeight.normal,
-      'letter-spacing': typography.letterSpacing.wide,
+      'font-weight': fontWeightNormal,
+      'letter-spacing': letterSpacingWide,
     },
 
     // For the brand color as background - dynamically choose text color
     '.text-on-brand': {
       'color': primaryIsDark ? darkText : lightText,
-      'font-weight': primaryIsDark
-        ? typography.fontWeight.medium
-        : typography.fontWeight.normal,
-      'letter-spacing': primaryIsDark
-        ? typography.letterSpacing.normal
-        : typography.letterSpacing.wide,
+      'font-weight': primaryIsDark ? fontWeightMedium : fontWeightNormal,
+      'letter-spacing': primaryIsDark ? letterSpacingNormal : letterSpacingWide,
     },
 
     // For glass elements with dark backdrop
     '.text-on-glass-dark': {
       'color': lightText,
       'text-shadow': `0 1px 2px rgba(${hexToRgb(
-        gray[900] || defaultColors.grayDark[900]
-      )}, 0.3)`,
-      'letter-spacing': typography.letterSpacing.wide,
+        theme('colors.gray.900') || gray[900] || defaultColors.grayDark[900]
+      )}, ${shadowOpacity.light})`,
+      'letter-spacing': letterSpacingWide,
     },
 
     // For glass elements with light backdrop
     '.text-on-glass-light': {
       'color': darkText,
-      'font-weight': typography.fontWeight.medium,
+      'font-weight': fontWeightMedium,
     },
 
     // Semantic text styles that are already WCAG AA compliant
     '.text-primary': {
       'color': theme('colors.text.primary'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
     },
 
     '.text-secondary': {
       'color': theme('colors.text.secondary'),
-      'font-weight': typography.fontWeight.normal,
+      'font-weight': theme('fontWeight.normal') || typography.fontWeight.normal,
     },
 
     '.text-tertiary': {
       'color': theme('colors.text.tertiary'),
-      'font-weight': typography.fontWeight.normal,
+      'font-weight': theme('fontWeight.normal') || typography.fontWeight.normal,
     },
 
     '.text-inverted': {
       'color': theme('colors.text.inverted'),
-      'font-weight': typography.fontWeight.normal,
+      'font-weight': theme('fontWeight.normal') || typography.fontWeight.normal,
     },
 
     '.text-link': {
       'color': theme('colors.text.link'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
       'text-decoration': 'none',
       '&:hover': {
         'text-decoration': 'underline',
@@ -112,70 +124,76 @@ export function accessibleTextPlugin({
 
     '.text-success': {
       'color': theme('colors.text.success'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
     },
 
     '.text-error': {
       'color': theme('colors.text.error'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
     },
 
     '.text-warning': {
       'color': theme('colors.text.warning'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
     },
 
     '.text-info': {
       'color': theme('colors.text.info'),
-      'font-weight': typography.fontWeight.semibold,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
     },
 
     // Additional contrast-ensuring utilities
     '.high-contrast': {
-      'font-weight': typography.fontWeight.semibold,
-      'letter-spacing': typography.letterSpacing.wide,
+      'font-weight':
+        theme('fontWeight.semibold') || typography.fontWeight.semibold,
+      'letter-spacing':
+        theme('letterSpacing.wide') || typography.letterSpacing.wide,
     },
 
     '.text-shadow-light': {
       'text-shadow': `0 1px 2px rgba(${hexToRgb(
-        gray[900] || defaultColors.grayDark[900]
-      )}, 0.2)`,
+        theme('colors.gray.900') || gray[900] || defaultColors.grayDark[900]
+      )}, ${shadowOpacity.subtle})`,
     },
 
     '.text-shadow-dark': {
       'text-shadow': `0 1px 3px rgba(${hexToRgb(
-        gray[900] || defaultColors.grayDark[900]
-      )}, 0.4)`,
+        theme('colors.gray.900') || gray[900] || defaultColors.grayDark[900]
+      )}, ${shadowOpacity.medium})`,
     },
 
-    // NEW: Text on primary surface
+    // NEW: Text on primary surface using theme tokens
     '.text-on-primary-surface': {
-      'color': primary[800],
-      'font-weight': typography.fontWeight.medium,
+      'color': theme('colors.primary.800') || primary[800],
+      'font-weight': theme('fontWeight.medium') || typography.fontWeight.medium,
     },
 
-    // NEW: Text on success surface
+    // NEW: Text on success surface using theme tokens
     '.text-on-success-surface': {
-      'color': success[800],
-      'font-weight': typography.fontWeight.medium,
+      'color': theme('colors.success.800') || success[800],
+      'font-weight': theme('fontWeight.medium') || typography.fontWeight.medium,
     },
 
-    // NEW: Text on error surface
+    // NEW: Text on error surface using theme tokens
     '.text-on-error-surface': {
-      'color': error[800],
-      'font-weight': typography.fontWeight.medium,
+      'color': theme('colors.error.800') || error[800],
+      'font-weight': theme('fontWeight.medium') || typography.fontWeight.medium,
     },
 
-    // NEW: Text on warning surface
+    // NEW: Text on warning surface using theme tokens
     '.text-on-warning-surface': {
-      'color': warning[800],
-      'font-weight': typography.fontWeight.medium,
+      'color': theme('colors.warning.800') || warning[800],
+      'font-weight': theme('fontWeight.medium') || typography.fontWeight.medium,
     },
 
-    // NEW: Text on info surface
+    // NEW: Text on info surface using theme tokens
     '.text-on-info-surface': {
-      'color': info[800],
-      'font-weight': typography.fontWeight.medium,
+      'color': theme('colors.info.800') || info[800],
+      'font-weight': theme('fontWeight.medium') || typography.fontWeight.medium,
     },
 
     // NEW: Text with auto-contrast (computed at runtime via CSS variables)
