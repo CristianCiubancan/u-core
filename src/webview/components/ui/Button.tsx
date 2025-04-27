@@ -6,6 +6,7 @@ interface ButtonProps {
   text?: string;
   fullWidth?: boolean;
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  className?: string;
 }
 
 const Button = ({ children, type, text, fullWidth, onClick }: ButtonProps) => {

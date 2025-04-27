@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '../../../../../../../webview/components';
+import Button from '../../../../../../../webview/components/ui/Button';
 import { MODELS } from '../../types';
 
 interface ModelTabProps {
@@ -18,8 +18,10 @@ export const ModelTab: React.FC<ModelTabProps> = ({
         {MODELS.map((model) => (
           <Button
             key={model.id}
-            variant={currentModel === model.id ? 'primary' : 'secondary'}
             onClick={() => onModelChange(model.id)}
+            className={`${
+              currentModel === model.id ? 'glass-brand' : 'glass-brand-dark'
+            }`}
           >
             {model.label}
           </Button>
