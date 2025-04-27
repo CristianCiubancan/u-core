@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '../../../../../../webview/components';
+import Button from '../../../../../../webview/components/ui/Button';
 
 interface CameraControlsProps {
   onRotate: (direction: 'left' | 'right') => void;
@@ -21,30 +21,26 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           </h3>
           <div className="flex space-x-2">
             <Button
-              variant="secondary"
               onClick={() => onRotate('right')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
             >
               ← Rotate
             </Button>
             <Button
-              variant="secondary"
               onClick={() => onRotate('left')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
             >
               Rotate →
             </Button>
             <Button
-              variant="secondary"
               onClick={() => onZoom('in')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
             >
               Zoom In
             </Button>
             <Button
-              variant="secondary"
               onClick={() => onZoom('out')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
             >
               Zoom Out
             </Button>
@@ -56,23 +52,20 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
             </h3>
             <div className="flex space-x-2">
               <Button
-                variant="secondary"
                 onClick={() => onFocus('head')}
-                className="py-1 px-2 text-xs flex justify-center items-center"
+                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
               >
                 Head
               </Button>
               <Button
-                variant="secondary"
                 onClick={() => onFocus('body')}
-                className="py-1 px-2 text-xs flex justify-center items-center"
+                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
               >
                 Body
               </Button>
               <Button
-                variant="secondary"
                 onClick={() => onFocus('legs')}
-                className="py-1 px-2 text-xs flex justify-center items-center"
+                className="py-1 px-2 text-xs flex justify-center items-center glass-brand-dark"
               >
                 Legs
               </Button>

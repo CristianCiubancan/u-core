@@ -2,11 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../../webview/utils/fetchNui';
 import { isEnvBrowser } from '../../../../../webview/utils/misc';
-import {
-  Layout,
-  TabNavigation,
-  Button,
-} from '../../../../../webview/components';
+import Button from '../../../../../webview/components/ui/Button';
+import Container from '../../../../../webview/components/ui/Container';
 import {
   ModelTab,
   FaceTab,
@@ -222,98 +219,115 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCloseUi]);
 
-  return <div>savalut</div>;
   // Render UI
-  // return isOpen ? (
-  //   <Layout
-  //     title="Character Creation"
-  //     onSave={handleSaveCharacter}
-  //     onClose={handleCloseUi}
-  //     position="left"
-  //     isSaving={isSaving}
-  //     saveButtonText="Save"
-  //     cancelButtonText="Cancel"
-  //     headerContent={
-  //       <div className="flex space-x-2">
-  //         <Button
-  //           variant="success"
-  //           onClick={handleSaveCharacter}
-  //           disabled={isSaving}
-  //           size="sm"
-  //         >
-  //           {isSaving ? 'Saving...' : 'Save'}
-  //         </Button>
-  //         <Button variant="danger" onClick={handleCloseUi} size="sm">
-  //           Cancel
-  //         </Button>
-  //       </div>
-  //     }
-  //     footerContent={
-  //       <div className="glass-brand-dark p-2 border-t border-brand-700">
-  //         <CameraControls
-  //           onRotate={handleRotateCamera}
-  //           onZoom={handleZoomCamera}
-  //           onFocus={handleFocusCamera}
-  //         />
-  //       </div>
-  //     }
-  //   >
-  //     <div className="flex h-full">
-  //       {/* Left sidebar - Tabs */}
-  //       <TabNavigation
-  //         tabs={[
-  //           { id: 'model', label: 'Character Model' },
-  //           { id: 'face', label: 'Face' },
-  //           { id: 'hair', label: 'Hair' },
-  //           { id: 'appearance', label: 'Appearance' },
-  //           { id: 'clothing', label: 'Clothing' },
-  //         ]}
-  //         activeTab={activeTab}
-  //         onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
-  //         orientation="vertical"
-  //         className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800"
-  //       />
-
-  //       {/* Right content - Tab content */}
-  //       <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
-  //         {activeTab === 'model' && (
-  //           <ModelTab
-  //             currentModel={characterData.model}
-  //             onModelChange={handleModelChange}
-  //           />
-  //         )}
-
-  //         {activeTab === 'face' && (
-  //           <FaceTab
-  //             faceData={characterData.face}
-  //             onFaceChange={handleFaceChange}
-  //           />
-  //         )}
-
-  //         {activeTab === 'hair' && (
-  //           <HairTab
-  //             hairData={characterData.hair}
-  //             onHairChange={handleHairChange}
-  //           />
-  //         )}
-
-  //         {activeTab === 'appearance' && (
-  //           <AppearanceTab
-  //             appearanceData={characterData.appearance}
-  //             onAppearanceChange={handleAppearanceChange}
-  //             onEyeColorChange={handleEyeColorChange}
-  //           />
-  //         )}
-
-  //         {activeTab === 'clothing' && (
-  //           <ClothingTab
-  //             clothingData={characterData.clothing}
-  //             onClothingChange={handleClothingChange}
-  //             model={characterData.model}
-  //           />
-  //         )}
-  //       </div>
-  //     </div>
-  //   </Layout>
-  // ) : null;
+  return isOpen ? (
+    <div className="flex h-screen w-screen bg-brand-900/70">
+      {' '}
+      {/* Main container */}
+      {/* Left sidebar - Tabs */}
+      <div className="w-[30%] min-w-[140px] max-w-[200px] border-r border-brand-800 flex flex-col">
+        {' '}
+        {/* Sidebar container */}
+        <div className="p-4 text-center text-xl font-bold text-white text-shadow">
+          Character Creation
+        </div>{' '}
+        {/* Title */}
+        <div className="flex flex-col space-y-2 p-4">
+          {' '}
+          {/* Tab buttons container */}
+          <Button
+            onClick={() => setActiveTab('model')}
+            fullWidth
+            className={`${
+              activeTab === 'model' ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            Character Model
+          </Button>
+          <Button
+            onClick={() => setActiveTab('face')}
+            fullWidth
+            className={`${
+              activeTab === 'face' ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            Face
+          </Button>
+          <Button
+            onClick={() => setActiveTab('hair')}
+            fullWidth
+            className={`${
+              activeTab === 'hair' ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            Hair
+          </Button>
+          <Button
+            onClick={() => setActiveTab('appearance')}
+            fullWidth
+            className={`${
+              activeTab === 'appearance' ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            Appearance
+          </Button>
+          <Button
+            onClick={() => setActiveTab('clothing')}
+            fullWidth
+            className={`${
+              activeTab === 'clothing' ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            Clothing
+          </Button>
+        </div>
+        <div className="glass-brand-dark p-2 border-t border-brand-700 mt-auto">
+          {' '}
+          {/* Footer content */}
+          <CameraControls
+            onRotate={handleRotateCamera}
+            onZoom={handleZoomCamera}
+            onFocus={handleFocusCamera}
+          />
+        </div>
+      </div>
+      {/* Right content - Tab content */}
+      <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
+        {' '}
+        {/* Content area */}
+        {activeTab === 'model' && (
+          <ModelTab
+            currentModel={characterData.model}
+            onModelChange={handleModelChange}
+          />
+        )}
+        {activeTab === 'face' && (
+          <FaceTab
+            faceData={characterData.face}
+            onFaceChange={handleFaceChange}
+          />
+        )}
+        {activeTab === 'hair' && (
+          <HairTab
+            hairData={characterData.hair}
+            onHairChange={handleHairChange}
+          />
+        )}
+        {activeTab === 'appearance' && (
+          <AppearanceTab
+            appearanceData={characterData.appearance}
+            onAppearanceChange={handleAppearanceChange}
+            onEyeColorChange={handleEyeColorChange}
+          />
+        )}
+        {activeTab === 'clothing' && (
+          <ClothingTab
+            clothingData={characterData.clothing}
+            onClothingChange={handleClothingChange}
+            model={characterData.model}
+          />
+        )}
+      </div>
+    </div>
+  ) : null;
 }
