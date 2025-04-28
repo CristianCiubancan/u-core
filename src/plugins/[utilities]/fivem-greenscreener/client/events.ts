@@ -2,7 +2,6 @@
 
 import { startWeatherResource } from './weather';
 import { destroyCamera } from './camera';
-import { cleanupPedAfterScreenshot } from './ped'; // Assuming ped state needs cleanup
 import { playerId, config } from './utils'; // Import playerId and config
 
 // Keep track of any active intervals or states that need cleanup
