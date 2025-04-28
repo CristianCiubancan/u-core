@@ -10,6 +10,7 @@
 import { toggleUI } from './ui';
 import { registerEvents } from './events';
 import { Delay } from './utils';
+import { characterManager } from './character-manager';
 
 /**
  * =======================================================
@@ -33,7 +34,9 @@ AddEventHandler('onClientResourceStart', (resourceName: string) => {
     const femaleModel = 'mp_f_freemode_01';
 
     console.log('[Character Create] Pre-loading character models');
-    RequestModel(GetHashKey(maleModel));
+    characterManager.loadAndSetModel(maleModel).then(() => {
+      console.log('[Character Create] Male model loaded');
+    });
     RequestModel(GetHashKey(femaleModel));
 
     // Auto-open character creation for new players

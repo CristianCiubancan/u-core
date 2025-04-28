@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from '../../../../../../../webview/components/ui/Button';
-import { MODELS } from '../../types';
+import { MODELS } from '../../../shared/types';
 
 interface ModelPickerProps {
   currentModel: string;

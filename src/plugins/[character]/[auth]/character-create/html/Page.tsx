@@ -17,7 +17,10 @@ import {
   NUI_EVENT,
   TabType,
   AppearanceOverlay,
-} from './types';
+  CameraFocus,
+  CameraDirection,
+  ZoomDirection,
+} from '../shared/types';
 
 export default function Page() {
   const [isOpen, setIsOpen] = useState(isEnvBrowser());

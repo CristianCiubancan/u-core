@@ -1,147 +1,167 @@
 /// <reference types="@citizenfx/client" />
 
-import { CameraFocus, CameraDirection, ZoomDirection } from '../types/types';
+import { CameraFocus, CameraDirection, ZoomDirection } from '../shared/types';
 import {
-  cameraRotation,
-  cameraZoom,
-  cameraFocus,
-  characterCreationCamera,
+  getCameraState,
   setCameraRotation,
   setCameraZoom,
   setCameraFocus,
   setCharacterCreationCamera,
-} from './state';
+} from '../shared/store';
 
 /**
- * =======================================================
- * CAMERA MANAGEMENT
- * =======================================================
+ * Camera Manager for character creation
+ * Handles all camera-related functionality
  */
+class CameraManager {
+  /**
+   * Set up the camera for character creation
+   */
+  setup(): void {
+    // Disable rendering of the player's camera while in character creation
+    NetworkSetInSpectatorMode(true, PlayerPedId());
 
-/**
- * Set up the camera for character creation
- */
-export function setupCamera(): void {
-  // Disable rendering of the player's camera while in character creation
-  NetworkSetInSpectatorMode(true, PlayerPedId());
-
-  // Create a camera pointing at the player
-  updateCameraPosition();
-}
-
-/**
- * Update the camera position based on current rotation, zoom, and focus
- */
-export function updateCameraPosition(): void {
-  const playerPed = PlayerPedId();
-  const coords = GetEntityCoords(playerPed, true);
-
-  // Calculate camera position based on rotation and zoom
-  const angleRad = (cameraRotation * Math.PI) / 180;
-  let cameraHeight = coords[2];
-
-  // Adjust height based on focus
-  if (cameraFocus === 'head') {
-    cameraHeight += 0.65;
-  } else if (cameraFocus === 'legs') {
-    cameraHeight -= 0.5;
-  } else {
-    cameraHeight += 0.2;
+    // Create a camera pointing at the player
+    this.updatePosition();
   }
 
-  // Calculate camera position
-  const cameraCoords = {
-    x: coords[0] + Math.sin(angleRad) * cameraZoom,
-    y: coords[1] + Math.cos(angleRad) * cameraZoom,
-    z: cameraHeight,
-  };
+  /**
+   * Update the camera position based on current rotation, zoom, and focus
+   */
+  updatePosition(): void {
+    const { cameraRotation, cameraZoom, cameraFocus, characterCreationCamera } =
+      getCameraState();
+    const playerPed = PlayerPedId();
+    const coords = GetEntityCoords(playerPed, true);
 
-  // Calculate the direct vector from camera to ped
-  const dirVector = {
-    x: coords[0] - cameraCoords.x,
-    y: coords[1] - cameraCoords.y,
-    z: cameraHeight - cameraCoords.z,
-  };
+    // Calculate camera position based on rotation and zoom
+    const angleRad = (cameraRotation * Math.PI) / 180;
+    let cameraHeight = coords[2];
 
-  const pitch =
-    Math.atan2(dirVector.z, Math.sqrt(dirVector.x ** 2 + dirVector.y ** 2)) *
-    (180 / Math.PI);
-  let yaw = Math.atan2(dirVector.x, dirVector.y) * (180 / Math.PI);
+    // Adjust height based on focus
+    if (cameraFocus === 'head') {
+      cameraHeight += 0.65;
+    } else if (cameraFocus === 'legs') {
+      cameraHeight -= 0.5;
+    } else {
+      cameraHeight += 0.2;
+    }
 
-  // Add our left-looking offset
-  const leftAngleOffset = 30;
-  yaw += leftAngleOffset;
+    // Calculate camera position
+    const cameraCoords = {
+      x: coords[0] + Math.sin(angleRad) * cameraZoom,
+      y: coords[1] + Math.cos(angleRad) * cameraZoom,
+      z: cameraHeight,
+    };
 
-  // Create or update the camera
-  if (!characterCreationCamera) {
-    const camera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true);
-    SetCamCoord(camera, cameraCoords.x, cameraCoords.y, cameraCoords.z);
-    SetCamRot(camera, pitch, 0.0, yaw, 2);
-    SetCamActive(camera, true);
-    RenderScriptCams(true, false, 0, true, true);
-    setCharacterCreationCamera(camera); // Update state
-  } else {
-    SetCamCoord(
-      characterCreationCamera,
-      cameraCoords.x,
-      cameraCoords.y,
-      cameraCoords.z
-    );
-    SetCamRot(characterCreationCamera, pitch, 0.0, yaw, 2);
+    // Calculate the direct vector from camera to ped
+    const dirVector = {
+      x: coords[0] - cameraCoords.x,
+      y: coords[1] - cameraCoords.y,
+      z: cameraHeight - cameraCoords.z,
+    };
+
+    const pitch =
+      Math.atan2(dirVector.z, Math.sqrt(dirVector.x ** 2 + dirVector.y ** 2)) *
+      (180 / Math.PI);
+    let yaw = Math.atan2(dirVector.x, dirVector.y) * (180 / Math.PI);
+
+    // Add our left-looking offset
+    const leftAngleOffset = 30;
+    yaw += leftAngleOffset;
+
+    // Create or update the camera
+    if (!characterCreationCamera) {
+      const camera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true);
+      SetCamCoord(camera, cameraCoords.x, cameraCoords.y, cameraCoords.z);
+      SetCamRot(camera, pitch, 0.0, yaw, 2);
+      SetCamActive(camera, true);
+      RenderScriptCams(true, false, 0, true, true);
+      setCharacterCreationCamera(camera);
+    } else {
+      SetCamCoord(
+        characterCreationCamera,
+        cameraCoords.x,
+        cameraCoords.y,
+        cameraCoords.z
+      );
+      SetCamRot(characterCreationCamera, pitch, 0.0, yaw, 2);
+    }
+  }
+
+  /**
+   * Rotate the camera around the player
+   * @param {CameraDirection} direction - The direction to rotate ('left' or 'right')
+   */
+  rotate(direction: CameraDirection): void {
+    const { cameraRotation } = getCameraState();
+    let newRotation = cameraRotation;
+
+    if (direction === 'left') {
+      newRotation = (cameraRotation - 15) % 360;
+    } else if (direction === 'right') {
+      newRotation = (cameraRotation + 15) % 360;
+    }
+
+    setCameraRotation(newRotation);
+    this.updatePosition();
+  }
+
+  /**
+   * Zoom the camera in or out
+   * @param {ZoomDirection} direction - The direction to zoom ('in' or 'out')
+   */
+  zoom(direction: ZoomDirection): void {
+    const { cameraZoom } = getCameraState();
+    let newZoom = cameraZoom;
+
+    if (direction === 'in') {
+      newZoom = Math.max(0.5, cameraZoom - 0.25);
+    } else if (direction === 'out') {
+      newZoom = Math.min(3.0, cameraZoom + 0.25);
+    }
+
+    setCameraZoom(newZoom);
+    this.updatePosition();
+  }
+
+  /**
+   * Focus the camera on a specific part of the player
+   * @param {CameraFocus} focus - The part to focus on ('head', 'body', or 'legs')
+   */
+  focus(focus: CameraFocus): void {
+    setCameraFocus(focus);
+    this.updatePosition();
+  }
+
+  /**
+   * Clean up the camera when exiting character creation
+   */
+  cleanup(): void {
+    const { characterCreationCamera } = getCameraState();
+
+    // Disable spectator mode
+    NetworkSetInSpectatorMode(false, PlayerPedId());
+
+    // Destroy the camera
+    if (characterCreationCamera) {
+      SetCamActive(characterCreationCamera, false);
+      DestroyCam(characterCreationCamera, true);
+      RenderScriptCams(false, false, 0, true, true);
+      setCharacterCreationCamera(null);
+    }
   }
 }
 
-/**
- * Rotate the camera around the player
- * @param {CameraDirection} direction - The direction to rotate ('left' or 'right')
- */
-export function rotateCamera(direction: CameraDirection): void {
-  let newRotation = cameraRotation;
-  if (direction === 'left') {
-    newRotation = (cameraRotation - 15) % 360;
-  } else if (direction === 'right') {
-    newRotation = (cameraRotation + 15) % 360;
-  }
-  setCameraRotation(newRotation); // Update state
-  updateCameraPosition();
-}
+// Export a singleton instance
+export const cameraManager = new CameraManager();
 
-/**
- * Zoom the camera in or out
- * @param {ZoomDirection} direction - The direction to zoom ('in' or 'out')
- */
-export function zoomCamera(direction: ZoomDirection): void {
-  let newZoom = cameraZoom;
-  if (direction === 'in') {
-    newZoom = Math.max(0.5, cameraZoom - 0.25);
-  } else if (direction === 'out') {
-    newZoom = Math.min(3.0, cameraZoom + 0.25);
-  }
-  setCameraZoom(newZoom); // Update state
-  updateCameraPosition();
-}
-
-/**
- * Focus the camera on a specific part of the player
- * @param {CameraFocus} focus - The part to focus on ('head', 'body', or 'legs')
- */
-export function focusCamera(focus: CameraFocus): void {
-  setCameraFocus(focus); // Update state
-  updateCameraPosition();
-}
-
-/**
- * Clean up the camera resources
- */
-export function cleanupCamera(): void {
-  // Disable spectator mode
-  NetworkSetInSpectatorMode(false, PlayerPedId());
-
-  // Destroy the camera
-  if (characterCreationCamera) {
-    SetCamActive(characterCreationCamera, false);
-    DestroyCam(characterCreationCamera, true);
-    RenderScriptCams(false, false, 0, true, true);
-    setCharacterCreationCamera(null); // Update state
-  }
-}
+// Export compatibility functions for existing code
+export const setupCamera = () => cameraManager.setup();
+export const updateCameraPosition = () => cameraManager.updatePosition();
+export const rotateCamera = (direction: CameraDirection) =>
+  cameraManager.rotate(direction);
+export const zoomCamera = (direction: ZoomDirection) =>
+  cameraManager.zoom(direction);
+export const focusCamera = (focus: CameraFocus) => cameraManager.focus(focus);
+export const cleanupCamera = () => cameraManager.cleanup();

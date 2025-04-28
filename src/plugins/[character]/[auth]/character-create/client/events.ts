@@ -11,8 +11,9 @@ import {
   CameraFocusData,
   SaveCharacterData,
   NuiCallback,
-} from '../types/types';
-import { uiVisible } from './state';
+  NUI_EVENT,
+} from '../shared/types';
+import { isUiVisible } from '../shared/store';
 import { toggleUI } from './ui';
 import {
   updateModel,
@@ -20,11 +21,10 @@ import {
   updateHair,
   updateAppearance,
   updateClothing,
-} from './character';
+} from './character-manager';
 import { rotateCamera, zoomCamera, focusCamera } from './camera';
 
 // Constants
-const NUI_EVENT = 'character-create:toggle-ui';
 const COMMAND_NAME = 'character-create:toggle_ui';
 
 /**
@@ -35,7 +35,7 @@ const COMMAND_NAME = 'character-create:toggle_ui';
 
 export function registerEvents(): void {
   // Register a command that can be triggered by key binding
-  RegisterCommand(COMMAND_NAME, () => toggleUI(!uiVisible), false);
+  RegisterCommand(COMMAND_NAME, () => toggleUI(!isUiVisible()), false);
 
   // Register key mapping (F3 key)
   RegisterKeyMapping(
