@@ -14,7 +14,7 @@ interface CameraControlsProps {
 }
 
 export const CameraControls: React.FC<CameraControlsProps> = ({
-  onRotate,
+  // onRotate,
   onZoom,
   onFocus,
   onRotatePlayer,
