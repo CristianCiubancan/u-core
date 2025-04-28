@@ -28,7 +28,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
             Camera Controls
           </h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {/* <Button
               onClick={() => onRotate('right')}
               className="py-1 px-2 text-xs flex justify-center items-center"
@@ -61,7 +61,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
             <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
               Character Rotation
             </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Button
                 onClick={() => onRotatePlayer('left')}
                 className="py-1 px-2 text-xs flex justify-center items-center"
@@ -82,7 +82,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
             Focus
           </h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <Button
               onClick={() => onFocus('head')}
               className={`py-1 px-2 text-xs flex justify-center items-center ${
