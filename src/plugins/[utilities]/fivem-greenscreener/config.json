@@ -5,6 +5,8 @@
   "useQBVehicles": false,
   "//__comment__//.": "If you want to use the QB Vehicles in the vehicles.lua file, set this to true. QBCore has to be installed and started before this script!",
   "coreResourceName": "qb-core",
+  "modelLoadTimeout": 10000,
+  "screenshotDelay": 2000,
   "includedVehicleClasses": {
     "0": true,
     "1": true,

@@ -4,23 +4,31 @@
 
 // @ts-ignore - Allow require for image-js until proper import/types are figured out if needed
 const imagejs = require('image-js');
-// const fs = require('fs'); // Remove fs dependency
+const fs = require('fs'); // We need fs for directory creation
 
 const resName = GetCurrentResourceName();
 const mainSavePath = GetResourcePath(resName) + '/images'; // Base path for images
 
 try {
-  // Removed fs.existsSync and fs.mkdirSync checks.
-  // Assuming screenshot-basic handles directory creation or they exist.
+  // Create the main images directory if it doesn't exist
+  if (!fs.existsSync(mainSavePath)) {
+    fs.mkdirSync(mainSavePath);
+    console.log(`Created main save directory: ${mainSavePath}`);
+  }
 
   onNet('takeScreenshot', async (filename, type) => {
     const savePath = `${mainSavePath}/${type}`; // Determine specific save path (e.g., /images/clothing)
-    // Removed fs.existsSync and fs.mkdirSync for savePath.
+
+    // Create type-specific directory if it doesn't exist
+    if (!fs.existsSync(savePath)) {
+      fs.mkdirSync(savePath);
+      console.log(`Created type-specific directory: ${savePath}`);
+    }
 
     exports['screenshot-basic'].requestClientScreenshot(
       source,
       {
-        fileName: savePath + '/' + filename + '.png',
+        fileName: `${savePath}/${filename}.png`,
         encoding: 'png',
         quality: 1.0,
       },
