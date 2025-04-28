@@ -227,17 +227,15 @@ export default function Page() {
 
   // Render UI
   return isOpen ? (
-    <div className="flex p-6 gap-4 h-screen">
-      <div className="flex-col w-[40vw] glass-dark text-on-dark rounded-lg shadow-lg">
-        {' '}
+    <div className="flex p-6 gap-4 h-screen max-h-screen">
+      <div className="flex flex-col w-[40vw] glass-dark text-on-dark rounded-lg shadow-lg overflow-hidden">
         {/* Main container */}
         {/* Left sidebar - Tabs */}
-        <div className="border-r border-brand-800 flex flex-col p-4">
-          {' '}
+        <div className="border-b border-brand-800 flex flex-col p-4 flex-shrink-0">
           {/* Sidebar container */}
           <div className="text-center text-xl font-bold text-white text-shadow mb-4">
             Character Creation
-          </div>{' '}
+          </div>
           <ModelPicker
             currentModel={characterData.model}
             onModelChange={handleModelChange}
@@ -275,7 +273,7 @@ export default function Page() {
           </div>
         </div>
         {/* Right content - Tab content */}
-        <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
+        <div className="flex-1 p-4 min-h-0 flex flex-col text-readable text-responsive-base">
           {activeTab === 'face' && (
             <FaceTab
               faceData={characterData.face}

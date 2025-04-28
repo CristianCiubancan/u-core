@@ -60,48 +60,48 @@ const CLOTHING_CATEGORIES = [
     id: 'tops',
     label: 'Tops',
     componentId: 11,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 50,
+    maxTextures: 8,
     icon: <GiTShirt />,
   },
   {
     id: 'undershirt',
     label: 'Undershirt',
     componentId: 8,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 40,
+    maxTextures: 8,
     icon: <FaTshirt />,
   },
   {
     id: 'legs',
     label: 'Legs',
     componentId: 4,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 45,
+    maxTextures: 8,
     icon: <GiArmoredPants />,
   },
   {
     id: 'shoes',
     label: 'Shoes',
     componentId: 6,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 35,
+    maxTextures: 8,
     icon: <GiRunningShoe />,
   },
   {
     id: 'accessories',
     label: 'Accessories',
     componentId: 7,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 30,
+    maxTextures: 8,
     icon: <GiNecklace />,
   },
   {
     id: 'torso',
     label: 'Torso',
     componentId: 3,
-    maxItems: 20,
-    maxTextures: 5,
+    maxItems: 40,
+    maxTextures: 8,
     icon: <GiClothes />,
   },
 ];
@@ -263,8 +263,9 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
   };
 
   return (
-    <div className="mb-6 h-full max-h-full overflow-hidden">
-      <div className="flex justify-between items-center mb-3">
+    <div className="flex flex-col h-full">
+      {/* Fixed header with styles and texture navigation */}
+      <div className="flex justify-between items-center mb-3 flex-shrink-0">
         <div className="flex items-center">
           <h4 className="text-sm font-medium mr-4">Styles</h4>
           <TextureNavigation
@@ -278,10 +279,10 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
           Selected: {selectedDrawable}
         </span>
       </div>
-      {/* Styles section with texture navigation */}
-      <div className="mb-4 h-full overflow-auto">
-        {/* Clothing grid with larger items and fewer columns for better visibility */}
-        <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+      {/* Scrollable grid container */}
+      <div className="overflow-y-auto flex-grow">
+        {/* Clothing grid with more columns for demonstrating scrolling */}
+        <div className="grid grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
           {drawableIds.map((drawableId) => (
             <ClothingItem
               key={`${category.id}-${drawableId}`}
@@ -374,9 +375,9 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
 
   return (
     <TabLayout title="Clothing Customization">
-      <div className="flex flex-col gap-4">
-        {/* Category selection - horizontal tabs */}
-        <div className="grid grid-cols-6 gap-2 pb-3 border-b border-brand-800/30 mb-3">
+      <div className="flex flex-col gap-4 h-full">
+        {/* Category selection - horizontal tabs (fixed) */}
+        <div className="grid grid-cols-6 gap-2 pb-3 border-b border-brand-800/30 mb-3 flex-shrink-0">
           {CLOTHING_CATEGORIES.map((category) => (
             <ClothingCategoryButton
               key={category.id}
@@ -389,8 +390,8 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
           ))}
         </div>
 
-        {/* Clothing grid - full width */}
-        <div className="w-full overflow-y-auto max-h-[500px]">
+        {/* Clothing grid container - takes remaining height */}
+        <div className="w-full flex-grow flex flex-col min-h-0 max-h-[calc(100vh-300px)]">
           <ClothingGrid
             category={currentCategory}
             model={model}
