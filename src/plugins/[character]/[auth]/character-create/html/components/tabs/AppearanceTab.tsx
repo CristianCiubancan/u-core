@@ -1,6 +1,5 @@
 import React from 'react';
 import { AppearanceData } from '../../../shared/types';
-import { Slider, TabLayout } from '../common';
 
 interface AppearanceTabProps {
   appearanceData: AppearanceData;

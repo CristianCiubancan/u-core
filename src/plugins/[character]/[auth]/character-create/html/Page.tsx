@@ -17,9 +17,6 @@ import {
   NUI_EVENT,
   TabType,
   AppearanceOverlay,
-  CameraFocus,
-  CameraDirection,
-  ZoomDirection,
 } from '../shared/types';
 
 export default function Page() {
@@ -27,7 +24,6 @@ export default function Page() {
   const [activeTab, setActiveTab] = useState<TabType>('face');
   const [characterData, setCharacterData] =
     useState<CharacterData>(DEFAULT_CHARACTER);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data: any) => {
@@ -43,19 +39,6 @@ export default function Page() {
       console.error('[UI] Failed to close UI:', error);
     }
   }, []);
-
-  // Handle save button click
-  const handleSaveCharacter = useCallback(async () => {
-    try {
-      setIsSaving(true);
-      await fetchNui(NUI_EVENT, { save: true, characterData });
-      setIsSaving(false);
-      handleCloseUi();
-    } catch (error: any) {
-      console.error('[UI] Failed to save character:', error);
-      setIsSaving(false);
-    }
-  }, [characterData, handleCloseUi]);
 
   // Handle model change
   const handleModelChange = useCallback((modelId: string) => {
