@@ -8,7 +8,7 @@ interface TabLayoutProps {
 /**
  * Reusable tab layout component with consistent styling
  */
-export const TabLayout: React.FC<TabLayoutProps> = ({ title, children }) => {
+const TabLayout: React.FC<TabLayoutProps> = ({ title, children }) => {
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">{title}</h2>
@@ -16,3 +16,5 @@ export const TabLayout: React.FC<TabLayoutProps> = ({ title, children }) => {
     </div>
   );
 };
+
+export default TabLayout;
