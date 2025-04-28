@@ -217,7 +217,7 @@ const FormSelect = ({
             isOpen
               ? 'opacity-100 scale-100'
               : 'opacity-0 scale-95 pointer-events-none'
-          } max-h-60 overflow-y-auto focus:outline-none`} // Added focus:outline-none
+          } max-h-60 overflow-y-auto scrollbar-brand-dark focus:outline-none`} // Added scrollbar-brand-dark class
         >
           {options.map((option: Option, index: number) => {
             const isActive = value === option.value;

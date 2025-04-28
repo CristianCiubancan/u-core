@@ -10,6 +10,7 @@ import { brandPalette, grayPalette } from './config/palettes';
 import { generateFontSizes } from './utils/fontSizeUtils';
 import { generateMergedGlassClasses } from './utils/glassUtils';
 import { generateAccessibleTextUtilities } from './utils/accessibleTextUtils';
+import { generateThemedScrollbarStyles } from './utils/scrollbarThemeUtils';
 import { generateSafelist } from './utils/safelistUtils';
 import { hexToRgb, getContrastRatio } from '../utils/colorUtils';
 
@@ -89,6 +90,16 @@ const tailwindConfig: Config = {
 
     function ({ addUtilities }: PluginAPI) {
       addUtilities(generateAccessibleTextUtilities(grayPalette, brandPalette));
+    },
+
+    function ({ addUtilities }: PluginAPI) {
+      // Add themed scrollbar utilities
+      addUtilities(
+        generateThemedScrollbarStyles(
+          grayPalette,
+          brandPalette
+        ) as unknown as CSSRuleObject
+      );
     },
 
     function ({ addUtilities }: PluginAPI) {

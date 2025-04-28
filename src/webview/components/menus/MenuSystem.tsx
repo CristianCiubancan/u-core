@@ -54,7 +54,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
             : 'translate-x-full'
         }`}
       >
-        <div className="glass-brand-dark h-full overflow-y-auto p-4 relative">
+        <div className="glass-brand-dark h-full overflow-y-auto scrollbar-brand-dark p-4 relative">
           <CloseButton
             onClose={onClose}
             position={position === 'left' ? 'right' : 'left'}
@@ -90,7 +90,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
         }`}
       >
         {/* Inner container with full height and scroll */}
-        <div className="glass-brand-dark overflow-y-auto p-4 h-full rounded-lg shadow-xl relative">
+        <div className="glass-brand-dark overflow-y-auto scrollbar-brand-dark p-4 h-full rounded-lg shadow-xl relative">
           <CloseButton onClose={onClose} />
           <div className="mt-8 pr-8">{children}</div>
         </div>

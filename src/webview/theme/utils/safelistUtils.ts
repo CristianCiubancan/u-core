@@ -51,6 +51,13 @@ function generateSafelist(
     'hover:glass-brand-dark',
   ];
 
+  const scrollbarClasses = [
+    'scrollbar-light',
+    'scrollbar-dark',
+    'scrollbar-brand',
+    'scrollbar-brand-dark',
+  ];
+
   const accessibilityClasses = [
     'text-accessible-light',
     'text-accessible-dark',
@@ -126,6 +133,7 @@ function generateSafelist(
     ...generatedColorClasses,
     ...generatedGrayClasses,
     ...glassClasses,
+    ...scrollbarClasses,
     ...accessibilityClasses,
     ...cursorClasses,
     ...staticUtilityClasses,
