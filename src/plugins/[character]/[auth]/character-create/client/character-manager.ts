@@ -6,7 +6,7 @@ import {
   AppearanceData,
   ClothingData,
 } from '../shared/types';
-import { getCharacterData, store } from '../shared/store';
+import { getCharacterData, getCameraState, store } from '../shared/store';
 
 /**
  * Character Manager for handling all character customization
@@ -384,6 +384,9 @@ class CharacterManager {
 
     // After model is changed, we need to reapply all customizations
     this.applyFullCharacterData();
+
+    // Make sure the character is facing the camera after model change
+    this.faceCamera();
   }
 
   /**
@@ -503,6 +506,31 @@ class CharacterManager {
     // Set the new heading
     SetEntityHeading(playerPed, newHeading);
   }
+
+  /**
+   * Make the player face the camera
+   * This ensures the character is always looking at the camera when the menu is opened
+   */
+  faceCamera(): void {
+    console.log('[Character Create] Making player face the camera');
+
+    const playerPed = PlayerPedId();
+
+    // Get camera position from the store
+    const { cameraRotation } = getCameraState();
+
+    // Calculate the angle that makes the player face the camera
+    // We add 180 degrees to make the player face directly at the camera
+    // The camera rotation is the angle around the player, so we need to invert it
+    const faceAngle = cameraRotation % 360;
+
+    console.log(
+      `[Character Create] Setting player heading to ${faceAngle} degrees`
+    );
+
+    // Set the player's heading to face the camera
+    SetEntityHeading(playerPed, faceAngle);
+  }
 }
 
 // Export a singleton instance
@@ -528,3 +556,4 @@ export const updateClothing = (key: keyof ClothingData, value: number) =>
   characterManager.updateClothing(key, value);
 export const rotatePlayer = (direction: 'left' | 'right') =>
   characterManager.rotatePlayer(direction);
+export const faceCamera = () => characterManager.faceCamera();
