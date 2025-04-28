@@ -274,7 +274,7 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
         </span>
       </div>
       {/* Scrollable grid container */}
-      <div className="overflow-y-scroll scrollbar-brand-dark flex-grow">
+      <div className="overflow-y-scroll overflow-x-hidden scrollbar-brand-dark flex-grow">
         {/* Clothing grid with more columns for demonstrating scrolling */}
         <div className="grid grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
           {drawableIds.map((drawableId) => (
