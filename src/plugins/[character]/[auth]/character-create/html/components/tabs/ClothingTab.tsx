@@ -10,6 +10,7 @@ import {
   GiNecklace,
 } from 'react-icons/gi';
 import { FaTshirt } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import {
   getClothingImage,
   getClothingImageFallback,
@@ -127,8 +128,8 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
   const [imagePath, setImagePath] = useState('');
 
   useEffect(() => {
-    // Define the quality level - using 'tiny' for grid items to improve performance
-    const quality = 'tiny';
+    // Use medium quality for better previews
+    const quality = 'medium';
 
     // Get the image path from the asset server
     const path = getClothingImage(
@@ -164,7 +165,7 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
 
   return (
     <div
-      className={`relative aspect-square rounded overflow-hidden cursor-pointer transition-all duration-200 ${
+      className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
         isSelected
           ? 'ring-2 ring-brand-500 scale-105 glass-brand-dark'
           : 'hover:scale-105 glass-dark'
@@ -182,6 +183,47 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
           {drawableId}
         </div>
       )}
+    </div>
+  );
+};
+
+// Texture Navigation component
+interface TextureNavigationProps {
+  currentTexture: number;
+  maxTextures: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}
+
+const TextureNavigation: React.FC<TextureNavigationProps> = ({
+  currentTexture,
+  maxTextures,
+  onPrevious,
+  onNext,
+}) => {
+  return (
+    <div className="flex items-center space-x-2">
+      <button
+        onClick={onPrevious}
+        className="p-1 rounded-full glass-dark hover:glass-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-500"
+        aria-label="Previous texture"
+      >
+        <IconWrapper>
+          <FaChevronLeft className="text-brand-300" />
+        </IconWrapper>
+      </button>
+      <span className="text-xs text-gray-300">
+        {currentTexture + 1}/{maxTextures}
+      </span>
+      <button
+        onClick={onNext}
+        className="p-1 rounded-full glass-dark hover:glass-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-500"
+        aria-label="Next texture"
+      >
+        <IconWrapper>
+          <FaChevronRight className="text-brand-300" />
+        </IconWrapper>
+      </button>
     </div>
   );
 };
@@ -207,52 +249,48 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
   // Generate a range of drawable IDs for the grid
   const drawableIds = Array.from({ length: category.maxItems }, (_, i) => i);
 
-  // Generate a range of texture IDs for the selected drawable
-  const textureIds = Array.from({ length: category.maxTextures }, (_, i) => i);
+  // Handle texture navigation
+  const handlePreviousTexture = () => {
+    const newTexture =
+      selectedTexture <= 0 ? category.maxTextures - 1 : selectedTexture - 1;
+    onSelectTexture(newTexture);
+  };
+
+  const handleNextTexture = () => {
+    const newTexture =
+      selectedTexture >= category.maxTextures - 1 ? 0 : selectedTexture + 1;
+    onSelectTexture(newTexture);
+  };
 
   return (
-    <div className="mb-6">
-      {/* Drawables grid */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="text-sm font-medium">Styles</h4>
-          <span className="text-xs text-gray-400">
-            Selected: {selectedDrawable}
-          </span>
+    <div className="mb-6 h-full max-h-full overflow-hidden">
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center">
+          <h4 className="text-sm font-medium mr-4">Styles</h4>
+          <TextureNavigation
+            currentTexture={selectedTexture}
+            maxTextures={category.maxTextures}
+            onPrevious={handlePreviousTexture}
+            onNext={handleNextTexture}
+          />
         </div>
-        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+        <span className="text-xs text-gray-400">
+          Selected: {selectedDrawable}
+        </span>
+      </div>
+      {/* Styles section with texture navigation */}
+      <div className="mb-4 h-full overflow-auto">
+        {/* Clothing grid with larger items and fewer columns for better visibility */}
+        <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
           {drawableIds.map((drawableId) => (
             <ClothingItem
               key={`${category.id}-${drawableId}`}
               model={model}
               componentId={category.componentId}
               drawableId={drawableId}
-              textureId={0}
+              textureId={selectedTexture}
               isSelected={selectedDrawable === drawableId}
               onClick={() => onSelectDrawable(drawableId)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Textures grid for selected drawable */}
-      <div>
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="text-sm font-medium">Textures</h4>
-          <span className="text-xs text-gray-400">
-            Selected: {selectedTexture}
-          </span>
-        </div>
-        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-          {textureIds.map((textureId) => (
-            <ClothingItem
-              key={`${category.id}-${selectedDrawable}-${textureId}`}
-              model={model}
-              componentId={category.componentId}
-              drawableId={selectedDrawable}
-              textureId={textureId}
-              isSelected={selectedTexture === textureId}
-              onClick={() => onSelectTexture(textureId)}
             />
           ))}
         </div>
@@ -338,7 +376,7 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
     <TabLayout title="Clothing Customization">
       <div className="flex flex-col gap-4">
         {/* Category selection - horizontal tabs */}
-        <div className="grid grid-cols-6 gap-2 pb-2 border-b border-brand-800/30 mb-2">
+        <div className="grid grid-cols-6 gap-2 pb-3 border-b border-brand-800/30 mb-3">
           {CLOTHING_CATEGORIES.map((category) => (
             <ClothingCategoryButton
               key={category.id}
