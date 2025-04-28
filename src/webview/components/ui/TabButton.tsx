@@ -1,26 +1,25 @@
 import React, { ReactNode } from 'react';
-import Button from '../../../../../../../webview/components/ui/Button';
-import { TabType } from '../../../shared/types';
-import { IconWrapper } from './IconWrapper';
+import Button from './Button';
+import IconWrapper from './IconWrapper';
 
-interface TabButtonProps {
-  tab: TabType;
-  activeTab: TabType;
+interface TabButtonProps<T extends string> {
+  tab: T;
+  activeTab: T;
   label: string;
   icon?: ReactNode;
-  onClick: (tab: TabType) => void;
+  onClick: (tab: T) => void;
 }
 
 /**
  * Reusable tab button component with consistent styling
  */
-export const TabButton: React.FC<TabButtonProps> = ({
+const TabButton = <T extends string>({
   tab,
   activeTab,
   label,
   icon,
   onClick,
-}) => {
+}: TabButtonProps<T>) => {
   return (
     <Button
       onClick={() => onClick(tab)}
@@ -38,3 +37,5 @@ export const TabButton: React.FC<TabButtonProps> = ({
     </Button>
   );
 };
+
+export default TabButton;

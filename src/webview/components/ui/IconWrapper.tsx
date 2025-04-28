@@ -9,7 +9,7 @@ interface IconWrapperProps {
 /**
  * Wrapper component for consistent icon styling
  */
-export const IconWrapper: React.FC<IconWrapperProps> = ({
+const IconWrapper: React.FC<IconWrapperProps> = ({
   children,
   className = '',
   size = '1em',
@@ -23,3 +23,5 @@ export const IconWrapper: React.FC<IconWrapperProps> = ({
     </span>
   );
 };
+
+export default IconWrapper;

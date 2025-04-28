@@ -1,8 +1,7 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { CharacterData } from '../../../shared/types';
-import { TabLayout } from '../common';
+import { IconWrapper, TabLayout } from '../common';
 import Button from '../../../../../../../webview/components/ui/Button';
-import { IconWrapper } from '../common/IconWrapper';
 import {
   GiClothes,
   GiTShirt,

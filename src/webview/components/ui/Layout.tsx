@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import Button from '../../../../../../webview/components/ui/Button';
+import Button from './Button';
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,8 +13,12 @@ interface LayoutProps {
   showButtons?: boolean;
   headerContent?: ReactNode;
   footerContent?: ReactNode;
+  width?: string;
 }
 
+/**
+ * Reusable layout component with consistent styling for modal-like interfaces
+ */
 const Layout: React.FC<LayoutProps> = ({
   children,
   title,
@@ -27,6 +31,7 @@ const Layout: React.FC<LayoutProps> = ({
   showButtons = true,
   headerContent,
   footerContent,
+  width = 'w-[50vw]',
 }) => {
   const getPositionClasses = () => {
     switch (position) {
@@ -42,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div
-      className={`inset-0 w-[50vw] h-screen py-8 flex ${getPositionClasses()}`}
+      className={`inset-0 ${width} h-screen py-8 flex ${getPositionClasses()}`}
     >
       <div
         className={`glass-dark h-full font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full overflow-hidden flex flex-col`}
