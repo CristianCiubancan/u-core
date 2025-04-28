@@ -8,6 +8,7 @@ import {
   setCameraFocus,
   setCharacterCreationCamera,
 } from '../shared/store';
+import { faceCamera } from './character-manager';
 
 /**
  * Camera Manager for character creation
@@ -105,6 +106,9 @@ class CameraManager {
 
     setCameraRotation(newRotation);
     this.updatePosition();
+
+    // Make the character face the camera after rotation
+    faceCamera();
   }
 
   /**

@@ -2,7 +2,11 @@
 
 import { NUI_EVENT, getCharacterData, setUiVisible } from '../shared/store';
 import { setupCamera, cleanupCamera } from './camera';
-import { loadAndSetModel, applyFullCharacterData } from './character-manager';
+import {
+  loadAndSetModel,
+  applyFullCharacterData,
+  faceCamera,
+} from './character-manager';
 
 /**
  * UI Manager for character creation
@@ -52,6 +56,9 @@ class UiManager {
 
     // Set up camera
     setupCamera();
+
+    // Make the character face the camera
+    faceCamera();
   }
 
   /**
