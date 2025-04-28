@@ -1,7 +1,7 @@
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay } from './utils';
-import { setupCameraForObject, destroyCamera } from './camera';
+import { setupCameraForObject } from './camera';
 import { setWeatherTime } from './weather';
 
 export async function createGreenScreenObject(

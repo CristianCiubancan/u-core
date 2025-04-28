@@ -4,7 +4,7 @@ import { config, Delay } from './utils';
 
 export function SetPedOnGround(ped: number) {
   const [x, y, z] = GetEntityCoords(ped, false);
-  const [retval, ground] = GetGroundZFor_3dCoord(x, y, z, false); // Changed 4th argument to boolean false
+  const [_, ground] = GetGroundZFor_3dCoord(x, y, z, false); // Changed 4th argument to boolean false
   SetEntityCoords(ped, x, y, ground, false, false, false, false);
   if (config.debug)
     console.log(`DEBUG: Set ped ${ped} on ground at Z: ${ground}`);

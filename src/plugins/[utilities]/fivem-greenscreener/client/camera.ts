@@ -134,7 +134,7 @@ export async function setupCameraForObject(object: number, hash: number) {
   ); // Ensure a minimum FOV
 
   const [objectX, objectY, objectZ] = GetEntityCoords(object, false); // Use false for exact coords
-  const [fwdX, fwdY, fwdZ] = GetEntityForwardVector(object);
+  const [fwdX, fwdY, _] = GetEntityForwardVector(object);
 
   // Calculate center based on model dimensions and entity coords
   const center = {

@@ -1,7 +1,7 @@
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay, QBCore } from './utils';
-import { setupCameraForVehicle, destroyCamera } from './camera';
+import { setupCameraForVehicle } from './camera';
 import { setWeatherTime } from './weather';
 
 export function getAllVehicleModels(): string[] {

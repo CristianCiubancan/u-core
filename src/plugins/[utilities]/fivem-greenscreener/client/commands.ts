@@ -1,39 +1,32 @@
 /// <reference types="@citizenfx/client" />
 
-import { config, Delay, playerId, QBCore } from './utils';
+import { destroyCamera, setupCameraForComponent } from './camera';
+import { setActiveInterval } from './events'; // Import setActiveInterval
 import {
-  setWeatherTime,
-  stopWeatherResource,
-  startWeatherResource,
-} from './weather';
+  cleanupObject,
+  createGreenScreenObject,
+  getObjectModelHash,
+  takeScreenshotForObject,
+} from './object';
 import {
-  setupCameraForComponent,
-  setupCameraForObject,
-  setupCameraForVehicle,
-  destroyCamera,
-} from './camera';
-import {
-  ResetPedComponents,
+  cleanupPedAfterScreenshot,
   LoadComponentVariation,
   LoadPropVariation,
+  ResetPedComponents,
   setupPedForScreenshot,
-  cleanupPedAfterScreenshot,
-  ClearAllPedProps,
-  SetPedOnGround,
 } from './ped';
+import { config, Delay, playerId, QBCore } from './utils';
 import {
-  getAllVehicleModels,
-  createGreenScreenVehicle,
-  takeScreenshotForVehicle,
   cleanupVehicle,
+  createGreenScreenVehicle,
+  getAllVehicleModels,
+  takeScreenshotForVehicle,
 } from './vehicle';
 import {
-  createGreenScreenObject,
-  takeScreenshotForObject,
-  cleanupObject,
-  getObjectModelHash,
-} from './object';
-import { setActiveInterval } from './events'; // Import setActiveInterval
+  setWeatherTime,
+  startWeatherResource,
+  stopWeatherResource,
+} from './weather';
 
 let currentPed: number | null = null;
 let taskInterval: NodeJS.Timeout | null = null;
