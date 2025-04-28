@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay, playerId, QBCore } from './utils';
@@ -37,7 +36,7 @@ import {
 import { setActiveInterval } from './events'; // Import setActiveInterval
 
 let currentPed: number | null = null;
-let taskInterval: number | null = null;
+let taskInterval: NodeJS.Timeout | null = null;
 
 // Helper function to take screenshot for components/props
 async function takeScreenshotForPedItem(
@@ -73,6 +72,10 @@ async function takeScreenshotForPedItem(
   const filename = `${pedType}_${
     type === 'PROPS' ? 'prop_' : ''
   }${component}_${itemId}${textureSuffix}`;
+
+  // Track this screenshot request
+  exports[GetCurrentResourceName()].trackScreenshotRequest();
+
   emitNet('takeScreenshot', filename, 'clothing');
   if (config.debug)
     console.log(`DEBUG: Screenshot request emitted for ${filename}`);
@@ -122,7 +125,7 @@ export function initializeCommands() {
             modelHash === GetHashKey('mp_m_freemode_01') ? 'male' : 'female';
 
           setupPedForScreenshot(currentPed);
-          SetPlayerControl(playerId, false);
+          SetPlayerControl(playerId, false, 0); // Added flags argument
 
           // Start interval to clear tasks
           taskInterval = setInterval(() => {
@@ -323,7 +326,7 @@ export function initializeCommands() {
 
   RegisterCommand(
     'customscreenshot',
-    async (source: number, args: string[]) => {
+    async (_source: number, args: string[]) => {
       if (args.length < 4) {
         console.log(
           "Usage: /customscreenshot <component_id> <drawable_id/'all'> <type: CLOTHING/PROPS> <gender: male/female/both> [camera_json]"
@@ -398,7 +401,7 @@ export function initializeCommands() {
             modelHash === GetHashKey('mp_m_freemode_01') ? 'male' : 'female';
 
           setupPedForScreenshot(currentPed);
-          SetPlayerControl(playerId, false);
+          SetPlayerControl(playerId, false, 0); // Added flags argument
           taskInterval = setInterval(() => {
             if (currentPed) ClearPedTasksImmediately(currentPed);
           }, 1);
@@ -666,7 +669,7 @@ export function initializeCommands() {
 
   RegisterCommand(
     'screenshotobject',
-    async (source: number, args: string[]) => {
+    async (_source: number, args: string[]) => {
       if (args.length < 1) {
         console.log('Usage: /screenshotobject <object_hash_or_name>');
         return;
@@ -697,10 +700,11 @@ export function initializeCommands() {
         false,
         false
       );
-      SetPlayerControl(playerId, false);
+      SetPlayerControl(playerId, false, 0); // Added flags argument
       await Delay(100);
 
       let objectHandle: number | null = null;
+      let errorOccurred = false; // Declare errorOccurred here
       try {
         objectHandle = await createGreenScreenObject(modelHash);
 
@@ -715,6 +719,7 @@ export function initializeCommands() {
           action: 'end',
           error: error.message || 'Failed to process object.',
         });
+        errorOccurred = true; // Set errorOccurred in catch block
       } finally {
         // Cleanup
         if (objectHandle !== null) {
@@ -722,9 +727,9 @@ export function initializeCommands() {
         }
         destroyCamera();
         startWeatherResource();
-        SetPlayerControl(playerId, true); // Restore player control
+        SetPlayerControl(playerId, true, 0); // Restore player control (added flags argument)
         DisableIdleCamera(false);
-        if (!error) SendNUIMessage({ action: 'end' }); // Send end only if no error occurred in catch
+        if (!errorOccurred) SendNUIMessage({ action: 'end' }); // Corrected variable name
         console.log('Screenshot object command finished.');
       }
     },
@@ -733,7 +738,7 @@ export function initializeCommands() {
 
   RegisterCommand(
     'screenshotvehicle',
-    async (source: number, args: string[]) => {
+    async (_source: number, args: string[]) => {
       if (args.length < 1) {
         console.log(
           "Usage: /screenshotvehicle <model_name/'all'> [primary_color] [secondary_color]"
@@ -759,7 +764,7 @@ export function initializeCommands() {
         false,
         false
       );
-      SetPlayerControl(playerId, false);
+      SetPlayerControl(playerId, false, 0); // Added flags argument
       await Delay(100);
 
       // Clear area
@@ -788,7 +793,7 @@ export function initializeCommands() {
           );
           // Cleanup and return
           startWeatherResource();
-          SetPlayerControl(playerId, true);
+          SetPlayerControl(playerId, true, 0); // Added flags argument
           DisableIdleCamera(false);
           return;
         }
@@ -887,7 +892,7 @@ export function initializeCommands() {
         // Final cleanup
         destroyCamera();
         startWeatherResource();
-        SetPlayerControl(playerId, true);
+        SetPlayerControl(playerId, true, 0); // Added flags argument
         DisableIdleCamera(false);
         SendNUIMessage({
           action: 'end',

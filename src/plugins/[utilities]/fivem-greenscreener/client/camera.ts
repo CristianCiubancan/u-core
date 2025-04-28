@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay } from './utils';
@@ -21,7 +20,7 @@ export function destroyCamera() {
     cam = null;
   }
   camInfo = null;
-  RenderScriptCams(false, false, 0, true, false, 0);
+  RenderScriptCams(false, false, 0, true, false); // Removed extra argument
   if (config.debug) console.log('DEBUG: Camera destroyed.');
 }
 
@@ -35,9 +34,14 @@ export async function setupCameraForComponent(
     camInfo.zPos !== cameraInfoConfig.zPos ||
     camInfo.fov !== cameraInfoConfig.fov
   ) {
-    camInfo = cameraInfoConfig;
+    // Store new settings locally before destroying the old camera state
+    const newCamSettings = {
+      zPos: cameraInfoConfig.zPos,
+      fov: cameraInfoConfig.fov,
+      rotation: cameraInfoConfig.rotation, // Store rotation as well
+    };
 
-    destroyCamera(); // Destroy existing cam before creating a new one
+    destroyCamera(); // Destroy existing cam before creating a new one, this nullifies global camInfo
 
     // Ensure ped is in the correct initial position and rotation for camera setup
     SetEntityRotation(
@@ -66,7 +70,7 @@ export async function setupCameraForComponent(
     const fwdPos = {
       x: playerX + fwdX * 1.2,
       y: playerY + fwdY * 1.2,
-      z: playerZ + fwdZ + camInfo.zPos,
+      z: playerZ + fwdZ + newCamSettings.zPos, // Use local variable
     };
 
     cam = CreateCamWithParams(
@@ -77,14 +81,18 @@ export async function setupCameraForComponent(
       0,
       0,
       0,
-      camInfo.fov,
+      newCamSettings.fov, // Use local variable
       true,
       0
     );
 
-    PointCamAtCoord(cam, playerX, playerY, playerZ + camInfo.zPos);
+    PointCamAtCoord(cam, playerX, playerY, playerZ + newCamSettings.zPos); // Use local variable
     SetCamActive(cam, true);
-    RenderScriptCams(true, false, 0, true, false, 0);
+    RenderScriptCams(true, false, 0, true, false); // Removed extra argument
+
+    // Update global camInfo *after* new camera is set up
+    camInfo = cameraInfoConfig;
+
     if (config.debug)
       console.log('DEBUG: New component camera created and activated.');
   } else {
@@ -92,12 +100,13 @@ export async function setupCameraForComponent(
       console.log('DEBUG: Reusing existing component camera setup.');
   }
 
-  // Apply final rotation after camera is potentially set up
+  // Apply final rotation after camera is potentially set up, using the correct settings for this run
+  const currentRotation = camInfo?.rotation || cameraInfoConfig.rotation; // Use global if exists, else the new one
   SetEntityRotation(
     ped,
-    camInfo.rotation.x,
-    camInfo.rotation.y,
-    camInfo.rotation.z,
+    currentRotation.x,
+    currentRotation.y,
+    currentRotation.z,
     2, // Rotation order might be important
     false
   );
@@ -168,7 +177,7 @@ export async function setupCameraForObject(object: number, hash: number) {
 
   PointCamAtCoord(cam, center.x, center.y, center.z);
   SetCamActive(cam, true);
-  RenderScriptCams(true, false, 0, true, false, 0);
+  RenderScriptCams(true, false, 0, true, false); // Removed extra argument
   if (config.debug)
     console.log('DEBUG: New object camera created and activated.');
 
@@ -240,7 +249,7 @@ export async function setupCameraForVehicle(vehicle: number, hash: number) {
 
   PointCamAtCoord(cam, center.x, center.y, center.z); // Point at the calculated center
   SetCamActive(cam, true);
-  RenderScriptCams(true, false, 0, true, false, 0);
+  RenderScriptCams(true, false, 0, true, false); // Removed extra argument
   if (config.debug)
     console.log('DEBUG: New vehicle camera created and activated.');
 

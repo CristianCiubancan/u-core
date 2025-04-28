@@ -1,11 +1,10 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay } from './utils';
 
 export function SetPedOnGround(ped: number) {
   const [x, y, z] = GetEntityCoords(ped, false);
-  const [retval, ground] = GetGroundZFor_3dCoord(x, y, z, 0, false);
+  const [retval, ground] = GetGroundZFor_3dCoord(x, y, z, false); // Changed 4th argument to boolean false
   SetEntityCoords(ped, x, y, ground, false, false, false, false);
   if (config.debug)
     console.log(`DEBUG: Set ped ${ped} on ground at Z: ${ground}`);
@@ -44,8 +43,9 @@ export async function ResetPedComponents(ped: number) {
 
   // Reset face features (optional)
   SetPedHeadBlendData(ped, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
-  for (let i = 0; i < GetNumPedHeadOverlayValues(0); i++) {
-    // Use GetNumPedHeadOverlayValues
+  for (let i = 0; i < GetNumHeadOverlayValues(0); i++) {
+    // Corrected native name
+    // Use GetNumHeadOverlayValues
     SetPedHeadOverlay(ped, i, 0, 0.0); // Reset overlays
   }
   for (let i = 0; i < 20; i++) {
@@ -92,7 +92,7 @@ export async function LoadComponentVariation(
 
   // Apply the variation
   SetPedComponentVariation(ped, component, drawable, texture, 0); // Palette 0 is standard
-  ClearPedPreloadVariationData(ped); // Clear preload data once applied
+  ReleasePedPreloadVariationData(ped); // Corrected native name
 
   await Delay(50); // Small delay after applying
   return true; // Indicate success
@@ -131,7 +131,7 @@ export async function LoadPropVariation(
   ClearPedProp(ped, component); // Clear existing prop first
   await Delay(10); // Tiny delay after clearing
   SetPedPropIndex(ped, component, prop, texture, true); // Attach prop
-  ClearPedPreloadPropData(ped); // Clear preload data
+  ReleasePedPreloadPropData(ped); // Corrected native name
 
   await Delay(50); // Small delay after applying
   return true; // Indicate success
@@ -159,10 +159,13 @@ export function setupPedForScreenshot(ped: number) {
   FreezeEntityPosition(ped, true);
 }
 
-export function cleanupPedAfterScreenshot(ped: number, intervalId?: number) {
+export function cleanupPedAfterScreenshot(
+  ped: number,
+  intervalId?: NodeJS.Timeout | null
+) {
   if (config.debug)
     console.log(`DEBUG: Cleaning up ped ${ped} after screenshot.`);
-  SetPlayerControl(PlayerId(), true); // Assuming ped is player ped
+  SetPlayerControl(PlayerId(), true, 0); // Changed 3rd argument to number 0
   FreezeEntityPosition(ped, false);
   if (intervalId) {
     clearInterval(intervalId);

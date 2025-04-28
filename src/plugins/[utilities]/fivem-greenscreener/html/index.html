@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FiveM Greenscreener</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: transparent;
+            color: white;
+            overflow: hidden;
+        }
+        #status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: none;
+            z-index: 1000;
+        }
+        .active {
+            display: block !important;
+            animation: fadeInOut 2s ease-in-out;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Processing screenshots...</div>
+
+    <script>
+        const statusElement = document.getElementById('status');
+        
+        // Listen for NUI messages from the client script
+        window.addEventListener('message', function(event) {
+            const data = event.data;
+            
+            if (data.action === 'start') {
+                statusElement.textContent = 'Processing screenshots...';
+                statusElement.classList.add('active');
+            } 
+            else if (data.action === 'end') {
+                if (data.error) {
+                    statusElement.textContent = `Error: ${data.error}`;
+                } else {
+                    statusElement.textContent = 'Screenshots completed!';
+                }
+                
+                // Remove the active class after a delay
+                setTimeout(() => {
+                    statusElement.classList.remove('active');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
