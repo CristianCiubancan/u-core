@@ -1,11 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { CharacterData } from '../../../shared/types';
-import { ClothingPreview } from '../ClothingPreview';
 import { TabLayout } from '../common';
+import Button from '../../../../../../../webview/components/ui/Button';
+import { IconWrapper } from '../common/IconWrapper';
+import {
+  GiClothes,
+  GiTShirt,
+  GiArmoredPants,
+  GiRunningShoe,
+  GiNecklace,
+} from 'react-icons/gi';
+import { FaTshirt } from 'react-icons/fa';
 import {
   getClothingImage,
   getClothingImageFallback,
 } from '../../utils/getClothingImage';
+
+// Custom clothing category button component
+interface ClothingCategoryButtonProps {
+  id: string;
+  activeCategory: string;
+  label: string;
+  icon: ReactNode;
+  onClick: (id: string) => void;
+}
+
+const ClothingCategoryButton: React.FC<ClothingCategoryButtonProps> = ({
+  id,
+  activeCategory,
+  label,
+  icon,
+  onClick,
+}) => {
+  return (
+    <Button
+      onClick={() => onClick(id)}
+      fullWidth
+      className={`${
+        activeCategory === id ? 'glass-brand' : 'glass-brand-dark'
+      } flex flex-col items-center justify-center py-2`}
+    >
+      <IconWrapper className="mb-1" size="1.5em">
+        {icon}
+      </IconWrapper>
+      <span className="text-xs">{label}</span>
+    </Button>
+  );
+};
 
 interface ClothingTabProps {
   clothingData: CharacterData['clothing'];
@@ -13,26 +54,56 @@ interface ClothingTabProps {
   model: string;
 }
 
-// Define the clothing categories
+// Define the clothing categories with icons
 const CLOTHING_CATEGORIES = [
-  { id: 'tops', label: 'Tops', componentId: 11, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'tops',
+    label: 'Tops',
+    componentId: 11,
+    maxItems: 20,
+    maxTextures: 5,
+    icon: <GiTShirt />,
+  },
   {
     id: 'undershirt',
     label: 'Undershirt',
     componentId: 8,
     maxItems: 20,
     maxTextures: 5,
+    icon: <FaTshirt />,
   },
-  { id: 'legs', label: 'Legs', componentId: 4, maxItems: 20, maxTextures: 5 },
-  { id: 'shoes', label: 'Shoes', componentId: 6, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'legs',
+    label: 'Legs',
+    componentId: 4,
+    maxItems: 20,
+    maxTextures: 5,
+    icon: <GiArmoredPants />,
+  },
+  {
+    id: 'shoes',
+    label: 'Shoes',
+    componentId: 6,
+    maxItems: 20,
+    maxTextures: 5,
+    icon: <GiRunningShoe />,
+  },
   {
     id: 'accessories',
     label: 'Accessories',
     componentId: 7,
     maxItems: 20,
     maxTextures: 5,
+    icon: <GiNecklace />,
   },
-  { id: 'torso', label: 'Torso', componentId: 3, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'torso',
+    label: 'Torso',
+    componentId: 3,
+    maxItems: 20,
+    maxTextures: 5,
+    icon: <GiClothes />,
+  },
 ];
 
 // ClothingItem component for the grid
@@ -94,8 +165,10 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
 
   return (
     <div
-      className={`relative w-16 h-16 rounded overflow-hidden cursor-pointer transition-all duration-200 ${
-        isSelected ? 'ring-2 ring-brand-500 scale-105' : 'hover:scale-105'
+      className={`relative aspect-square rounded overflow-hidden cursor-pointer transition-all duration-200 ${
+        isSelected
+          ? 'ring-2 ring-brand-500 scale-105 glass-brand-dark'
+          : 'hover:scale-105 glass-dark'
       }`}
       onClick={onClick}
     >
@@ -106,7 +179,7 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-black/30 text-xs text-center">
+        <div className="w-full h-full flex items-center justify-center text-xs text-center">
           {drawableId}
         </div>
       )}
@@ -140,12 +213,15 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
 
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-semibold mb-2">{category.label}</h3>
-
       {/* Drawables grid */}
-      <div className="mb-4">
-        <h4 className="text-sm font-medium mb-1">Styles</h4>
-        <div className="grid grid-cols-5 gap-2">
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="text-sm font-medium">Styles</h4>
+          <span className="text-xs text-gray-400">
+            Selected: {selectedDrawable}
+          </span>
+        </div>
+        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
           {drawableIds.map((drawableId) => (
             <ClothingItem
               key={`${category.id}-${drawableId}`}
@@ -162,8 +238,13 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
 
       {/* Textures grid for selected drawable */}
       <div>
-        <h4 className="text-sm font-medium mb-1">Textures</h4>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="text-sm font-medium">Textures</h4>
+          <span className="text-xs text-gray-400">
+            Selected: {selectedTexture}
+          </span>
+        </div>
+        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
           {textureIds.map((textureId) => (
             <ClothingItem
               key={`${category.id}-${selectedDrawable}-${textureId}`}
@@ -256,39 +337,23 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
 
   return (
     <TabLayout title="Clothing Customization">
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Left side - Character preview and category selection */}
-        <div className="w-full md:w-1/3">
-          {/* Character preview */}
-          <div className="mb-4">
-            <ClothingPreview
-              model={model}
-              clothingKey={activeCategory}
-              drawableId={drawableId}
-              textureId={textureId}
+      <div className="flex flex-col gap-4">
+        {/* Category selection - horizontal tabs */}
+        <div className="grid grid-cols-6 gap-2 pb-2 border-b border-brand-800/30 mb-2">
+          {CLOTHING_CATEGORIES.map((category) => (
+            <ClothingCategoryButton
+              key={category.id}
+              id={category.id}
+              activeCategory={activeCategory}
+              label={category.label}
+              icon={category.icon}
+              onClick={handleCategorySelect}
             />
-          </div>
-
-          {/* Category selection */}
-          <div className="flex flex-col gap-2">
-            {CLOTHING_CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                className={`px-3 py-2 rounded w-full text-left ${
-                  activeCategory === category.id
-                    ? 'glass-brand'
-                    : 'glass-brand-dark'
-                }`}
-                onClick={() => handleCategorySelect(category.id)}
-              >
-                {category.label}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
 
-        {/* Right side - Clothing grid */}
-        <div className="w-full md:w-2/3 overflow-y-auto max-h-[500px] pr-2">
+        {/* Clothing grid - full width */}
+        <div className="w-full overflow-y-auto max-h-[500px]">
           <ClothingGrid
             category={currentCategory}
             model={model}
