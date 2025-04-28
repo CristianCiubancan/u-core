@@ -35,7 +35,7 @@ export const getClothingImage = (
 
   // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+    process.env.ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Create the image path with texture ID
   const imagePath = `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}_${textureId}.png`;
@@ -64,7 +64,7 @@ export const getClothingImageFallback = (
 
   // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+    process.env.ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Create a fallback path without texture ID
   return `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}.png`;
