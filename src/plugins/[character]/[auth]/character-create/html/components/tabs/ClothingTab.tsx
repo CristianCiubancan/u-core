@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CharacterData, ClothingData } from '../../../shared/types';
+import { CharacterData } from '../../../shared/types';
 import { ClothingPreview } from '../ClothingPreview';
 import { TabLayout } from '../common';
 import {

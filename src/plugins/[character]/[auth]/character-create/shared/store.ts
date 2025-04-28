@@ -63,10 +63,13 @@ class Store {
     property: K,
     value: Partial<CharacterData[K]>
   ): void {
+    // Create a new object for the property if it doesn't exist
+    const currentPropertyValue = this.state.characterData[property] || {};
+
     this.state.characterData = {
       ...this.state.characterData,
       [property]: {
-        ...this.state.characterData[property],
+        ...currentPropertyValue,
         ...value,
       },
     };

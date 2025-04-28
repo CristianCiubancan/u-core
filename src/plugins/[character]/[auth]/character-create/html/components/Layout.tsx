@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import Button from '../../../../../../webview/components/Button';
+import Button from '../../../../../../webview/components/ui/Button';
 
 interface LayoutProps {
   children: ReactNode;
