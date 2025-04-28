@@ -599,7 +599,7 @@ const DatePicker = ({
             isOpen
               ? 'opacity-100 scale-100'
               : 'opacity-0 scale-95 pointer-events-none'
-          } focus:outline-none`}
+          } scrollbar-brand-dark focus:outline-none`}
         >
           {isOpen && ( // Conditionally render content to ensure refs are available
             <div className="p-2">
