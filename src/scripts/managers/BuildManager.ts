@@ -356,7 +356,7 @@ class BuildManager {
             sourcemap: 'inline',
             loader,
             logLevel: 'info',
-            external: externalPackages,
+            external: externalPackages.concat(isServerScript ? ['canvas'] : []), // Add canvas as external for server scripts
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',
           });
