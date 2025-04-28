@@ -309,7 +309,7 @@ export default function Page() {
         </div>
       </div>
       <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
-        {/* Footer content */}
+        {/* Camera controls in vertical layout */}
         <CameraControls
           onRotate={handleRotateCamera}
           onZoom={handleZoomCamera}
