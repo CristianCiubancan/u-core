@@ -1,5 +1,9 @@
 import React from 'react';
 import Button from '../../../../../../webview/components/ui/Button';
+import { MdZoomIn, MdZoomOut } from 'react-icons/md';
+import { FaArrowRotateLeft, FaArrowRotateRight } from 'react-icons/fa6';
+import { FaFaceSmile, FaPersonHalfDress, FaShoePrints } from 'react-icons/fa6';
+import { IconWrapper } from './common';
 import {
   CameraDirection,
   ZoomDirection,
@@ -45,12 +49,18 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
               onClick={() => onZoom('in')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
+              <IconWrapper className="mr-2">
+                <MdZoomIn />
+              </IconWrapper>
               Zoom In
             </Button>
             <Button
               onClick={() => onZoom('out')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
+              <IconWrapper className="mr-2">
+                <MdZoomOut />
+              </IconWrapper>
               Zoom Out
             </Button>
           </div>
@@ -66,13 +76,19 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
                 onClick={() => onRotatePlayer('left')}
                 className="py-1 px-2 text-xs flex justify-center items-center"
               >
-                ← Rotate Character
+                <IconWrapper className="mr-2">
+                  <FaArrowRotateLeft />
+                </IconWrapper>
+                Rotate Left
               </Button>
               <Button
                 onClick={() => onRotatePlayer('right')}
                 className="py-1 px-2 text-xs flex justify-center items-center"
               >
-                Rotate Character →
+                <IconWrapper className="mr-2">
+                  <FaArrowRotateRight />
+                </IconWrapper>
+                Rotate Right
               </Button>
             </div>
           </div>
@@ -89,6 +105,9 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
                 activeFocus === 'head' ? 'glass-brand' : 'glass-brand-dark'
               }`}
             >
+              <IconWrapper className="mr-2">
+                <FaFaceSmile />
+              </IconWrapper>
               Head
             </Button>
             <Button
@@ -97,6 +116,9 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
                 activeFocus === 'body' ? 'glass-brand' : 'glass-brand-dark'
               }`}
             >
+              <IconWrapper className="mr-2">
+                <FaPersonHalfDress />
+              </IconWrapper>
               Body
             </Button>
             <Button
@@ -105,6 +127,9 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
                 activeFocus === 'legs' ? 'glass-brand' : 'glass-brand-dark'
               }`}
             >
+              <IconWrapper className="mr-2">
+                <FaShoePrints />
+              </IconWrapper>
               Legs
             </Button>
           </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import Button from '../../../../../../../webview/components/ui/Button';
+import { FaMars, FaVenus } from 'react-icons/fa6';
+import { IconWrapper } from '../common';
 import { MODELS } from '../../../shared/types';
 
 interface ModelPickerProps {
@@ -20,9 +22,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             onClick={() => onModelChange(model.id)}
             className={`${
               currentModel === model.id ? 'glass-brand' : 'glass-brand-dark'
-            }`}
+            } flex flex-col items-center justify-center py-3`}
           >
-            {model.label}
+            <IconWrapper size="1.5em" className="mb-1">
+              {model.id === 'mp_m_freemode_01' ? <FaMars /> : <FaVenus />}
+            </IconWrapper>
+            <span>{model.label}</span>
           </Button>
         ))}
       </div>
