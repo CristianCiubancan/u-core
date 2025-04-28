@@ -243,7 +243,7 @@ export default function Page() {
             onModelChange={handleModelChange}
           />
           {/* Tabs */}
-          <div className="grid grid-cols-4 gap-2 mt-4">
+          <div className="grid grid-cols-4 gap-4 mt-4">
             <TabButton
               tab="face"
               activeTab={activeTab}
