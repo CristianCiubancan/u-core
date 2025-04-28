@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 export const config = JSON.parse(

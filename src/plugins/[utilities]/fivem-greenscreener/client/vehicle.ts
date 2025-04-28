@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay, QBCore } from './utils';
@@ -103,6 +102,9 @@ export async function takeScreenshotForVehicle(
   await setupCameraForVehicle(vehicle, hash);
 
   await Delay(100); // Delay after camera setup
+
+  // Track this screenshot request
+  exports[GetCurrentResourceName()].trackScreenshotRequest();
 
   emitNet('takeScreenshot', `${model}`, 'vehicles');
   if (config.debug)

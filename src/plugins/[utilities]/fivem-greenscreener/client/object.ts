@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config, Delay } from './utils';
@@ -77,6 +76,9 @@ export async function takeScreenshotForObject(object: number, hash: number) {
 
   await Delay(100); // Delay after camera setup
 
+  // Track this screenshot request
+  exports[GetCurrentResourceName()].trackScreenshotRequest();
+
   emitNet('takeScreenshot', `${hash}`, 'objects');
   if (config.debug)
     console.log(`DEBUG: Screenshot request emitted for object ${hash}`);
@@ -124,11 +126,13 @@ export function getObjectModelHash(input: string | number): number | null {
     }
   }
 
-  // Validate if the resulting hash (or original input if not a weapon) is a valid object model
-  if (IsModelValid(modelHash) && IsModelAnObject(modelHash)) {
+  // Validate if the resulting hash (or original input if not a weapon) is a valid model
+  if (IsModelValid(modelHash)) {
+    // We assume it's an object if it's valid and not handled as a weapon above.
+    // A more robust check isn't readily available client-side.
     if (config.debug)
       console.log(
-        `DEBUG: Using object model hash ${modelHash} for input ${input}`
+        `DEBUG: Using model hash ${modelHash} for input ${input} (assumed object)`
       );
     return modelHash;
   } else {

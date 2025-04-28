@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="@citizenfx/client" />
 
 import { config } from './utils';
