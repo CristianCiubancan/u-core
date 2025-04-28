@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CharacterData } from '../../types';
+import { CharacterData, ClothingData } from '../../../shared/types';
 import { ClothingPreview } from '../ClothingPreview';
+import { TabLayout } from '../common';
 import {
   getClothingImage,
   getClothingImageFallback,
@@ -254,9 +255,7 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
     CLOTHING_CATEGORIES[0];
 
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-4">Clothing Customization</h2>
-
+    <TabLayout title="Clothing Customization">
       <div className="flex flex-col md:flex-row gap-4">
         {/* Left side - Character preview and category selection */}
         <div className="w-full md:w-1/3">
@@ -300,6 +299,6 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
           />
         </div>
       </div>
-    </div>
+    </TabLayout>
   );
 };

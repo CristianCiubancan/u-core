@@ -28,6 +28,7 @@
   "include": [
     "src/webview/**/*",
     "src/plugins/**/html/**/*",
+    "src/plugins/**/shared/**/*",
     "src/webview/utils/**/*",
     "src/webview/theme/tailwind.config.ts"
   ]

@@ -1,10 +1,15 @@
 import React from 'react';
 import Button from '../../../../../../webview/components/ui/Button';
+import {
+  CameraDirection,
+  ZoomDirection,
+  CameraFocus,
+} from '../../shared/types';
 
 interface CameraControlsProps {
-  onRotate: (direction: 'left' | 'right') => void;
-  onZoom: (direction: 'in' | 'out') => void;
-  onFocus: (focus: 'head' | 'body' | 'legs') => void;
+  onRotate: (direction: CameraDirection) => void;
+  onZoom: (direction: ZoomDirection) => void;
+  onFocus: (focus: CameraFocus) => void;
 }
 
 export const CameraControls: React.FC<CameraControlsProps> = ({
