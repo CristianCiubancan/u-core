@@ -1,6 +1,11 @@
 /// <reference types="@citizenfx/client" />
 
-import { CharacterData, FaceData, HairData, AppearanceData, ClothingData } from '../shared/types';
+import {
+  FaceData,
+  HairData,
+  AppearanceData,
+  ClothingData,
+} from '../shared/types';
 import { getCharacterData, store } from '../shared/store';
 
 /**
@@ -221,38 +226,98 @@ class CharacterManager {
     const playerPed = PlayerPedId();
 
     // Apply torso
-    SetPedComponentVariation(playerPed, 3, clothing.torso, clothing.torsoTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      3,
+      clothing.torso,
+      clothing.torsoTexture,
+      0
+    );
 
     // Apply legs
-    SetPedComponentVariation(playerPed, 4, clothing.legs, clothing.legsTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      4,
+      clothing.legs,
+      clothing.legsTexture,
+      0
+    );
 
     // Apply shoes
-    SetPedComponentVariation(playerPed, 6, clothing.shoes, clothing.shoesTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      6,
+      clothing.shoes,
+      clothing.shoesTexture,
+      0
+    );
 
     // Apply accessories
-    SetPedComponentVariation(playerPed, 7, clothing.accessories, clothing.accessoriesTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      7,
+      clothing.accessories,
+      clothing.accessoriesTexture,
+      0
+    );
 
     // Apply undershirt
-    SetPedComponentVariation(playerPed, 8, clothing.undershirt, clothing.undershirtTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      8,
+      clothing.undershirt,
+      clothing.undershirtTexture,
+      0
+    );
 
     // Apply tops
-    SetPedComponentVariation(playerPed, 11, clothing.tops, clothing.topsTexture, 0);
+    SetPedComponentVariation(
+      playerPed,
+      11,
+      clothing.tops,
+      clothing.topsTexture,
+      0
+    );
 
     // Apply optional clothing if they exist
     if (clothing.mask !== undefined) {
-      SetPedComponentVariation(playerPed, 1, clothing.mask, clothing.maskTexture || 0, 0);
+      SetPedComponentVariation(
+        playerPed,
+        1,
+        clothing.mask,
+        clothing.maskTexture || 0,
+        0
+      );
     }
 
     if (clothing.bags !== undefined) {
-      SetPedComponentVariation(playerPed, 5, clothing.bags, clothing.bagsTexture || 0, 0);
+      SetPedComponentVariation(
+        playerPed,
+        5,
+        clothing.bags,
+        clothing.bagsTexture || 0,
+        0
+      );
     }
 
     if (clothing.armor !== undefined) {
-      SetPedComponentVariation(playerPed, 9, clothing.armor, clothing.armorTexture || 0, 0);
+      SetPedComponentVariation(
+        playerPed,
+        9,
+        clothing.armor,
+        clothing.armorTexture || 0,
+        0
+      );
     }
 
     if (clothing.decals !== undefined) {
-      SetPedComponentVariation(playerPed, 10, clothing.decals, clothing.decalsTexture || 0, 0);
+      SetPedComponentVariation(
+        playerPed,
+        10,
+        clothing.decals,
+        clothing.decalsTexture || 0,
+        0
+      );
     }
   }
 
@@ -270,7 +335,13 @@ class CharacterManager {
 
     // Apply glasses
     if (props.glasses !== undefined) {
-      SetPedPropIndex(playerPed, 1, props.glasses, props.glassesTexture || 0, true);
+      SetPedPropIndex(
+        playerPed,
+        1,
+        props.glasses,
+        props.glassesTexture || 0,
+        true
+      );
     }
 
     // Apply ears
@@ -280,12 +351,24 @@ class CharacterManager {
 
     // Apply watches
     if (props.watches !== undefined) {
-      SetPedPropIndex(playerPed, 6, props.watches, props.watchesTexture || 0, true);
+      SetPedPropIndex(
+        playerPed,
+        6,
+        props.watches,
+        props.watchesTexture || 0,
+        true
+      );
     }
 
     // Apply bracelets
     if (props.bracelets !== undefined) {
-      SetPedPropIndex(playerPed, 7, props.bracelets, props.braceletsTexture || 0, true);
+      SetPedPropIndex(
+        playerPed,
+        7,
+        props.bracelets,
+        props.braceletsTexture || 0,
+        true
+      );
     }
   }
 
@@ -350,8 +433,14 @@ class CharacterManager {
    * @param {string} key - The specific property to update
    * @param {number} value - The new value
    */
-  updateAppearance(category: keyof AppearanceData, key: string, value: number): void {
-    console.log(`[Character Create] Updating appearance ${category}.${key} to ${value}`);
+  updateAppearance(
+    category: keyof AppearanceData,
+    key: string,
+    value: number
+  ): void {
+    console.log(
+      `[Character Create] Updating appearance ${category}.${key} to ${value}`
+    );
 
     // Get current appearance data
     const characterData = getCharacterData();
@@ -369,7 +458,9 @@ class CharacterManager {
         ...currentAppearance[category],
         [key]: value,
       };
-      store.updateCharacterProperty('appearance', { [category]: updatedCategory });
+      store.updateCharacterProperty('appearance', {
+        [category]: updatedCategory,
+      });
     }
 
     // Apply the update
@@ -396,12 +487,20 @@ class CharacterManager {
 export const characterManager = new CharacterManager();
 
 // Export compatibility functions for existing code
-export const loadAndSetModel = (model: string) => characterManager.loadAndSetModel(model);
-export const applyFullCharacterData = () => characterManager.applyFullCharacterData();
-export const updateModel = (model: string) => characterManager.updateModel(model);
-export const updateFace = (key: keyof FaceData, value: number) => characterManager.updateFace(key, value);
-export const updateHair = (key: keyof HairData, value: number) => characterManager.updateHair(key, value);
-export const updateAppearance = (category: keyof AppearanceData, key: string, value: number) => 
-  characterManager.updateAppearance(category, key, value);
-export const updateClothing = (key: keyof ClothingData, value: number) => 
+export const loadAndSetModel = (model: string) =>
+  characterManager.loadAndSetModel(model);
+export const applyFullCharacterData = () =>
+  characterManager.applyFullCharacterData();
+export const updateModel = (model: string) =>
+  characterManager.updateModel(model);
+export const updateFace = (key: keyof FaceData, value: number) =>
+  characterManager.updateFace(key, value);
+export const updateHair = (key: keyof HairData, value: number) =>
+  characterManager.updateHair(key, value);
+export const updateAppearance = (
+  category: keyof AppearanceData,
+  key: string,
+  value: number
+) => characterManager.updateAppearance(category, key, value);
+export const updateClothing = (key: keyof ClothingData, value: number) =>
   characterManager.updateClothing(key, value);
