@@ -9,6 +9,7 @@ import {
   CameraRotationData,
   CameraZoomData,
   CameraFocusData,
+  PlayerRotationData,
   SaveCharacterData,
   NuiCallback,
   NUI_EVENT,
@@ -21,6 +22,7 @@ import {
   updateHair,
   updateAppearance,
   updateClothing,
+  rotatePlayer,
 } from './character-manager';
 import { rotateCamera, zoomCamera, focusCamera } from './camera';
 
@@ -177,6 +179,19 @@ export function registerEvents(): void {
     focusCamera(data.focus);
     cb({ status: 'ok' });
   }) as NuiCallback<CameraFocusData>);
+
+  // Handle player rotation
+  RegisterNuiCallback('character-create:rotate-player', ((
+    data: PlayerRotationData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Player rotation request:',
+      JSON.stringify(data)
+    );
+    rotatePlayer(data.direction);
+    cb({ status: 'ok' });
+  }) as NuiCallback<PlayerRotationData>);
 
   /**
    * =======================================================

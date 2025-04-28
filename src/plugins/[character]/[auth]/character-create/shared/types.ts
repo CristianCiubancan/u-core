@@ -222,6 +222,10 @@ export interface CameraFocusData {
   focus: CameraFocus;
 }
 
+export interface PlayerRotationData {
+  direction: CameraDirection;
+}
+
 export interface SaveCharacterData {
   close?: boolean;
   save?: boolean;
