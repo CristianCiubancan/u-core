@@ -481,6 +481,28 @@ class CharacterManager {
     // Apply the update
     this.applyClothing(getCharacterData().clothing);
   }
+
+  /**
+   * Rotate the player character
+   * @param {string} direction - The direction to rotate ('left' or 'right')
+   */
+  rotatePlayer(direction: 'left' | 'right'): void {
+    console.log(`[Character Create] Rotating player: ${direction}`);
+
+    const playerPed = PlayerPedId();
+    const currentHeading = GetEntityHeading(playerPed);
+    let newHeading = currentHeading;
+
+    // Rotate by 15 degrees in the specified direction
+    if (direction === 'left') {
+      newHeading = (currentHeading - 15) % 360;
+    } else if (direction === 'right') {
+      newHeading = (currentHeading + 15) % 360;
+    }
+
+    // Set the new heading
+    SetEntityHeading(playerPed, newHeading);
+  }
 }
 
 // Export a singleton instance
@@ -504,3 +526,5 @@ export const updateAppearance = (
 ) => characterManager.updateAppearance(category, key, value);
 export const updateClothing = (key: keyof ClothingData, value: number) =>
   characterManager.updateClothing(key, value);
+export const rotatePlayer = (direction: 'left' | 'right') =>
+  characterManager.rotatePlayer(direction);

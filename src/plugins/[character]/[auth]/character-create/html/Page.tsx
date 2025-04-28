@@ -192,6 +192,15 @@ export default function Page() {
     });
   }, []);
 
+  // Handle player rotation
+  const handleRotatePlayer = useCallback((direction: 'left' | 'right') => {
+    fetchNui('character-create:rotate-player', { direction }).catch(
+      (error: any) => {
+        console.error('[UI] Failed to rotate player:', error);
+      }
+    );
+  }, []);
+
   useEffect(() => {
     // listen for F3 key press
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -297,6 +306,7 @@ export default function Page() {
           onRotate={handleRotateCamera}
           onZoom={handleZoomCamera}
           onFocus={handleFocusCamera}
+          onRotatePlayer={handleRotatePlayer}
         />
       </div>
     </div>
