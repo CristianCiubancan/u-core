@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../../webview/utils/fetchNui';
 import { isEnvBrowser } from '../../../../../webview/utils/misc';
-import Button from '../../../../../webview/components/ui/Button';
+import { FaFaceSmile } from 'react-icons/fa6';
+import { FaScissors } from 'react-icons/fa6';
+import { MdOutlineColorLens } from 'react-icons/md';
+import { GiClothes } from 'react-icons/gi';
 import {
   FaceTab,
   HairTab,
@@ -11,6 +14,7 @@ import {
   CameraControls,
   ModelPicker,
 } from './components';
+import { TabButton } from './components/common';
 import {
   CharacterData,
   DEFAULT_CHARACTER,
@@ -238,44 +242,36 @@ export default function Page() {
             currentModel={characterData.model}
             onModelChange={handleModelChange}
           />
-          {/* Title */}
-          <div className="flex flex-row space-x-2 mt-4">
-            <Button
-              onClick={() => setActiveTab('face')}
-              fullWidth
-              className={`${
-                activeTab === 'face' ? 'glass-brand' : 'glass-brand-dark'
-              }`}
-            >
-              Face
-            </Button>
-            <Button
-              onClick={() => setActiveTab('hair')}
-              fullWidth
-              className={`${
-                activeTab === 'hair' ? 'glass-brand' : 'glass-brand-dark'
-              }`}
-            >
-              Hair
-            </Button>
-            <Button
-              onClick={() => setActiveTab('appearance')}
-              fullWidth
-              className={`${
-                activeTab === 'appearance' ? 'glass-brand' : 'glass-brand-dark'
-              }`}
-            >
-              Appearance
-            </Button>
-            <Button
-              onClick={() => setActiveTab('clothing')}
-              fullWidth
-              className={`${
-                activeTab === 'clothing' ? 'glass-brand' : 'glass-brand-dark'
-              }`}
-            >
-              Clothing
-            </Button>
+          {/* Tabs */}
+          <div className="grid grid-cols-4 gap-2 mt-4">
+            <TabButton
+              tab="face"
+              activeTab={activeTab}
+              label="Face"
+              icon={<FaFaceSmile />}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              tab="hair"
+              activeTab={activeTab}
+              label="Hair"
+              icon={<FaScissors />}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              tab="appearance"
+              activeTab={activeTab}
+              label="Appearance"
+              icon={<MdOutlineColorLens />}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              tab="clothing"
+              activeTab={activeTab}
+              label="Clothing"
+              icon={<GiClothes />}
+              onClick={setActiveTab}
+            />
           </div>
         </div>
         {/* Right content - Tab content */}

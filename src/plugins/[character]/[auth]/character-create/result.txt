@@ -1,0 +1,2945 @@
+# ./client/camera.ts
+
+/// <reference types="@citizenfx/client" />
+
+import { CameraFocus, CameraDirection, ZoomDirection } from '../shared/types';
+import {
+  getCameraState,
+  setCameraRotation,
+  setCameraZoom,
+  setCameraFocus,
+  setCharacterCreationCamera,
+} from '../shared/store';
+
+/**
+ * Camera Manager for character creation
+ * Handles all camera-related functionality
+ */
+class CameraManager {
+  /**
+   * Set up the camera for character creation
+   */
+  setup(): void {
+    // Disable rendering of the player's camera while in character creation
+    NetworkSetInSpectatorMode(true, PlayerPedId());
+
+    // Create a camera pointing at the player
+    this.updatePosition();
+  }
+
+  /**
+   * Update the camera position based on current rotation, zoom, and focus
+   */
+  updatePosition(): void {
+    const { cameraRotation, cameraZoom, cameraFocus, characterCreationCamera } =
+      getCameraState();
+    const playerPed = PlayerPedId();
+    const coords = GetEntityCoords(playerPed, true);
+
+    // Calculate camera position based on rotation and zoom
+    const angleRad = (cameraRotation * Math.PI) / 180;
+    let cameraHeight = coords[2];
+
+    // Adjust height based on focus
+    if (cameraFocus === 'head') {
+      cameraHeight += 0.65;
+    } else if (cameraFocus === 'legs') {
+      cameraHeight -= 0.5;
+    } else {
+      cameraHeight += 0.2;
+    }
+
+    // Calculate camera position
+    const cameraCoords = {
+      x: coords[0] + Math.sin(angleRad) * cameraZoom,
+      y: coords[1] + Math.cos(angleRad) * cameraZoom,
+      z: cameraHeight,
+    };
+
+    // Calculate the direct vector from camera to ped
+    const dirVector = {
+      x: coords[0] - cameraCoords.x,
+      y: coords[1] - cameraCoords.y,
+      z: cameraHeight - cameraCoords.z,
+    };
+
+    const pitch =
+      Math.atan2(dirVector.z, Math.sqrt(dirVector.x ** 2 + dirVector.y ** 2)) *
+      (180 / Math.PI);
+    let yaw = Math.atan2(dirVector.x, dirVector.y) * (180 / Math.PI);
+
+    // Add our left-looking offset
+    const leftAngleOffset = 30;
+    yaw += leftAngleOffset;
+
+    // Create or update the camera
+    if (!characterCreationCamera) {
+      const camera = CreateCam('DEFAULT_SCRIPTED_CAMERA', true);
+      SetCamCoord(camera, cameraCoords.x, cameraCoords.y, cameraCoords.z);
+      SetCamRot(camera, pitch, 0.0, yaw, 2);
+      SetCamActive(camera, true);
+      RenderScriptCams(true, false, 0, true, true);
+      setCharacterCreationCamera(camera);
+    } else {
+      SetCamCoord(
+        characterCreationCamera,
+        cameraCoords.x,
+        cameraCoords.y,
+        cameraCoords.z
+      );
+      SetCamRot(characterCreationCamera, pitch, 0.0, yaw, 2);
+    }
+  }
+
+  /**
+   * Rotate the camera around the player
+   * @param {CameraDirection} direction - The direction to rotate ('left' or 'right')
+   */
+  rotate(direction: CameraDirection): void {
+    const { cameraRotation } = getCameraState();
+    let newRotation = cameraRotation;
+
+    if (direction === 'left') {
+      newRotation = (cameraRotation - 15) % 360;
+    } else if (direction === 'right') {
+      newRotation = (cameraRotation + 15) % 360;
+    }
+
+    setCameraRotation(newRotation);
+    this.updatePosition();
+  }
+
+  /**
+   * Zoom the camera in or out
+   * @param {ZoomDirection} direction - The direction to zoom ('in' or 'out')
+   */
+  zoom(direction: ZoomDirection): void {
+    const { cameraZoom } = getCameraState();
+    let newZoom = cameraZoom;
+
+    if (direction === 'in') {
+      newZoom = Math.max(0.5, cameraZoom - 0.25);
+    } else if (direction === 'out') {
+      newZoom = Math.min(3.0, cameraZoom + 0.25);
+    }
+
+    setCameraZoom(newZoom);
+    this.updatePosition();
+  }
+
+  /**
+   * Focus the camera on a specific part of the player
+   * @param {CameraFocus} focus - The part to focus on ('head', 'body', or 'legs')
+   */
+  focus(focus: CameraFocus): void {
+    setCameraFocus(focus);
+    this.updatePosition();
+  }
+
+  /**
+   * Clean up the camera when exiting character creation
+   */
+  cleanup(): void {
+    const { characterCreationCamera } = getCameraState();
+
+    // Disable spectator mode
+    NetworkSetInSpectatorMode(false, PlayerPedId());
+
+    // Destroy the camera
+    if (characterCreationCamera) {
+      SetCamActive(characterCreationCamera, false);
+      DestroyCam(characterCreationCamera, true);
+      RenderScriptCams(false, false, 0, true, true);
+      setCharacterCreationCamera(null);
+    }
+  }
+}
+
+// Export a singleton instance
+export const cameraManager = new CameraManager();
+
+// Export compatibility functions for existing code
+export const setupCamera = () => cameraManager.setup();
+export const updateCameraPosition = () => cameraManager.updatePosition();
+export const rotateCamera = (direction: CameraDirection) =>
+  cameraManager.rotate(direction);
+export const zoomCamera = (direction: ZoomDirection) =>
+  cameraManager.zoom(direction);
+export const focusCamera = (focus: CameraFocus) => cameraManager.focus(focus);
+export const cleanupCamera = () => cameraManager.cleanup();
+
+
+================================================================================
+
+# ./client/character-manager.ts
+
+/// <reference types="@citizenfx/client" />
+
+import {
+  FaceData,
+  HairData,
+  AppearanceData,
+  ClothingData,
+} from '../shared/types';
+import { getCharacterData, store } from '../shared/store';
+
+/**
+ * Character Manager for handling all character customization
+ */
+class CharacterManager {
+  /**
+   * Load and set the player model
+   * @param {string} model - The model to set
+   */
+  async loadAndSetModel(model: string): Promise<void> {
+    console.log(`[Character Create] Loading and setting model: ${model}`);
+
+    // Update our character data
+    store.updateCharacterData({ model });
+
+    // Request the model
+    const modelHash = GetHashKey(model);
+    RequestModel(modelHash);
+
+    // Wait for the model to load with improved timeout handling
+    const startTime = GetGameTimer();
+    let modelLoaded = false;
+
+    while (!modelLoaded && GetGameTimer() - startTime < 5000) {
+      if (HasModelLoaded(modelHash)) {
+        modelLoaded = true;
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    if (!modelLoaded) {
+      console.error(`[Character Create] Failed to load model: ${model}`);
+      return;
+    }
+
+    // Set the player model
+    SetPlayerModel(PlayerId(), modelHash);
+    SetModelAsNoLongerNeeded(modelHash);
+
+    // Reset appearance after model change
+    SetPedDefaultComponentVariation(PlayerPedId());
+    ClearAllPedProps(PlayerPedId());
+  }
+
+  /**
+   * Apply all character customizations in the correct sequence
+   * This ensures consistency across all updates
+   */
+  applyFullCharacterData(): void {
+    const characterData = getCharacterData();
+    const playerPed = PlayerPedId();
+
+    // First apply head blend data (ethnicity, parents, etc)
+    SetPedHeadBlendData(
+      playerPed,
+      characterData.face.fatherIndex,
+      characterData.face.motherIndex,
+      0, // Parent 3 (unused)
+      characterData.face.fatherIndex,
+      characterData.face.motherIndex,
+      0, // Parent 3 (unused)
+      characterData.face.shapeMix,
+      characterData.face.skinMix,
+      0.0, // Parent 3 mix (unused)
+      false // Is parent inheritance
+    );
+
+    // Apply hair
+    SetPedComponentVariation(playerPed, 2, characterData.hair.style, 0, 0);
+    SetPedHairColor(
+      playerPed,
+      characterData.hair.color,
+      characterData.hair.highlight
+    );
+
+    // Apply appearance overlays
+    this.applyAppearanceOverlays(characterData.appearance);
+
+    // Apply clothing
+    this.applyClothing(characterData.clothing);
+
+    // Apply props if they exist
+    if (characterData.props) {
+      this.applyProps(characterData.props);
+    }
+  }
+
+  /**
+   * Apply appearance overlays (facial features)
+   * @param {AppearanceData} appearance - The appearance data to apply
+   */
+  private applyAppearanceOverlays(appearance: AppearanceData): void {
+    const playerPed = PlayerPedId();
+
+    // Apply eye color
+    SetPedEyeColor(playerPed, appearance.eyeColor);
+
+    // Apply eyebrows
+    SetPedHeadOverlay(
+      playerPed,
+      2, // Eyebrows
+      appearance.eyebrows.style,
+      appearance.eyebrows.opacity || 1.0
+    );
+    SetPedHeadOverlayColor(
+      playerPed,
+      2, // Eyebrows
+      1, // Color type (1 for hair color)
+      appearance.eyebrows.color || 0,
+      appearance.eyebrows.color || 0
+    );
+
+    // Apply beard
+    SetPedHeadOverlay(
+      playerPed,
+      1, // Beard
+      appearance.beard.style,
+      appearance.beard.opacity || 1.0
+    );
+    SetPedHeadOverlayColor(
+      playerPed,
+      1, // Beard
+      1, // Color type (1 for hair color)
+      appearance.beard.color || 0,
+      appearance.beard.color || 0
+    );
+
+    // Apply other overlays if they exist
+    if (appearance.blemishes) {
+      SetPedHeadOverlay(
+        playerPed,
+        0, // Blemishes
+        appearance.blemishes.style,
+        appearance.blemishes.opacity
+      );
+    }
+
+    if (appearance.ageing) {
+      SetPedHeadOverlay(
+        playerPed,
+        3, // Ageing
+        appearance.ageing.style,
+        appearance.ageing.opacity
+      );
+    }
+
+    if (appearance.complexion) {
+      SetPedHeadOverlay(
+        playerPed,
+        6, // Complexion
+        appearance.complexion.style,
+        appearance.complexion.opacity
+      );
+    }
+
+    if (appearance.moles) {
+      SetPedHeadOverlay(
+        playerPed,
+        9, // Moles/Freckles
+        appearance.moles.style,
+        appearance.moles.opacity
+      );
+    }
+
+    if (appearance.sunDamage) {
+      SetPedHeadOverlay(
+        playerPed,
+        7, // Sun Damage
+        appearance.sunDamage.style,
+        appearance.sunDamage.opacity
+      );
+    }
+
+    if (appearance.makeUp) {
+      SetPedHeadOverlay(
+        playerPed,
+        4, // Makeup
+        appearance.makeUp.style,
+        appearance.makeUp.opacity
+      );
+      if (appearance.makeUp.color !== undefined) {
+        SetPedHeadOverlayColor(
+          playerPed,
+          4, // Makeup
+          2, // Color type (2 for makeup)
+          appearance.makeUp.color,
+          appearance.makeUp.color
+        );
+      }
+    }
+
+    if (appearance.lipstick) {
+      SetPedHeadOverlay(
+        playerPed,
+        8, // Lipstick
+        appearance.lipstick.style,
+        appearance.lipstick.opacity
+      );
+      if (appearance.lipstick.color !== undefined) {
+        SetPedHeadOverlayColor(
+          playerPed,
+          8, // Lipstick
+          2, // Color type (2 for makeup)
+          appearance.lipstick.color,
+          appearance.lipstick.color
+        );
+      }
+    }
+  }
+
+  /**
+   * Apply clothing to the character
+   * @param {ClothingData} clothing - The clothing data to apply
+   */
+  private applyClothing(clothing: ClothingData): void {
+    const playerPed = PlayerPedId();
+
+    // Apply torso
+    SetPedComponentVariation(
+      playerPed,
+      3,
+      clothing.torso,
+      clothing.torsoTexture,
+      0
+    );
+
+    // Apply legs
+    SetPedComponentVariation(
+      playerPed,
+      4,
+      clothing.legs,
+      clothing.legsTexture,
+      0
+    );
+
+    // Apply shoes
+    SetPedComponentVariation(
+      playerPed,
+      6,
+      clothing.shoes,
+      clothing.shoesTexture,
+      0
+    );
+
+    // Apply accessories
+    SetPedComponentVariation(
+      playerPed,
+      7,
+      clothing.accessories,
+      clothing.accessoriesTexture,
+      0
+    );
+
+    // Apply undershirt
+    SetPedComponentVariation(
+      playerPed,
+      8,
+      clothing.undershirt,
+      clothing.undershirtTexture,
+      0
+    );
+
+    // Apply tops
+    SetPedComponentVariation(
+      playerPed,
+      11,
+      clothing.tops,
+      clothing.topsTexture,
+      0
+    );
+
+    // Apply optional clothing if they exist
+    if (clothing.mask !== undefined) {
+      SetPedComponentVariation(
+        playerPed,
+        1,
+        clothing.mask,
+        clothing.maskTexture || 0,
+        0
+      );
+    }
+
+    if (clothing.bags !== undefined) {
+      SetPedComponentVariation(
+        playerPed,
+        5,
+        clothing.bags,
+        clothing.bagsTexture || 0,
+        0
+      );
+    }
+
+    if (clothing.armor !== undefined) {
+      SetPedComponentVariation(
+        playerPed,
+        9,
+        clothing.armor,
+        clothing.armorTexture || 0,
+        0
+      );
+    }
+
+    if (clothing.decals !== undefined) {
+      SetPedComponentVariation(
+        playerPed,
+        10,
+        clothing.decals,
+        clothing.decalsTexture || 0,
+        0
+      );
+    }
+  }
+
+  /**
+   * Apply props (accessories) to the character
+   * @param {PropData} props - The props data to apply
+   */
+  private applyProps(props: any): void {
+    const playerPed = PlayerPedId();
+
+    // Apply hat
+    if (props.hat !== undefined) {
+      SetPedPropIndex(playerPed, 0, props.hat, props.hatTexture || 0, true);
+    }
+
+    // Apply glasses
+    if (props.glasses !== undefined) {
+      SetPedPropIndex(
+        playerPed,
+        1,
+        props.glasses,
+        props.glassesTexture || 0,
+        true
+      );
+    }
+
+    // Apply ears
+    if (props.ears !== undefined) {
+      SetPedPropIndex(playerPed, 2, props.ears, props.earsTexture || 0, true);
+    }
+
+    // Apply watches
+    if (props.watches !== undefined) {
+      SetPedPropIndex(
+        playerPed,
+        6,
+        props.watches,
+        props.watchesTexture || 0,
+        true
+      );
+    }
+
+    // Apply bracelets
+    if (props.bracelets !== undefined) {
+      SetPedPropIndex(
+        playerPed,
+        7,
+        props.bracelets,
+        props.braceletsTexture || 0,
+        true
+      );
+    }
+  }
+
+  /**
+   * Update the player model
+   * @param {string} model - The model to set
+   */
+  async updateModel(model: string): Promise<void> {
+    console.log(`[Character Create] Updating player model to: ${model}`);
+
+    // Update the model
+    await this.loadAndSetModel(model);
+
+    // After model is changed, we need to reapply all customizations
+    this.applyFullCharacterData();
+  }
+
+  /**
+   * Update face data
+   * @param {keyof FaceData} key - The face property to update
+   * @param {number} value - The new value
+   */
+  updateFace(key: keyof FaceData, value: number): void {
+    console.log(`[Character Create] Updating face ${key} to ${value}`);
+
+    // Update our character data
+    store.updateCharacterProperty('face', { [key]: value });
+
+    // Apply the update
+    this.applyFullCharacterData();
+  }
+
+  /**
+   * Update hair data
+   * @param {keyof HairData} key - The hair property to update
+   * @param {number} value - The new value
+   */
+  updateHair(key: keyof HairData, value: number): void {
+    console.log(`[Character Create] Updating hair ${key} to ${value}`);
+
+    // Update our character data
+    store.updateCharacterProperty('hair', { [key]: value });
+
+    // Apply the update
+    const playerPed = PlayerPedId();
+    const characterData = getCharacterData();
+
+    if (key === 'style') {
+      SetPedComponentVariation(playerPed, 2, value, 0, 0);
+    } else {
+      SetPedHairColor(
+        playerPed,
+        characterData.hair.color,
+        characterData.hair.highlight
+      );
+    }
+  }
+
+  /**
+   * Update appearance data
+   * @param {keyof AppearanceData} category - The appearance category to update
+   * @param {string} key - The specific property to update
+   * @param {number} value - The new value
+   */
+  updateAppearance(
+    category: keyof AppearanceData,
+    key: string,
+    value: number
+  ): void {
+    console.log(
+      `[Character Create] Updating appearance ${category}.${key} to ${value}`
+    );
+
+    // Get current appearance data
+    const characterData = getCharacterData();
+    const currentAppearance = characterData.appearance;
+
+    // Create updated appearance data
+    let updatedCategory: any;
+
+    if (typeof currentAppearance[category] === 'number') {
+      // Handle simple number properties like eyeColor
+      store.updateCharacterProperty('appearance', { [category]: value });
+    } else {
+      // Handle complex properties like eyebrows, beard, etc.
+      updatedCategory = {
+        ...currentAppearance[category],
+        [key]: value,
+      };
+      store.updateCharacterProperty('appearance', {
+        [category]: updatedCategory,
+      });
+    }
+
+    // Apply the update
+    this.applyAppearanceOverlays(getCharacterData().appearance);
+  }
+
+  /**
+   * Update clothing data
+   * @param {keyof ClothingData} key - The clothing property to update
+   * @param {number} value - The new value
+   */
+  updateClothing(key: keyof ClothingData, value: number): void {
+    console.log(`[Character Create] Updating clothing ${key} to ${value}`);
+
+    // Update our character data
+    store.updateCharacterProperty('clothing', { [key]: value });
+
+    // Apply the update
+    this.applyClothing(getCharacterData().clothing);
+  }
+}
+
+// Export a singleton instance
+export const characterManager = new CharacterManager();
+
+// Export compatibility functions for existing code
+export const loadAndSetModel = (model: string) =>
+  characterManager.loadAndSetModel(model);
+export const applyFullCharacterData = () =>
+  characterManager.applyFullCharacterData();
+export const updateModel = (model: string) =>
+  characterManager.updateModel(model);
+export const updateFace = (key: keyof FaceData, value: number) =>
+  characterManager.updateFace(key, value);
+export const updateHair = (key: keyof HairData, value: number) =>
+  characterManager.updateHair(key, value);
+export const updateAppearance = (
+  category: keyof AppearanceData,
+  key: string,
+  value: number
+) => characterManager.updateAppearance(category, key, value);
+export const updateClothing = (key: keyof ClothingData, value: number) =>
+  characterManager.updateClothing(key, value);
+
+
+================================================================================
+
+# ./client/events.ts
+
+/// <reference types="@citizenfx/client" />
+
+import {
+  ModelUpdateData,
+  FaceUpdateData,
+  HairUpdateData,
+  AppearanceUpdateData,
+  ClothingUpdateData,
+  CameraRotationData,
+  CameraZoomData,
+  CameraFocusData,
+  SaveCharacterData,
+  NuiCallback,
+  NUI_EVENT,
+} from '../shared/types';
+import { isUiVisible } from '../shared/store';
+import { toggleUI } from './ui';
+import {
+  updateModel,
+  updateFace,
+  updateHair,
+  updateAppearance,
+  updateClothing,
+} from './character-manager';
+import { rotateCamera, zoomCamera, focusCamera } from './camera';
+
+// Constants
+const COMMAND_NAME = 'character-create:toggle_ui';
+
+/**
+ * =======================================================
+ * NUI CALLBACKS & EVENT HANDLERS
+ * =======================================================
+ */
+
+export function registerEvents(): void {
+  // Register a command that can be triggered by key binding
+  RegisterCommand(COMMAND_NAME, () => toggleUI(!isUiVisible()), false);
+
+  // Register key mapping (F3 key)
+  RegisterKeyMapping(
+    COMMAND_NAME,
+    'Toggle Character Creation UI',
+    'keyboard',
+    'F3'
+  );
+
+  // Handle NUI callback when UI is closed from the interface
+  RegisterNuiCallback(NUI_EVENT, ((
+    data: SaveCharacterData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Received NUI event with data:',
+      JSON.stringify(data)
+    );
+
+    if (data.close) {
+      console.log('[Character Create] Closing UI from NUI request');
+      toggleUI(false);
+    }
+
+    // If saving character data
+    if (data.save && data.characterData) {
+      console.log(
+        '[Character Create] Saving character data:',
+        JSON.stringify(data.characterData)
+      );
+      // Save character data to server
+      emitNet('character-create:save', data.characterData);
+    }
+
+    // Send response back to NUI
+    cb({ status: 'ok' });
+  }) as NuiCallback<SaveCharacterData>);
+
+  // Handle model update
+  RegisterNuiCallback('character-create:update-model', (async (
+    data: ModelUpdateData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Update model request:',
+      JSON.stringify(data)
+    );
+    await updateModel(data.model);
+    cb({ status: 'ok' });
+  }) as NuiCallback<ModelUpdateData>);
+
+  // Handle face update
+  RegisterNuiCallback('character-create:update-face', ((
+    data: FaceUpdateData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Update face request:',
+      JSON.stringify(data)
+    );
+    updateFace(data.key, data.value);
+    cb({ status: 'ok' });
+  }) as NuiCallback<FaceUpdateData>);
+
+  // Handle hair update
+  RegisterNuiCallback('character-create:update-hair', ((
+    data: HairUpdateData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Update hair request:',
+      JSON.stringify(data)
+    );
+    updateHair(data.key, data.value);
+    cb({ status: 'ok' });
+  }) as NuiCallback<HairUpdateData>);
+
+  // Handle appearance update
+  RegisterNuiCallback('character-create:update-appearance', ((
+    data: AppearanceUpdateData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Update appearance request:',
+      JSON.stringify(data)
+    );
+    updateAppearance(data.category, data.key, data.value);
+    cb({ status: 'ok' });
+  }) as NuiCallback<AppearanceUpdateData>);
+
+  // Handle clothing update
+  RegisterNuiCallback('character-create:update-clothing', ((
+    data: ClothingUpdateData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Update clothing request:',
+      JSON.stringify(data)
+    );
+    updateClothing(data.key, data.value);
+    cb({ status: 'ok' });
+  }) as NuiCallback<ClothingUpdateData>);
+
+  // Handle camera rotation
+  RegisterNuiCallback('character-create:rotate-camera', ((
+    data: CameraRotationData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Camera rotation request:',
+      JSON.stringify(data)
+    );
+    rotateCamera(data.direction);
+    cb({ status: 'ok' });
+  }) as NuiCallback<CameraRotationData>);
+
+  // Handle camera zoom
+  RegisterNuiCallback('character-create:zoom-camera', ((
+    data: CameraZoomData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Camera zoom request:',
+      JSON.stringify(data)
+    );
+    zoomCamera(data.direction);
+    cb({ status: 'ok' });
+  }) as NuiCallback<CameraZoomData>);
+
+  // Handle camera focus
+  RegisterNuiCallback('character-create:focus-camera', ((
+    data: CameraFocusData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Camera focus request:',
+      JSON.stringify(data)
+    );
+    focusCamera(data.focus);
+    cb({ status: 'ok' });
+  }) as NuiCallback<CameraFocusData>);
+
+  /**
+   * =======================================================
+   * SERVER EVENT HANDLERS
+   * =======================================================
+   */
+
+  // Handle save result from server
+  onNet(
+    'character-create:save-result',
+    (result: { success: boolean; error?: string }) => {
+      console.log(
+        '[Character Create] Save result from server:',
+        JSON.stringify(result)
+      );
+
+      if (result.success) {
+        console.log('[Character Create] Character saved successfully');
+        // You could add additional logic here, like teleporting the player to a spawn point
+      } else {
+        console.error(
+          '[Character Create] Failed to save character:',
+          result.error
+        );
+      }
+    }
+  );
+}
+
+
+================================================================================
+
+# ./client/index.ts
+
+/**
+ * FiveM Character Creator - Client Side Script
+ *
+ * This script manages the character creation interface and functionality
+ * for players to customize their characters in a FiveM server.
+ */
+
+/// <reference types="@citizenfx/client" />
+
+import { toggleUI } from './ui';
+import { registerEvents } from './events';
+import { Delay } from './utils';
+import { characterManager } from './character-manager';
+
+/**
+ * =======================================================
+ * INITIALIZATION
+ * =======================================================
+ */
+
+// Register all events (NUI callbacks, commands, etc.)
+registerEvents();
+
+// Initialize UI as hidden on resource start
+AddEventHandler('onClientResourceStart', (resourceName: string) => {
+  if (resourceName === GetCurrentResourceName()) {
+    console.log('[Character Create] Resource started');
+
+    // Initialize UI as hidden
+    toggleUI(false);
+
+    // Pre-load character models to ensure they're available when needed
+    const maleModel = 'mp_m_freemode_01';
+    const femaleModel = 'mp_f_freemode_01';
+
+    console.log('[Character Create] Pre-loading character models');
+    characterManager.loadAndSetModel(maleModel).then(() => {
+      console.log('[Character Create] Male model loaded');
+    });
+    RequestModel(GetHashKey(femaleModel));
+
+    // Auto-open character creation for new players
+    setTimeout(async () => {
+      console.log('[Character Create] Auto-opening character creation UI');
+      // Use Delay utility for timeout
+      await Delay(2000);
+      toggleUI(true);
+    }, 0); // setTimeout with 0ms delay to run after current execution context
+  }
+});
+
+// Add a basic log on script load
+console.log('Character creation client script loaded! F3 key will toggle UI');
+
+
+================================================================================
+
+# ./client/ui.ts
+
+/// <reference types="@citizenfx/client" />
+
+import { NUI_EVENT, getCharacterData, setUiVisible } from '../shared/store';
+import { setupCamera, cleanupCamera } from './camera';
+import { loadAndSetModel, applyFullCharacterData } from './character-manager';
+
+/**
+ * UI Manager for character creation
+ * Handles UI visibility and setup/cleanup
+ */
+class UiManager {
+  /**
+   * Toggle UI visibility
+   * @param {boolean} state - The state to set the UI to (true = visible, false = hidden)
+   */
+  async toggle(state: boolean): Promise<void> {
+    console.log(
+      `[Character Create] Toggling UI to ${state ? 'visible' : 'hidden'}`
+    );
+
+    setUiVisible(state);
+
+    // Send message to NUI
+    SendNUIMessage({
+      action: NUI_EVENT,
+      data: state,
+    });
+
+    // Set focus to UI when visible
+    SetNuiFocus(state, state);
+
+    // If showing UI, set up the character creation environment
+    if (state) {
+      await this.setup();
+    } else {
+      this.cleanup();
+    }
+  }
+
+  /**
+   * Set up the character creation environment
+   */
+  private async setup(): Promise<void> {
+    console.log('[Character Create] Setting up character creation environment');
+
+    // Always ensure we have a valid character model when opening the UI
+    const characterData = getCharacterData();
+    await loadAndSetModel(characterData.model);
+
+    // Apply all customizations in the proper order
+    applyFullCharacterData();
+
+    // Set up camera
+    setupCamera();
+  }
+
+  /**
+   * Clean up the character creation environment
+   */
+  private cleanup(): void {
+    cleanupCamera();
+  }
+}
+
+// Export a singleton instance
+export const uiManager = new UiManager();
+
+// Export compatibility function for existing code
+export const toggleUI = (state: boolean) => uiManager.toggle(state);
+
+
+================================================================================
+
+# ./client/utils.ts
+
+/**
+ * Creates a delay/timeout that works with the FiveM environment
+ * @param {number} ms - The number of milliseconds to delay
+ * @returns {Promise<void>}
+ */
+export function Delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+
+================================================================================
+
+# ./html/Page.tsx
+
+import { useCallback, useEffect, useState } from 'react';
+import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
+import { fetchNui } from '../../../../../webview/utils/fetchNui';
+import { isEnvBrowser } from '../../../../../webview/utils/misc';
+import Button from '../../../../../webview/components/ui/Button';
+import {
+  FaceTab,
+  HairTab,
+  AppearanceTab,
+  ClothingTab,
+  CameraControls,
+  ModelPicker,
+} from './components';
+import {
+  CharacterData,
+  DEFAULT_CHARACTER,
+  NUI_EVENT,
+  TabType,
+  AppearanceOverlay,
+} from '../shared/types';
+
+export default function Page() {
+  const [isOpen, setIsOpen] = useState(isEnvBrowser());
+  const [activeTab, setActiveTab] = useState<TabType>('face');
+  const [characterData, setCharacterData] =
+    useState<CharacterData>(DEFAULT_CHARACTER);
+
+  // Listen for toggle events from the client script
+  useNuiEvent(NUI_EVENT, (data: any) => {
+    setIsOpen(!!data);
+  });
+
+  // Handle close button click
+  const handleCloseUi = useCallback(async () => {
+    try {
+      await fetchNui(NUI_EVENT, { close: true });
+      setIsOpen(false);
+    } catch (error: any) {
+      console.error('[UI] Failed to close UI:', error);
+    }
+  }, []);
+
+  // Handle model change
+  const handleModelChange = useCallback((modelId: string) => {
+    setCharacterData((prev) => ({
+      ...prev,
+      model: modelId,
+    }));
+
+    // Send model change to client
+    fetchNui('character-create:update-model', { model: modelId }).catch(
+      (error: any) => {
+        console.error('[UI] Failed to update model:', error);
+      }
+    );
+  }, []);
+
+  // Handle face change
+  const handleFaceChange = useCallback((key: string, value: number) => {
+    setCharacterData((prev) => ({
+      ...prev,
+      face: {
+        ...prev.face,
+        [key]: value,
+      },
+    }));
+
+    // Send face change to client
+    fetchNui('character-create:update-face', {
+      key,
+      value,
+    }).catch((error: any) => {
+      console.error('[UI] Failed to update face:', error);
+    });
+  }, []);
+
+  // Handle hair change
+  const handleHairChange = useCallback((key: string, value: number) => {
+    setCharacterData((prev) => ({
+      ...prev,
+      hair: {
+        ...prev.hair,
+        [key]: value,
+      },
+    }));
+
+    // Send hair change to client
+    fetchNui('character-create:update-hair', {
+      key,
+      value,
+    }).catch((error: any) => {
+      console.error('[UI] Failed to update hair:', error);
+    });
+  }, []);
+
+  // Handle appearance change
+  const handleAppearanceChange = useCallback(
+    (category: string, key: string, value: number) => {
+      setCharacterData((prev) => {
+        // Get the current category data
+        const categoryData = prev.appearance[category] as AppearanceOverlay;
+
+        if (!categoryData) {
+          console.error(`Category ${category} not found in appearance data`);
+          return prev;
+        }
+
+        return {
+          ...prev,
+          appearance: {
+            ...prev.appearance,
+            [category]: {
+              ...categoryData,
+              [key]: value,
+            },
+          },
+        };
+      });
+
+      // Send appearance change to client
+      fetchNui('character-create:update-appearance', {
+        category,
+        key,
+        value,
+      }).catch((error: any) => {
+        console.error('[UI] Failed to update appearance:', error);
+      });
+    },
+    []
+  );
+
+  // Handle eye color change
+  const handleEyeColorChange = useCallback((value: number) => {
+    setCharacterData((prev) => ({
+      ...prev,
+      appearance: {
+        ...prev.appearance,
+        eyeColor: value,
+      },
+    }));
+
+    // Send eye color change to client
+    fetchNui('character-create:update-appearance', {
+      category: 'eyeColor',
+      value,
+    }).catch((error: any) => {
+      console.error('[UI] Failed to update eye color:', error);
+    });
+  }, []);
+
+  // Handle clothing change
+  const handleClothingChange = useCallback((key: string, value: number) => {
+    setCharacterData((prev) => ({
+      ...prev,
+      clothing: {
+        ...prev.clothing,
+        [key]: value,
+      },
+    }));
+
+    // Send clothing change to client
+    fetchNui('character-create:update-clothing', {
+      key,
+      value,
+    }).catch((error: any) => {
+      console.error('[UI] Failed to update clothing:', error);
+    });
+  }, []);
+
+  // Handle camera rotation
+  const handleRotateCamera = useCallback((direction: 'left' | 'right') => {
+    fetchNui('character-create:rotate-camera', { direction }).catch(
+      (error: any) => {
+        console.error('[UI] Failed to rotate camera:', error);
+      }
+    );
+  }, []);
+
+  // Handle camera zoom
+  const handleZoomCamera = useCallback((direction: 'in' | 'out') => {
+    fetchNui('character-create:zoom-camera', { direction }).catch(
+      (error: any) => {
+        console.error('[UI] Failed to zoom camera:', error);
+      }
+    );
+  }, []);
+
+  // Handle camera focus
+  const handleFocusCamera = useCallback((focus: 'head' | 'body' | 'legs') => {
+    fetchNui('character-create:focus-camera', { focus }).catch((error: any) => {
+      console.error('[UI] Failed to focus camera:', error);
+    });
+  }, []);
+
+  useEffect(() => {
+    // listen for F3 key press
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F3') {
+        handleCloseUi();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCloseUi]);
+
+  // Render UI
+  return isOpen ? (
+    <div className="flex p-6 gap-4 h-screen">
+      <div className="flex-col w-[50vw] glass-dark text-on-dark rounded-lg shadow-lg">
+        {' '}
+        {/* Main container */}
+        {/* Left sidebar - Tabs */}
+        <div className="border-r border-brand-800 flex flex-col p-4">
+          {' '}
+          {/* Sidebar container */}
+          <div className="text-center text-xl font-bold text-white text-shadow mb-4">
+            Character Creation
+          </div>{' '}
+          <ModelPicker
+            currentModel={characterData.model}
+            onModelChange={handleModelChange}
+          />
+          {/* Title */}
+          <div className="flex flex-row space-x-2 mt-4">
+            <Button
+              onClick={() => setActiveTab('face')}
+              fullWidth
+              className={`${
+                activeTab === 'face' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
+            >
+              Face
+            </Button>
+            <Button
+              onClick={() => setActiveTab('hair')}
+              fullWidth
+              className={`${
+                activeTab === 'hair' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
+            >
+              Hair
+            </Button>
+            <Button
+              onClick={() => setActiveTab('appearance')}
+              fullWidth
+              className={`${
+                activeTab === 'appearance' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
+            >
+              Appearance
+            </Button>
+            <Button
+              onClick={() => setActiveTab('clothing')}
+              fullWidth
+              className={`${
+                activeTab === 'clothing' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
+            >
+              Clothing
+            </Button>
+          </div>
+        </div>
+        {/* Right content - Tab content */}
+        <div className="flex-1 p-4 overflow-y-auto text-readable text-responsive-base">
+          {activeTab === 'face' && (
+            <FaceTab
+              faceData={characterData.face}
+              onFaceChange={handleFaceChange}
+            />
+          )}
+          {activeTab === 'hair' && (
+            <HairTab
+              hairData={characterData.hair}
+              onHairChange={handleHairChange}
+            />
+          )}
+          {activeTab === 'appearance' && (
+            <AppearanceTab
+              appearanceData={characterData.appearance}
+              onAppearanceChange={handleAppearanceChange}
+              onEyeColorChange={handleEyeColorChange}
+            />
+          )}
+          {activeTab === 'clothing' && (
+            <ClothingTab
+              clothingData={characterData.clothing}
+              onClothingChange={handleClothingChange}
+              model={characterData.model}
+            />
+          )}
+        </div>
+      </div>
+      <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
+        {/* Footer content */}
+        <CameraControls
+          onRotate={handleRotateCamera}
+          onZoom={handleZoomCamera}
+          onFocus={handleFocusCamera}
+        />
+      </div>
+    </div>
+  ) : null;
+}
+
+
+================================================================================
+
+# ./html/components/CameraControls.tsx
+
+import React from 'react';
+import Button from '../../../../../../webview/components/ui/Button';
+import {
+  CameraDirection,
+  ZoomDirection,
+  CameraFocus,
+} from '../../shared/types';
+
+interface CameraControlsProps {
+  onRotate: (direction: CameraDirection) => void;
+  onZoom: (direction: ZoomDirection) => void;
+  onFocus: (focus: CameraFocus) => void;
+}
+
+export const CameraControls: React.FC<CameraControlsProps> = ({
+  onRotate,
+  onZoom,
+  onFocus,
+}) => {
+  return (
+    <div className="text-sm w-full">
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
+            Camera Controls
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={() => onRotate('right')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              ← Rotate
+            </Button>
+            <Button
+              onClick={() => onRotate('left')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Rotate →
+            </Button>
+            <Button
+              onClick={() => onZoom('in')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Zoom In
+            </Button>
+            <Button
+              onClick={() => onZoom('out')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Zoom Out
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
+            Focus
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              onClick={() => onFocus('head')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Head
+            </Button>
+            <Button
+              onClick={() => onFocus('body')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Body
+            </Button>
+            <Button
+              onClick={() => onFocus('legs')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              Legs
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/ClothingPreview.tsx
+
+import React, { useState, useEffect } from 'react';
+import {
+  getClothingImage,
+  getClothingImageFallback,
+  getComponentIdFromKey,
+} from '../utils/getClothingImage';
+
+interface ClothingPreviewProps {
+  model: string;
+  clothingKey: string;
+  drawableId: number;
+  textureId: number;
+}
+
+export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
+  model,
+  clothingKey,
+  drawableId,
+  textureId,
+}) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imagePath, setImagePath] = useState('');
+  const [fallbackPath, setFallbackPath] = useState('');
+  const [usingFallback, setUsingFallback] = useState(false);
+  const componentId = getComponentIdFromKey(clothingKey);
+
+  useEffect(() => {
+    // Reset image loaded state when props change
+    setImageLoaded(false);
+    setUsingFallback(false);
+
+    // Define the quality level - could be made configurable via props
+    const quality = 'medium';
+
+    // Get the primary image path with texture from the asset server
+    const primaryPath = getClothingImage(
+      model,
+      componentId,
+      drawableId,
+      textureId,
+      quality
+    );
+    setImagePath(primaryPath);
+
+    // Also prepare a fallback path without texture from the asset server
+    const backupPath = getClothingImageFallback(
+      model,
+      componentId,
+      drawableId,
+      quality
+    );
+    setFallbackPath(backupPath);
+
+    // Preload the image to check if it exists
+    const img = new Image();
+    img.onload = () => {
+      setImageLoaded(true);
+      setUsingFallback(false);
+    };
+    img.onerror = () => {
+      // Try the fallback image without texture
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
+        setImageLoaded(true);
+        setUsingFallback(true);
+      };
+      fallbackImg.onerror = () => {
+        setImageLoaded(false);
+        setUsingFallback(false);
+      };
+      fallbackImg.src = backupPath;
+    };
+    img.src = primaryPath;
+  }, [model, componentId, drawableId, textureId]);
+
+  // Function to handle image loading errors
+  const handleImageError = (
+    e: React.SyntheticEvent<HTMLImageElement, Event>
+  ) => {
+    // If we're already using the fallback and it fails, show no image
+    if (usingFallback) {
+      setImageLoaded(false);
+      e.currentTarget.style.display = 'none';
+      return;
+    }
+
+    // Try the fallback image
+    setUsingFallback(true);
+    e.currentTarget.src = fallbackPath;
+  };
+
+  return (
+    <div className="flex justify-center items-center p-2 glass-dark rounded-lg h-48 overflow-hidden">
+      {imageLoaded ? (
+        <img
+          src={usingFallback ? fallbackPath : imagePath}
+          alt={`${clothingKey} preview`}
+          className="max-h-full max-w-full object-contain"
+          onError={handleImageError}
+        />
+      ) : (
+        <div className="text-center text-gray-400">
+          <p>No preview available</p>
+          <p className="text-sm mt-1">
+            Item: {clothingKey} #{drawableId}
+          </p>
+          <p className="text-xs mt-1">Texture: {textureId}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/Layout.tsx
+
+import React, { ReactNode } from 'react';
+import Button from '../../../../../../webview/components/ui/Button';
+
+interface LayoutProps {
+  children: ReactNode;
+  title: string;
+  position?: 'left' | 'center' | 'right';
+  onSave?: () => void;
+  onClose?: () => void;
+  isSaving?: boolean;
+  saveButtonText?: string;
+  cancelButtonText?: string;
+  showButtons?: boolean;
+  headerContent?: ReactNode;
+  footerContent?: ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  title,
+  position = 'center',
+  onSave,
+  onClose,
+  isSaving = false,
+  saveButtonText = 'Save',
+  cancelButtonText = 'Cancel',
+  showButtons = true,
+  headerContent,
+  footerContent,
+}) => {
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'left':
+        return 'justify-start';
+      case 'right':
+        return 'justify-end';
+      case 'center':
+      default:
+        return 'justify-center';
+    }
+  };
+
+  return (
+    <div
+      className={`inset-0 w-[50vw] h-screen py-8 flex ${getPositionClasses()}`}
+    >
+      <div
+        className={`glass-dark h-full font-smooth text-on-dark rounded-lg shadow-elevation-3 w-full overflow-hidden flex flex-col`}
+      >
+        {/* Header */}
+        <div className="glass-brand-dark p-3 flex justify-between items-center border-b border-brand-700">
+          <h1 className="text-responsive-xl font-semibold tracking-tight text-accessible-on-glass">
+            {title}
+          </h1>
+          {headerContent ? (
+            headerContent
+          ) : showButtons ? (
+            <div className="flex space-x-2">
+              {onSave && (
+                <Button onClick={onSave} disabled={isSaving} size="sm">
+                  {isSaving ? 'Saving...' : saveButtonText}
+                </Button>
+              )}
+              {onClose && (
+                <Button onClick={onClose} size="sm">
+                  {cancelButtonText}
+                </Button>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
+
+        {/* Footer */}
+        {footerContent && (
+          <div className="border-t border-brand-700/30">{footerContent}</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Layout;
+
+
+================================================================================
+
+# ./html/components/common/Slider.tsx
+
+import React from 'react';
+
+interface SliderProps {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (value: number) => void;
+  step?: number;
+  showValue?: boolean;
+  valueLabel?: string;
+}
+
+/**
+ * Reusable slider component with consistent styling
+ */
+export const Slider: React.FC<SliderProps> = ({
+  id,
+  label,
+  min,
+  max,
+  value,
+  onChange,
+  step = 1,
+  showValue = true,
+  valueLabel,
+}) => {
+  return (
+    <div className="mb-4">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-white text-shadow mb-2"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+          onChange(parseFloat(event.target.value))
+        }
+        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+      />
+      {showValue && (
+        <div className="text-right text-xs text-white text-shadow mt-1">
+          {valueLabel || label}: {value}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/common/TabButton.tsx
+
+import React from 'react';
+import Button from '../../../../../../../webview/components/ui/Button';
+import { TabType } from '../../../shared/types';
+
+interface TabButtonProps {
+  tab: TabType;
+  activeTab: TabType;
+  label: string;
+  onClick: (tab: TabType) => void;
+}
+
+/**
+ * Reusable tab button component with consistent styling
+ */
+export const TabButton: React.FC<TabButtonProps> = ({
+  tab,
+  activeTab,
+  label,
+  onClick,
+}) => {
+  return (
+    <Button
+      onClick={() => onClick(tab)}
+      fullWidth
+      className={`${
+        activeTab === tab ? 'glass-brand' : 'glass-brand-dark'
+      }`}
+    >
+      {label}
+    </Button>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/common/TabLayout.tsx
+
+import React, { ReactNode } from 'react';
+
+interface TabLayoutProps {
+  title: string;
+  children: ReactNode;
+}
+
+/**
+ * Reusable tab layout component with consistent styling
+ */
+export const TabLayout: React.FC<TabLayoutProps> = ({ title, children }) => {
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">{title}</h2>
+      {children}
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/common/index.ts
+
+export * from './Slider';
+export * from './TabButton';
+export * from './TabLayout';
+
+
+================================================================================
+
+# ./html/components/index.ts
+
+export * from './CameraControls';
+export * from './ClothingPreview';
+export * from './tabs/ModelTab';
+export * from './tabs/FaceTab';
+export * from './tabs/HairTab';
+export * from './tabs/AppearanceTab';
+export * from './tabs/ClothingTab';
+
+
+================================================================================
+
+# ./html/components/tabs/AppearanceTab.tsx
+
+import React from 'react';
+import { AppearanceData } from '../../../shared/types';
+
+interface AppearanceTabProps {
+  appearanceData: AppearanceData;
+  onAppearanceChange: (category: string, key: string, value: number) => void;
+  onEyeColorChange: (value: number) => void;
+}
+
+export const AppearanceTab: React.FC<AppearanceTabProps> = ({
+  appearanceData,
+  onAppearanceChange,
+  onEyeColorChange,
+}) => {
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Appearance Customization</h2>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="mb-4">
+          <label
+            htmlFor="eyebrows-style"
+            className="block text-sm font-medium text-white text-shadow mb-2"
+          >
+            Eyebrows Style
+          </label>
+          <input
+            id="eyebrows-style"
+            type="range"
+            min={0}
+            max={33}
+            value={appearanceData.eyebrows.style}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onAppearanceChange(
+                'eyebrows',
+                'style',
+                parseInt(event.target.value)
+              )
+            }
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+          />
+          <div className="text-right text-xs text-white text-shadow mt-1">
+            Style: {appearanceData.eyebrows.style}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="eyebrows-color"
+            className="block text-sm font-medium text-white text-shadow mb-2"
+          >
+            Eyebrows Color
+          </label>
+          <input
+            id="eyebrows-color"
+            type="range"
+            min={0}
+            max={63}
+            value={appearanceData.eyebrows.color || 0}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onAppearanceChange(
+                'eyebrows',
+                'color',
+                parseInt(event.target.value)
+              )
+            }
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+          />
+          <div className="text-right text-xs text-white text-shadow mt-1">
+            Color: {appearanceData.eyebrows.color || 0}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="beard-style"
+            className="block text-sm font-medium text-white text-shadow mb-2"
+          >
+            Beard Style
+          </label>
+          <input
+            id="beard-style"
+            type="range"
+            min={0}
+            max={28}
+            value={appearanceData.beard.style}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onAppearanceChange('beard', 'style', parseInt(event.target.value))
+            }
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+          />
+          <div className="text-right text-xs text-white text-shadow mt-1">
+            Style: {appearanceData.beard.style}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="beard-color"
+            className="block text-sm font-medium text-white text-shadow mb-2"
+          >
+            Beard Color
+          </label>
+          <input
+            id="beard-color"
+            type="range"
+            min={0}
+            max={63}
+            value={appearanceData.beard.color || 0}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onAppearanceChange('beard', 'color', parseInt(event.target.value))
+            }
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+          />
+          <div className="text-right text-xs text-white text-shadow mt-1">
+            Color: {appearanceData.beard.color || 0}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="eye-color"
+            className="block text-sm font-medium text-white text-shadow mb-2"
+          >
+            Eye Color
+          </label>
+          <input
+            id="eye-color"
+            type="range"
+            min={0}
+            max={31}
+            value={appearanceData.eyeColor}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onEyeColorChange(parseInt(event.target.value))
+            }
+            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm"
+          />
+          <div className="text-right text-xs text-white text-shadow mt-1">
+            Color: {appearanceData.eyeColor}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/tabs/ClothingTab.tsx
+
+import React, { useState, useEffect } from 'react';
+import { CharacterData } from '../../../shared/types';
+import { ClothingPreview } from '../ClothingPreview';
+import { TabLayout } from '../common';
+import {
+  getClothingImage,
+  getClothingImageFallback,
+} from '../../utils/getClothingImage';
+
+interface ClothingTabProps {
+  clothingData: CharacterData['clothing'];
+  onClothingChange: (key: string, value: number) => void;
+  model: string;
+}
+
+// Define the clothing categories
+const CLOTHING_CATEGORIES = [
+  { id: 'tops', label: 'Tops', componentId: 11, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'undershirt',
+    label: 'Undershirt',
+    componentId: 8,
+    maxItems: 20,
+    maxTextures: 5,
+  },
+  { id: 'legs', label: 'Legs', componentId: 4, maxItems: 20, maxTextures: 5 },
+  { id: 'shoes', label: 'Shoes', componentId: 6, maxItems: 20, maxTextures: 5 },
+  {
+    id: 'accessories',
+    label: 'Accessories',
+    componentId: 7,
+    maxItems: 20,
+    maxTextures: 5,
+  },
+  { id: 'torso', label: 'Torso', componentId: 3, maxItems: 20, maxTextures: 5 },
+];
+
+// ClothingItem component for the grid
+interface ClothingItemProps {
+  model: string;
+  componentId: number;
+  drawableId: number;
+  textureId: number;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const ClothingItem: React.FC<ClothingItemProps> = ({
+  model,
+  componentId,
+  drawableId,
+  textureId,
+  isSelected,
+  onClick,
+}) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imagePath, setImagePath] = useState('');
+
+  useEffect(() => {
+    // Define the quality level - using 'tiny' for grid items to improve performance
+    const quality = 'tiny';
+
+    // Get the image path from the asset server
+    const path = getClothingImage(
+      model,
+      componentId,
+      drawableId,
+      textureId,
+      quality
+    );
+    setImagePath(path);
+
+    // Preload the image
+    const img = new Image();
+    img.onload = () => setImageLoaded(true);
+    img.onerror = () => {
+      // Try fallback without texture
+      const fallbackPath = getClothingImageFallback(
+        model,
+        componentId,
+        drawableId,
+        quality
+      );
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
+        setImageLoaded(true);
+        setImagePath(fallbackPath);
+      };
+      fallbackImg.onerror = () => setImageLoaded(false);
+      fallbackImg.src = fallbackPath;
+    };
+    img.src = path;
+  }, [model, componentId, drawableId, textureId]);
+
+  return (
+    <div
+      className={`relative w-16 h-16 rounded overflow-hidden cursor-pointer transition-all duration-200 ${
+        isSelected ? 'ring-2 ring-brand-500 scale-105' : 'hover:scale-105'
+      }`}
+      onClick={onClick}
+    >
+      {imageLoaded ? (
+        <img
+          src={imagePath}
+          alt={`Clothing item ${drawableId}`}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-black/30 text-xs text-center">
+          {drawableId}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ClothingGrid component for each category
+interface ClothingGridProps {
+  category: (typeof CLOTHING_CATEGORIES)[0];
+  model: string;
+  selectedDrawable: number;
+  selectedTexture: number;
+  onSelectDrawable: (value: number) => void;
+  onSelectTexture: (value: number) => void;
+}
+
+const ClothingGrid: React.FC<ClothingGridProps> = ({
+  category,
+  model,
+  selectedDrawable,
+  selectedTexture,
+  onSelectDrawable,
+  onSelectTexture,
+}) => {
+  // Generate a range of drawable IDs for the grid
+  const drawableIds = Array.from({ length: category.maxItems }, (_, i) => i);
+
+  // Generate a range of texture IDs for the selected drawable
+  const textureIds = Array.from({ length: category.maxTextures }, (_, i) => i);
+
+  return (
+    <div className="mb-6">
+      <h3 className="text-lg font-semibold mb-2">{category.label}</h3>
+
+      {/* Drawables grid */}
+      <div className="mb-4">
+        <h4 className="text-sm font-medium mb-1">Styles</h4>
+        <div className="grid grid-cols-5 gap-2">
+          {drawableIds.map((drawableId) => (
+            <ClothingItem
+              key={`${category.id}-${drawableId}`}
+              model={model}
+              componentId={category.componentId}
+              drawableId={drawableId}
+              textureId={0}
+              isSelected={selectedDrawable === drawableId}
+              onClick={() => onSelectDrawable(drawableId)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Textures grid for selected drawable */}
+      <div>
+        <h4 className="text-sm font-medium mb-1">Textures</h4>
+        <div className="grid grid-cols-5 gap-2">
+          {textureIds.map((textureId) => (
+            <ClothingItem
+              key={`${category.id}-${selectedDrawable}-${textureId}`}
+              model={model}
+              componentId={category.componentId}
+              drawableId={selectedDrawable}
+              textureId={textureId}
+              isSelected={selectedTexture === textureId}
+              onClick={() => onSelectTexture(textureId)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const ClothingTab: React.FC<ClothingTabProps> = ({
+  clothingData,
+  onClothingChange,
+  model,
+}) => {
+  // State to track which clothing category is currently active
+  const [activeCategory, setActiveCategory] = useState<string>('tops');
+
+  // Function to handle clicking on a clothing category
+  const handleCategorySelect = (categoryId: string) => {
+    setActiveCategory(categoryId);
+  };
+
+  // Get the drawable ID and texture ID for the currently selected category
+  const getDrawableAndTexture = () => {
+    switch (activeCategory) {
+      case 'tops':
+        return {
+          drawableId: clothingData.tops,
+          textureId: clothingData.topsTexture,
+        };
+      case 'undershirt':
+        return {
+          drawableId: clothingData.undershirt,
+          textureId: clothingData.undershirtTexture,
+        };
+      case 'legs':
+        return {
+          drawableId: clothingData.legs,
+          textureId: clothingData.legsTexture,
+        };
+      case 'shoes':
+        return {
+          drawableId: clothingData.shoes,
+          textureId: clothingData.shoesTexture,
+        };
+      case 'accessories':
+        return {
+          drawableId: clothingData.accessories,
+          textureId: clothingData.accessoriesTexture,
+        };
+      case 'torso':
+        return {
+          drawableId: clothingData.torso,
+          textureId: clothingData.torsoTexture,
+        };
+      default:
+        return {
+          drawableId: clothingData.tops,
+          textureId: clothingData.topsTexture,
+        };
+    }
+  };
+
+  const { drawableId, textureId } = getDrawableAndTexture();
+
+  // Handle drawable selection
+  const handleDrawableSelect = (value: number) => {
+    const key = activeCategory;
+    onClothingChange(key, value);
+  };
+
+  // Handle texture selection
+  const handleTextureSelect = (value: number) => {
+    const key = `${activeCategory}Texture`;
+    onClothingChange(key, value);
+  };
+
+  // Find the current active category object
+  const currentCategory =
+    CLOTHING_CATEGORIES.find((cat) => cat.id === activeCategory) ||
+    CLOTHING_CATEGORIES[0];
+
+  return (
+    <TabLayout title="Clothing Customization">
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* Left side - Character preview and category selection */}
+        <div className="w-full md:w-1/3">
+          {/* Character preview */}
+          <div className="mb-4">
+            <ClothingPreview
+              model={model}
+              clothingKey={activeCategory}
+              drawableId={drawableId}
+              textureId={textureId}
+            />
+          </div>
+
+          {/* Category selection */}
+          <div className="flex flex-col gap-2">
+            {CLOTHING_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                className={`px-3 py-2 rounded w-full text-left ${
+                  activeCategory === category.id
+                    ? 'glass-brand'
+                    : 'glass-brand-dark'
+                }`}
+                onClick={() => handleCategorySelect(category.id)}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right side - Clothing grid */}
+        <div className="w-full md:w-2/3 overflow-y-auto max-h-[500px] pr-2">
+          <ClothingGrid
+            category={currentCategory}
+            model={model}
+            selectedDrawable={drawableId}
+            selectedTexture={textureId}
+            onSelectDrawable={handleDrawableSelect}
+            onSelectTexture={handleTextureSelect}
+          />
+        </div>
+      </div>
+    </TabLayout>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/tabs/FaceTab.tsx
+
+import React from 'react';
+import { FaceData } from '../../../shared/types';
+import { Slider, TabLayout } from '../common';
+
+interface FaceTabProps {
+  faceData: FaceData;
+  onFaceChange: (key: string, value: number) => void;
+}
+
+export const FaceTab: React.FC<FaceTabProps> = ({ faceData, onFaceChange }) => {
+  return (
+    <TabLayout title="Face Customization">
+      <Slider
+        id="father-index"
+        label="Father"
+        min={0}
+        max={45}
+        value={faceData.fatherIndex}
+        onChange={(value) => onFaceChange('fatherIndex', value)}
+        valueLabel="Father Index"
+      />
+
+      <Slider
+        id="mother-index"
+        label="Mother"
+        min={0}
+        max={45}
+        value={faceData.motherIndex}
+        onChange={(value) => onFaceChange('motherIndex', value)}
+        valueLabel="Mother Index"
+      />
+
+      <Slider
+        id="shape-mix"
+        label="Shape Mix (Father - Mother)"
+        min={0}
+        max={1}
+        step={0.01}
+        value={faceData.shapeMix}
+        onChange={(value) => onFaceChange('shapeMix', value)}
+        valueLabel="Shape Mix"
+      />
+
+      <Slider
+        id="skin-mix"
+        label="Skin Mix (Father - Mother)"
+        min={0}
+        max={1}
+        step={0.01}
+        value={faceData.skinMix}
+        onChange={(value) => onFaceChange('skinMix', value)}
+        valueLabel="Skin Mix"
+      />
+    </TabLayout>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/tabs/HairTab.tsx
+
+import React from 'react';
+import { HairData } from '../../../shared/types';
+import { Slider, TabLayout } from '../common';
+
+interface HairTabProps {
+  hairData: HairData;
+  onHairChange: (key: string, value: number) => void;
+}
+
+export const HairTab: React.FC<HairTabProps> = ({ hairData, onHairChange }) => {
+  return (
+    <TabLayout title="Hair Customization">
+      <Slider
+        id="hair-style"
+        label="Hair Style"
+        min={0}
+        max={73}
+        value={hairData.style}
+        onChange={(value) => onHairChange('style', value)}
+        valueLabel="Style"
+      />
+
+      <Slider
+        id="hair-color"
+        label="Hair Color"
+        min={0}
+        max={63}
+        value={hairData.color}
+        onChange={(value) => onHairChange('color', value)}
+        valueLabel="Color"
+      />
+
+      <Slider
+        id="hair-highlight"
+        label="Hair Highlight"
+        min={0}
+        max={63}
+        value={hairData.highlight}
+        onChange={(value) => onHairChange('highlight', value)}
+        valueLabel="Highlight"
+      />
+    </TabLayout>
+  );
+};
+
+
+================================================================================
+
+# ./html/components/tabs/ModelTab.tsx
+
+import React from 'react';
+import Button from '../../../../../../../webview/components/ui/Button';
+import { MODELS } from '../../../shared/types';
+
+interface ModelPickerProps {
+  currentModel: string;
+  onModelChange: (modelId: string) => void;
+}
+
+export const ModelPicker: React.FC<ModelPickerProps> = ({
+  currentModel,
+  onModelChange,
+}) => {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-4">
+        {MODELS.map((model) => (
+          <Button
+            key={model.id}
+            onClick={() => onModelChange(model.id)}
+            className={`${
+              currentModel === model.id ? 'glass-brand' : 'glass-brand-dark'
+            }`}
+          >
+            {model.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
+================================================================================
+
+# ./html/utils/getClothingImage.ts
+
+/**
+ * Utility function to get the clothing image path based on the character model, component ID, and drawable ID
+ * Uses the asset server to retrieve optimized images
+ *
+ * @param model The character model (male/female)
+ * @param componentId The clothing component ID
+ * @param drawableId The drawable ID (style)
+ * @param textureId The texture ID
+ * @param quality The image quality level (high, medium, low, tiny)
+ * @returns The path to the clothing image
+ */
+export const getClothingImage = (
+  model: string,
+  componentId: number,
+  drawableId: number,
+  textureId: number,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
+): string => {
+  // Determine if male or female
+  const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
+
+  // Map component IDs to their respective clothing types
+  // 0: Face
+  // 1: Mask
+  // 2: Hair
+  // 3: Torso
+  // 4: Legs
+  // 5: Bags
+  // 6: Shoes
+  // 7: Accessories
+  // 8: Undershirt
+  // 9: Body Armor
+  // 10: Decals
+  // 11: Tops
+
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+
+  // Create the image path with texture ID
+  const imagePath = `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}_${textureId}.png`;
+
+  // Return the primary path - the component will handle fallback if needed
+  return imagePath;
+};
+
+/**
+ * Get the fallback clothing image path (without texture ID)
+ *
+ * @param model The character model (male/female)
+ * @param componentId The clothing component ID
+ * @param drawableId The drawable ID (style)
+ * @param quality The image quality level (high, medium, low, tiny)
+ * @returns The fallback path to the clothing image
+ */
+export const getClothingImageFallback = (
+  model: string,
+  componentId: number,
+  drawableId: number,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
+): string => {
+  // Determine if male or female
+  const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
+
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+
+  // Create a fallback path without texture ID
+  return `${assetServerUrl}/assets/${quality}/images/clothing/${gender}_${componentId}_${drawableId}.png`;
+};
+
+/**
+ * Maps clothing keys from the UI to component IDs in FiveM
+ *
+ * @param key The clothing key from the UI
+ * @returns The component ID
+ */
+export const getComponentIdFromKey = (key: string): number => {
+  const componentMap: Record<string, number> = {
+    'tops': 11,
+    'torso': 3,
+    'undershirt': 8,
+    'legs': 4,
+    'shoes': 6,
+    'accessories': 7,
+  };
+
+  return componentMap[key] || 11; // Default to tops if not found
+};
+
+
+================================================================================
+
+# ./server/index.ts
+
+/// <reference types="@citizenfx/server" />
+import 'dotenv/config';
+import { CharacterData } from '../shared/types';
+
+/**
+ * Character Creation Server
+ * Handles saving character data and other server-side operations
+ */
+class CharacterServer {
+  /**
+   * Initialize the server
+   */
+  initialize(): void {
+    // Register event handlers
+    this.registerEventHandlers();
+
+    // Log when the resource starts
+    console.log('[Character Create] Server script loaded!');
+  }
+
+  /**
+   * Register event handlers
+   */
+  private registerEventHandlers(): void {
+    // Event handler for saving character data
+    onNet('character-create:save', this.handleSaveCharacter.bind(this));
+  }
+
+  /**
+   * Handle saving character data
+   * @param {CharacterData} characterData - The character data to save
+   */
+  private handleSaveCharacter(characterData: CharacterData): void {
+    const source = global.source;
+    const playerId = source.toString();
+
+    console.log(
+      `[Character Create] Saving character data for player ${playerId}`
+    );
+
+    try {
+      // Here you would typically save the character data to a database
+      // For this example, we'll just log it
+      console.log(
+        '[Character Create] Character data:',
+        JSON.stringify(characterData)
+      );
+
+      // Send a success message back to the client
+      emitNet('character-create:save-result', source, { success: true });
+    } catch (error) {
+      console.error(`[Character Create] Error saving character data: ${error}`);
+      emitNet('character-create:save-result', source, {
+        success: false,
+        error: 'Failed to save character data',
+      });
+    }
+  }
+}
+
+// Create and initialize the server
+const server = new CharacterServer();
+server.initialize();
+
+
+================================================================================
+
+# ./shared/store.ts
+
+/**
+ * Simple state management for character creation
+ */
+import {
+  CharacterData,
+  CameraFocus,
+  DEFAULT_CHARACTER,
+  NUI_EVENT,
+} from './types';
+
+// Re-export constants
+export { NUI_EVENT };
+
+// Define the store state interface
+interface StoreState {
+  // UI State
+  uiVisible: boolean;
+
+  // Camera state
+  cameraRotation: number;
+  cameraZoom: number;
+  cameraFocus: CameraFocus;
+  characterCreationCamera: number | null;
+
+  // Character data
+  characterData: CharacterData;
+}
+
+// Initialize with default values
+const initialState: StoreState = {
+  uiVisible: false,
+  cameraRotation: 0,
+  cameraZoom: 1.5,
+  cameraFocus: 'body',
+  characterCreationCamera: null,
+  characterData: DEFAULT_CHARACTER,
+};
+
+// Create a simple store
+class Store {
+  private state: StoreState = initialState;
+  private listeners: Array<(state: StoreState) => void> = [];
+
+  // Get current state
+  getState(): StoreState {
+    return this.state;
+  }
+
+  // Update state
+  setState(partialState: Partial<StoreState>): void {
+    this.state = { ...this.state, ...partialState };
+    this.notifyListeners();
+  }
+
+  // Update character data
+  updateCharacterData(partialData: Partial<CharacterData>): void {
+    this.state.characterData = { ...this.state.characterData, ...partialData };
+    this.notifyListeners();
+  }
+
+  // Update nested character data properties
+  updateCharacterProperty<K extends keyof CharacterData>(
+    property: K,
+    value: Partial<CharacterData[K]>
+  ): void {
+    // Create a new object for the property if it doesn't exist
+    const currentPropertyValue = this.state.characterData[property] || {};
+
+    this.state.characterData = {
+      ...this.state.characterData,
+      [property]: {
+        ...currentPropertyValue,
+        ...value,
+      },
+    };
+    this.notifyListeners();
+  }
+
+  // Subscribe to state changes
+  subscribe(listener: (state: StoreState) => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  // Notify all listeners of state change
+  private notifyListeners(): void {
+    this.listeners.forEach((listener) => listener(this.state));
+  }
+
+  // Reset state to initial values
+  reset(): void {
+    this.state = initialState;
+    this.notifyListeners();
+  }
+}
+
+// Create and export a singleton instance
+export const store = new Store();
+
+// Helper functions to access specific parts of state
+export const getCharacterData = (): CharacterData =>
+  store.getState().characterData;
+export const isUiVisible = (): boolean => store.getState().uiVisible;
+export const getCameraState = () => {
+  const { cameraRotation, cameraZoom, cameraFocus, characterCreationCamera } =
+    store.getState();
+  return { cameraRotation, cameraZoom, cameraFocus, characterCreationCamera };
+};
+
+// Helper functions to update specific parts of state
+export const setUiVisible = (visible: boolean): void =>
+  store.setState({ uiVisible: visible });
+export const setCameraRotation = (rotation: number): void =>
+  store.setState({ cameraRotation: rotation });
+export const setCameraZoom = (zoom: number): void =>
+  store.setState({ cameraZoom: zoom });
+export const setCameraFocus = (focus: CameraFocus): void =>
+  store.setState({ cameraFocus: focus });
+export const setCharacterCreationCamera = (camera: number | null): void =>
+  store.setState({ characterCreationCamera: camera });
+export const updateCharacterModel = (model: string): void =>
+  store.updateCharacterData({ model });
+
+
+================================================================================
+
+# ./shared/types.ts
+
+/**
+ * Shared types for character creation
+ * This file contains all type definitions used across client and UI
+ */
+
+// Constants
+export const NUI_EVENT = 'character-create:toggle-ui';
+
+// Character model options
+export const MODELS = [
+  { id: 'mp_m_freemode_01', label: 'Male' },
+  { id: 'mp_f_freemode_01', label: 'Female' },
+];
+
+/**
+ * Interface for character face data
+ */
+export interface FaceData {
+  fatherIndex: number;
+  motherIndex: number;
+  shapeMix: number;
+  skinMix: number;
+}
+
+/**
+ * Interface for character hair data
+ */
+export interface HairData {
+  style: number;
+  color: number;
+  highlight: number;
+}
+
+/**
+ * Interface for appearance overlay items
+ */
+export interface AppearanceOverlay {
+  style: number;
+  color?: number;
+  opacity: number;
+}
+
+/**
+ * Interface for facial appearance data
+ */
+export interface AppearanceData {
+  eyebrows: AppearanceOverlay;
+  beard: AppearanceOverlay;
+  eyeColor: number;
+  blemishes: AppearanceOverlay;
+  ageing: AppearanceOverlay;
+  complexion: AppearanceOverlay;
+  moles: AppearanceOverlay;
+  sunDamage: AppearanceOverlay;
+  makeUp: AppearanceOverlay;
+  lipstick: AppearanceOverlay;
+  [key: string]: AppearanceOverlay | number;
+}
+
+/**
+ * Interface for character clothing data
+ */
+export interface ClothingData {
+  tops: number;
+  topsTexture: number;
+  torso: number;
+  torsoTexture: number;
+  undershirt: number;
+  undershirtTexture: number;
+  legs: number;
+  legsTexture: number;
+  shoes: number;
+  shoesTexture: number;
+  accessories: number;
+  accessoriesTexture: number;
+  mask?: number;
+  maskTexture?: number;
+  bags?: number;
+  bagsTexture?: number;
+  armor?: number;
+  armorTexture?: number;
+  decals?: number;
+  decalsTexture?: number;
+}
+
+/**
+ * Interface for character props (accessories)
+ */
+export interface PropData {
+  hat?: number;
+  hatTexture?: number;
+  glasses?: number;
+  glassesTexture?: number;
+  ears?: number;
+  earsTexture?: number;
+  watches?: number;
+  watchesTexture?: number;
+  bracelets?: number;
+  braceletsTexture?: number;
+}
+
+/**
+ * Interface for complete character data
+ */
+export interface CharacterData {
+  model: string;
+  face: FaceData;
+  hair: HairData;
+  appearance: AppearanceData;
+  clothing: ClothingData;
+  props?: PropData;
+}
+
+/**
+ * Default character data
+ */
+export const DEFAULT_CHARACTER: CharacterData = {
+  model: 'mp_m_freemode_01',
+  face: {
+    fatherIndex: 0,
+    motherIndex: 0,
+    shapeMix: 0.5,
+    skinMix: 0.5,
+  },
+  hair: {
+    style: 0,
+    color: 0,
+    highlight: 0,
+  },
+  appearance: {
+    eyebrows: { style: 0, color: 0, opacity: 1.0 },
+    beard: { style: 0, color: 0, opacity: 1.0 },
+    eyeColor: 0,
+    blemishes: { style: 0, opacity: 0.0 },
+    ageing: { style: 0, opacity: 0.0 },
+    complexion: { style: 0, opacity: 0.0 },
+    moles: { style: 0, opacity: 0.0 },
+    sunDamage: { style: 0, opacity: 0.0 },
+    makeUp: { style: 0, color: 0, opacity: 0.0 },
+    lipstick: { style: 0, color: 0, opacity: 0.0 },
+  },
+  clothing: {
+    torso: 0,
+    torsoTexture: 0,
+    legs: 0,
+    legsTexture: 0,
+    shoes: 0,
+    shoesTexture: 0,
+    accessories: 0,
+    accessoriesTexture: 0,
+    undershirt: 0,
+    undershirtTexture: 0,
+    tops: 0,
+    topsTexture: 0,
+  },
+};
+
+/**
+ * Camera focus position types
+ */
+export type CameraFocus = 'head' | 'body' | 'legs';
+
+/**
+ * Camera direction types
+ */
+export type CameraDirection = 'left' | 'right';
+
+/**
+ * Camera zoom direction types
+ */
+export type ZoomDirection = 'in' | 'out';
+
+/**
+ * Tab types for UI
+ */
+export type TabType = 'model' | 'face' | 'hair' | 'appearance' | 'clothing';
+
+/**
+ * Component map type for clothing components
+ */
+export interface ComponentMap {
+  [key: string]: number;
+}
+
+/**
+ * NUI callback data for various character customization events
+ */
+export interface ModelUpdateData {
+  model: string;
+}
+
+export interface FaceUpdateData {
+  key: keyof FaceData;
+  value: number;
+}
+
+export interface HairUpdateData {
+  key: keyof HairData;
+  value: number;
+}
+
+export interface AppearanceUpdateData {
+  category: keyof AppearanceData;
+  key: string;
+  value: number;
+}
+
+export interface ClothingUpdateData {
+  key: keyof ClothingData;
+  value: number;
+}
+
+export interface CameraRotationData {
+  direction: CameraDirection;
+}
+
+export interface CameraZoomData {
+  direction: ZoomDirection;
+}
+
+export interface CameraFocusData {
+  focus: CameraFocus;
+}
+
+export interface SaveCharacterData {
+  close?: boolean;
+  save?: boolean;
+  characterData?: CharacterData;
+}
+
+/**
+ * Utility type for NUI callbacks
+ */
+export type NuiCallback<T> = (data: T, cb: (response: any) => void) => void;
+
+
+--------------------------------------------------------------------------------
+Total TypeScript files found: 24
