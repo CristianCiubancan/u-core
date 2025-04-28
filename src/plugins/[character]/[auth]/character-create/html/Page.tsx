@@ -224,7 +224,7 @@ export default function Page() {
   // Render UI
   return isOpen ? (
     <div className="flex p-6 gap-4 h-screen">
-      <div className="flex-col w-[50vw] glass-dark text-on-dark rounded-lg shadow-lg">
+      <div className="flex-col w-[40vw] glass-dark text-on-dark rounded-lg shadow-lg">
         {' '}
         {/* Main container */}
         {/* Left sidebar - Tabs */}
