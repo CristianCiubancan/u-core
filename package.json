@@ -35,7 +35,9 @@
     "react-dom": "^19.1.0",
     "react-i18next": "^15.4.1",
     "react-icons": "^5.5.0",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "canvas": "^2.11.2",
+    "image-js": "^0.35.5"
   },
   "devDependencies": {
     "@citizenfx/client": "2.0.14482-1",

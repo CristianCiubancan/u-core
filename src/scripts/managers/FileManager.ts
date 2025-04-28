@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { glob } from 'glob'; // For pattern matching in file paths
+// Removed ignore import
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
 import { PluginManifest, BasicPluginManifest } from '../types/Manifest.js';
@@ -12,6 +13,7 @@ import { PluginManifest, BasicPluginManifest } from '../types/Manifest.js';
  */
 class FileManager {
   private rootPath: string;
+  // Removed projectRoot and gitignore properties
   private plugins: Map<string, Plugin> = new Map();
   private files: Map<string, File> = new Map();
 
@@ -23,7 +25,7 @@ class FileManager {
    * @param rootPath Path to the plugins directory
    */
   constructor(rootPath: string = 'src/plugins') {
-    this.rootPath = path.resolve(rootPath);
+    this.rootPath = path.resolve(rootPath); // Reverted to original initialization
   }
 
   /**
@@ -32,9 +34,10 @@ class FileManager {
    */
   async initialize(): Promise<void> {
     try {
+      // Removed loadGitignore call
       await this.scanPlugins();
       console.log(
-        `FileManager initialized with ${this.plugins.size} plugins and ${this.files.size} files`
+        `FileManager initialized with ${this.plugins.size} plugins and ${this.files.size} files` // Reverted log message
       );
     } catch (error) {
       const errorMessage =
@@ -43,6 +46,8 @@ class FileManager {
       throw new Error(`Failed to initialize FileManager: ${errorMessage}`);
     }
   }
+
+  // Removed loadGitignore method
 
   /**
    * Safely escapes special characters in paths for glob patterns
@@ -232,11 +237,19 @@ class FileManager {
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name);
 
+        // Manually ignore node_modules directories
+        if (entry.isDirectory() && entry.name === 'node_modules') {
+          // console.log(`Ignoring node_modules directory: ${fullPath}`); // Optional debug log
+          continue; // Skip this directory
+        }
+
+        // Removed gitignore check
+
         if (entry.isDirectory()) {
           // Recursively scan subdirectories
           await this.scanPluginFiles(plugin, fullPath);
         } else if (entry.isFile()) {
-          // Register the file, including plugin.json which we now track as a file
+          // Register the file
           const file: File = {
             fileName: entry.name,
             fullPath: fullPath,

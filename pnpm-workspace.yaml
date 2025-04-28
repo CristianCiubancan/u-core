@@ -1,2 +1,9 @@
+packages:
+  - 'src/plugins/**'
+  # Include other workspace directories if necessary, e.g.:
+  # - 'src/scripts'
+  # - 'src/webview'
+  # - 'asset-server'
+
 ignoredBuiltDependencies:
   - esbuild
