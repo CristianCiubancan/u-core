@@ -70,8 +70,7 @@ const Page: React.FC = () => {
     return null; // Don't render anything if not visible
   }
 
-  // Basic styling similar to the original CSS might be needed
-  // Or integrate with existing UI components/theme
+  // Styling to match our HTML implementation
   const containerStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: '5%',
