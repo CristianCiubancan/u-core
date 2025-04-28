@@ -3,15 +3,35 @@
 import { initializePedCommands } from './pedCommands';
 import { initializeObjectCommands } from './objectCommands';
 import { initializeVehicleCommands } from './vehicleCommands';
+import { initializeUtilsCommands } from './utilsCommands'; // Import the initializer
 
 export function initializeCommands() {
   initializePedCommands();
   initializeObjectCommands();
   initializeVehicleCommands();
+  initializeUtilsCommands(); // Call the initializer
 
   // --- Add Chat Suggestions ---
   setImmediate(() => {
     emit('chat:addSuggestions', [
+      {
+        name: '/newscreenshot',
+        help: 'Generate clothing & prop screenshots with optional limits.',
+        params: [
+          {
+            name: 'items_per_position',
+            help: '(Optional) Max drawables/props per component.',
+          },
+          {
+            name: 'variations_per_item',
+            help: '(Optional) Max textures per drawable/prop.',
+          },
+        ],
+      },
+      {
+        name: '/stopscreenshot',
+        help: 'Stops the currently running /newscreenshot process.',
+      },
       {
         name: '/screenshot',
         help: 'Generate clothing & prop screenshots for both genders.',
@@ -44,6 +64,16 @@ export function initializeCommands() {
           { name: 'model_name/"all"', help: 'Vehicle Model Name or "all"' },
           { name: 'primary_color', help: '(Optional) Primary Color ID' },
           { name: 'secondary_color', help: '(Optional) Secondary Color ID' },
+        ],
+      },
+      {
+        name: '/listvariations',
+        help: 'List available clothing and prop variations for peds.',
+        params: [
+          {
+            name: 'gender',
+            help: '(Optional) male, female, or both (default)',
+          },
         ],
       },
     ]);

@@ -7,6 +7,13 @@
   "coreResourceName": "qb-core",
   "modelLoadTimeout": 10000,
   "screenshotDelay": 2000,
+  "delayAfterWeatherSet": 50,
+  "delayAfterCameraSetup": 50,
+  "delayAfterIdleCamDisable": 100,
+  "delayModelLoadCheck": 100,
+  "delayAfterModelSet": 250,
+  "delayAfterPedReset": 150,
+  "delayAfterPropClear": 50,
   "includedVehicleClasses": {
     "0": true,
     "1": true,

@@ -274,6 +274,36 @@ try {
     }
   });
 
+  // Listener for saving variation data from client
+  onNet('greenscreener:saveVariationsJson', (jsonData: string) => {
+    console.log(
+      `[fivem-greenscreener] Received variation data from client ${source}. Attempting to save...`
+    );
+    try {
+      const success = SaveResourceFile(
+        GetCurrentResourceName(),
+        'variations.json',
+        jsonData,
+        -1 // Save immediately
+      );
+
+      if (success) {
+        console.log(
+          `[fivem-greenscreener] Variation data successfully saved to resources/${GetCurrentResourceName()}/variations.json`
+        );
+      } else {
+        console.error(
+          '[fivem-greenscreener] ERROR: Failed to save variation data to file using SaveResourceFile.'
+        );
+      }
+    } catch (saveError: any) {
+      console.error(
+        `[fivem-greenscreener] ERROR during SaveResourceFile: ${saveError.message}`
+      );
+      console.error(saveError.stack);
+    }
+  });
+
   console.log(`[fivem-greenscreener] Server-side initialized successfully.`);
 } catch (error) {
   console.error(`[fivem-greenscreener] Error initializing: ${error.message}`);

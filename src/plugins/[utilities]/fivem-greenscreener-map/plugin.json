@@ -1,0 +1,10 @@
+{
+  "name": "fivem-greenscreener",
+  "version": "1.6.5",
+  "fx_version": "cerulean",
+  "author": "Ben",
+  "description": "Refactored fivem-greenscreener plugin",
+  "games": ["gta5"],
+  "is_map": true,
+  "files": ["stream/**/*"]
+}

@@ -5,10 +5,9 @@
   "author": "Ben",
   "description": "Refactored fivem-greenscreener plugin",
   "games": ["gta5"],
-  "is_map": true,
   "client_scripts": ["client/index.js"],
   "server_scripts": ["server/index.js"],
   "ui_page": "html/index.html",
-  "files": ["config.json", "html/**/*", "stream/**/*", "images/**/*"],
+  "files": ["config.json", "html/**/*", "images/**/*"],
   "dependencies": ["screenshot-basic"]
 }
