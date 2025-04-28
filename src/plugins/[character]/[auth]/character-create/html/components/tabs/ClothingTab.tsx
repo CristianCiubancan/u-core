@@ -129,16 +129,10 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
 
   useEffect(() => {
     // Use medium quality for better previews
-    const quality = 'medium';
+    const quality = 'tiny';
 
     // Get the image path from the asset server
-    const path = getClothingImage(
-      model,
-      componentId,
-      drawableId,
-      textureId,
-      quality
-    );
+    const path = getClothingImage(model, componentId, drawableId, quality);
     setImagePath(path);
 
     // Preload the image
@@ -280,7 +274,7 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
         </span>
       </div>
       {/* Scrollable grid container */}
-      <div className="overflow-y-auto scrollbar-brand-dark flex-grow">
+      <div className="overflow-y-scroll scrollbar-brand-dark flex-grow">
         {/* Clothing grid with more columns for demonstrating scrolling */}
         <div className="grid grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
           {drawableIds.map((drawableId) => (

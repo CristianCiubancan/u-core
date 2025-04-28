@@ -13,7 +13,6 @@ export const getClothingImage = (
   model: string,
   componentId: number,
   drawableId: number,
-  textureId: number,
   quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
 ): string => {
   // Determine if male or female
