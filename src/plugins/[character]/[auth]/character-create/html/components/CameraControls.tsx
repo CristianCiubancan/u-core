@@ -11,6 +11,7 @@ interface CameraControlsProps {
   onZoom: (direction: ZoomDirection) => void;
   onFocus: (focus: CameraFocus) => void;
   onRotatePlayer?: (direction: CameraDirection) => void;
+  activeFocus: CameraFocus;
 }
 
 export const CameraControls: React.FC<CameraControlsProps> = ({
@@ -18,6 +19,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
   onZoom,
   onFocus,
   onRotatePlayer,
+  activeFocus,
 }) => {
   return (
     <div className="text-sm w-full">
@@ -83,19 +85,25 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           <div className="grid grid-cols-3 gap-2">
             <Button
               onClick={() => onFocus('head')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className={`py-1 px-2 text-xs flex justify-center items-center ${
+                activeFocus === 'head' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
             >
               Head
             </Button>
             <Button
               onClick={() => onFocus('body')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className={`py-1 px-2 text-xs flex justify-center items-center ${
+                activeFocus === 'body' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
             >
               Body
             </Button>
             <Button
               onClick={() => onFocus('legs')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
+              className={`py-1 px-2 text-xs flex justify-center items-center ${
+                activeFocus === 'legs' ? 'glass-brand' : 'glass-brand-dark'
+              }`}
             >
               Legs
             </Button>

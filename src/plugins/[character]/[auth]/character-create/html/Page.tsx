@@ -17,11 +17,13 @@ import {
   NUI_EVENT,
   TabType,
   AppearanceOverlay,
+  CameraFocus,
 } from '../shared/types';
 
 export default function Page() {
   const [isOpen, setIsOpen] = useState(isEnvBrowser());
   const [activeTab, setActiveTab] = useState<TabType>('face');
+  const [activeFocus, setActiveFocus] = useState<CameraFocus>('body');
   const [characterData, setCharacterData] =
     useState<CharacterData>(DEFAULT_CHARACTER);
 
@@ -186,11 +188,17 @@ export default function Page() {
   }, []);
 
   // Handle camera focus
-  const handleFocusCamera = useCallback((focus: 'head' | 'body' | 'legs') => {
-    fetchNui('character-create:focus-camera', { focus }).catch((error: any) => {
-      console.error('[UI] Failed to focus camera:', error);
-    });
-  }, []);
+  const handleFocusCamera = useCallback(
+    (focus: CameraFocus) => {
+      setActiveFocus(focus);
+      fetchNui('character-create:focus-camera', { focus }).catch(
+        (error: any) => {
+          console.error('[UI] Failed to focus camera:', error);
+        }
+      );
+    },
+    [setActiveFocus]
+  );
 
   // Handle player rotation
   const handleRotatePlayer = useCallback((direction: 'left' | 'right') => {
@@ -307,6 +315,7 @@ export default function Page() {
           onZoom={handleZoomCamera}
           onFocus={handleFocusCamera}
           onRotatePlayer={handleRotatePlayer}
+          activeFocus={activeFocus}
         />
       </div>
     </div>
