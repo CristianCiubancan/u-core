@@ -6,6 +6,8 @@ server.txt
 *cache*
 .replxx_history
 
+asset-server/public/*
+
 # node_modules
 node_modules
 package-lock.json
