@@ -1,6 +1,6 @@
 {
-  "debug": false,
-  "includeTextures": false,
+  "debug": true,
+  "includeTextures": true,
   "//__comment__//": "The image generation will take much longer and you will have much more images!",
   "useQBVehicles": false,
   "//__comment__//.": "If you want to use the QB Vehicles in the vehicles.lua file, set this to true. QBCore has to be installed and started before this script!",
