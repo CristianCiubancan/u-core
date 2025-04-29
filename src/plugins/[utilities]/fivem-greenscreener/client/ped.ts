@@ -172,3 +172,50 @@ export function cleanupPedAfterScreenshot(
   }
   SetPedOnGround(ped); // Ensure ped is grounded after processing
 }
+
+/**
+ * Resets all clothing components to their default state
+ * More thorough than just resetting a single component
+ */
+export async function ResetAllComponentsToDefault(ped: number) {
+  if (config.debug)
+    console.log(`DEBUG: Resetting ped ${ped} to underwear state`);
+
+  // Check gender by directly comparing model hash instead of using IsPedMale
+  const pedModel = GetEntityModel(ped);
+  const isMale = pedModel === GetHashKey('mp_m_freemode_01');
+  // const isFemale = pedModel === GetHashKey('mp_f_freemode_01'); // Alternative check if needed
+
+  if (config.debug)
+    console.log(`DEBUG: Ped model hash: ${pedModel}, isMale: ${isMale}`);
+
+  if (isMale) {
+    // Male underwear setup (these values may need adjustment for your specific server)
+    SetPedComponentVariation(ped, 0, 0, 0, 0); // Face
+    SetPedComponentVariation(ped, 1, 0, 0, 0); // Mask - none
+    SetPedComponentVariation(ped, 2, 0, 0, 0); // Hair - keep default
+    SetPedComponentVariation(ped, 3, 15, 0, 0); // Torso - bare torso
+    SetPedComponentVariation(ped, 4, 14, 0, 0); // Legs - underwear/boxers
+    SetPedComponentVariation(ped, 5, 0, 0, 0); // Bags - none
+    SetPedComponentVariation(ped, 6, 34, 0, 0); // Shoes - barefoot
+    SetPedComponentVariation(ped, 7, 0, 0, 0); // Accessories - none
+    SetPedComponentVariation(ped, 8, 15, 0, 0); // Undershirt - none
+    SetPedComponentVariation(ped, 9, 0, 0, 0); // Body Armor - none
+    SetPedComponentVariation(ped, 10, 0, 0, 0); // Decals - none
+    SetPedComponentVariation(ped, 11, 15, 0, 0); // Torso 2 (Outer top) - none
+  } else {
+    // Female underwear setup
+    SetPedComponentVariation(ped, 0, 0, 0, 0); // Face
+    SetPedComponentVariation(ped, 1, 0, 0, 0); // Mask - none
+    SetPedComponentVariation(ped, 2, 0, 0, 0); // Hair - keep default
+    SetPedComponentVariation(ped, 3, 15, 0, 0); // Torso - basic
+    SetPedComponentVariation(ped, 4, 15, 0, 0); // Legs - underwear (changed from 15 to 17)
+    SetPedComponentVariation(ped, 5, 0, 0, 0); // Bags - none
+    SetPedComponentVariation(ped, 6, 35, 0, 0); // Shoes - barefoot (changed from 35 to 34)
+    SetPedComponentVariation(ped, 7, 0, 0, 0); // Accessories - none
+    SetPedComponentVariation(ped, 8, 2, 0, 0); // Undershirt - basic
+    SetPedComponentVariation(ped, 9, 0, 0, 0); // Body Armor - none
+    SetPedComponentVariation(ped, 10, 0, 0, 0); // Decals - none
+    SetPedComponentVariation(ped, 11, 15, 0, 0); // Torso 2 (Outer top) - none
+  }
+}

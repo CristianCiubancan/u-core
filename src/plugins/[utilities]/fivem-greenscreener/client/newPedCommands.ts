@@ -9,6 +9,7 @@ import {
   LoadPropVariation,
   ResetPedComponents,
   setupPedForScreenshot,
+  ResetAllComponentsToDefault,
 } from './ped';
 import { config, Delay, playerId } from './utils'; // Removed SendNUIMessage import
 import {
@@ -239,10 +240,10 @@ export function initializeNewPedCommands() {
                   }
                 }
 
-                // Reset this component to default before moving to next component
-                // This is the key fix - ensure we clean up clothing components after processing
-                await LoadComponentVariation(currentPed, component, 0, 0);
-                await Delay(config.delayAfterComponentReset || 50);
+                // Reset ALL components after completing a component group
+                // This is the key fix - ensure ALL components are reset between camera positions
+                await ResetAllComponentsToDefault(currentPed);
+                await Delay(config.delayAfterComponentReset || 100);
               } else if (type === 'PROPS') {
                 const propVariationCount = GetNumberOfPedPropDrawableVariations(
                   currentPed,
