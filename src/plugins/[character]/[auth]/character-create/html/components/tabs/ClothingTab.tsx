@@ -14,6 +14,9 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import {
   getClothingImage,
   getClothingImageFallback,
+  getMaxTexturesForItem,
+  getMaxItemsForComponent,
+  ClothingCategory,
 } from '../../utils/getClothingImage';
 
 // Custom clothing category button component
@@ -55,53 +58,47 @@ interface ClothingTabProps {
 }
 
 // Define the clothing categories with icons
-const CLOTHING_CATEGORIES = [
+const createClothingCategories = (model: string): ClothingCategory[] => [
   {
     id: 'tops',
     label: 'Tops',
     componentId: 11,
-    maxItems: 50,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 11),
     icon: <GiTShirt />,
   },
   {
     id: 'undershirt',
     label: 'Undershirt',
     componentId: 8,
-    maxItems: 40,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 8),
     icon: <FaTshirt />,
   },
   {
     id: 'legs',
     label: 'Legs',
     componentId: 4,
-    maxItems: 45,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 4),
     icon: <GiArmoredPants />,
   },
   {
     id: 'shoes',
     label: 'Shoes',
     componentId: 6,
-    maxItems: 35,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 6),
     icon: <GiRunningShoe />,
   },
   {
     id: 'accessories',
     label: 'Accessories',
     componentId: 7,
-    maxItems: 30,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 7),
     icon: <GiNecklace />,
   },
   {
     id: 'torso',
     label: 'Torso',
     componentId: 3,
-    maxItems: 40,
-    maxTextures: 8,
+    maxItems: getMaxItemsForComponent(model, 3),
     icon: <GiClothes />,
   },
 ];
@@ -128,18 +125,24 @@ const ClothingItem: React.FC<ClothingItemProps> = ({
   const [imagePath, setImagePath] = useState('');
 
   useEffect(() => {
-    // Use medium quality for better previews
+    // Use tiny quality for grid items to improve performance
     const quality = 'tiny';
 
-    // Get the image path from the asset server
-    const path = getClothingImage(model, componentId, drawableId, quality);
+    // Get the image path from the asset server with texture ID
+    const path = getClothingImage(
+      model,
+      componentId,
+      drawableId,
+      textureId,
+      quality
+    );
     setImagePath(path);
 
     // Preload the image
     const img = new Image();
     img.onload = () => setImageLoaded(true);
     img.onerror = () => {
-      // Try fallback without texture
+      // Try fallback with texture ID 0
       const fallbackPath = getClothingImageFallback(
         model,
         componentId,
@@ -243,16 +246,23 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
   // Generate a range of drawable IDs for the grid
   const drawableIds = Array.from({ length: category.maxItems }, (_, i) => i);
 
+  // Get the maximum number of textures for the selected item from variations.json
+  const maxTextures = getMaxTexturesForItem(
+    model,
+    category.componentId,
+    selectedDrawable
+  );
+
   // Handle texture navigation
   const handlePreviousTexture = () => {
     const newTexture =
-      selectedTexture <= 0 ? category.maxTextures - 1 : selectedTexture - 1;
+      selectedTexture <= 0 ? maxTextures - 1 : selectedTexture - 1;
     onSelectTexture(newTexture);
   };
 
   const handleNextTexture = () => {
     const newTexture =
-      selectedTexture >= category.maxTextures - 1 ? 0 : selectedTexture + 1;
+      selectedTexture >= maxTextures - 1 ? 0 : selectedTexture + 1;
     onSelectTexture(newTexture);
   };
 
@@ -264,7 +274,7 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
           <h4 className="text-sm font-medium mr-4">Styles</h4>
           <TextureNavigation
             currentTexture={selectedTexture}
-            maxTextures={category.maxTextures}
+            maxTextures={maxTextures}
             onPrevious={handlePreviousTexture}
             onNext={handleNextTexture}
           />
@@ -301,6 +311,9 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
 }) => {
   // State to track which clothing category is currently active
   const [activeCategory, setActiveCategory] = useState<string>('tops');
+
+  // Create clothing categories based on the current model
+  const clothingCategories = createClothingCategories(model);
 
   // Function to handle clicking on a clothing category
   const handleCategorySelect = (categoryId: string) => {
@@ -364,15 +377,15 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
 
   // Find the current active category object
   const currentCategory =
-    CLOTHING_CATEGORIES.find((cat) => cat.id === activeCategory) ||
-    CLOTHING_CATEGORIES[0];
+    clothingCategories.find((cat) => cat.id === activeCategory) ||
+    clothingCategories[0];
 
   return (
     <TabLayout title="Clothing Customization">
       <div className="flex flex-col gap-4 h-full">
         {/* Category selection - horizontal tabs (fixed) */}
         <div className="grid grid-cols-6 gap-2 pb-3 border-b border-brand-800/30 mb-3 flex-shrink-0">
-          {CLOTHING_CATEGORIES.map((category) => (
+          {clothingCategories.map((category) => (
             <ClothingCategoryButton
               key={category.id}
               id={category.id}
