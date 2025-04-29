@@ -1,6 +1,7 @@
 /// <reference types="@citizenfx/client" />
 
 // Import necessary functions and variables - these will need to be adjusted based on actual file structure/exports
+import variationsData from './variations.json'; // Import the variations data
 import { destroyCamera, setupCameraForComponent } from './camera';
 import { setActiveInterval } from './events';
 import {
@@ -151,179 +152,283 @@ export function initializeNewPedCommands() {
           await ResetPedComponents(currentPed);
           await Delay(config.delayAfterPedReset || 150);
 
-          // Iterate through CLOTHING and PROPS defined in config
-          for (const type of Object.keys(config.cameraSettings) as Array<
-            'CLOTHING' | 'PROPS'
-          >) {
-            if (!isScreenshotProcessRunning) break; // Check before processing type
-            if (type !== 'CLOTHING' && type !== 'PROPS') continue;
+          // Get variations for the current ped type
+          const pedVariations = (variationsData as any)[pedType];
+          if (!pedVariations) {
+            console.error(
+              `ERROR: No variations found for ped type: ${pedType}`
+            );
+            continue; // Skip this model if no variations defined
+          }
 
-            for (const stringComponent of Object.keys(
-              config.cameraSettings[type]
-            )) {
+          // Iterate through CLOTHING defined in variations.json
+          if (pedVariations.CLOTHING) {
+            for (const stringComponent of Object.keys(pedVariations.CLOTHING)) {
               if (!isScreenshotProcessRunning) break; // Check before processing component
               const component = parseInt(stringComponent);
+              const componentVariations = pedVariations.CLOTHING[component];
               const componentName =
-                config.cameraSettings[type]?.[component]?.name ||
-                `Comp ${component}`;
+                config.cameraSettings.CLOTHING?.[component]?.name ||
+                `Comp ${component}`; // Still use config for name/camera
 
-              if (type === 'CLOTHING') {
-                const drawableVariationCount = GetNumberOfPedDrawableVariations(
-                  currentPed,
-                  component
+              // Check if camera settings exist for this component from variations
+              const cameraInfo = config.cameraSettings.CLOTHING?.[component];
+              if (!cameraInfo) {
+                console.warn(
+                  `WARN: Missing camera settings in config for CLOTHING component ${component} found in variations.json. Skipping.`
                 );
-                // Limit drawables if itemsPerPosition is set
-                const drawableLimit =
-                  itemsPerPosition !== null
-                    ? Math.min(drawableVariationCount, itemsPerPosition)
-                    : drawableVariationCount;
+                continue;
+              }
 
-                for (let drawable = 0; drawable < drawableLimit; drawable++) {
-                  if (!isScreenshotProcessRunning) break; // Check before processing drawable
-                  SendNUIMessage({
-                    action: 'progressUpdate',
-                    data: {
-                      command: 'newscreenshot',
-                      type: componentName,
-                      value: drawable,
-                      max: drawableVariationCount,
-                    },
-                  });
+              // Use Object.keys to get drawables and calculate max for progress
+              const drawables = Object.keys(componentVariations);
+              // Limit drawables if itemsPerPosition is set
+              const drawableLimit =
+                itemsPerPosition !== null
+                  ? Math.min(drawables.length, itemsPerPosition)
+                  : drawables.length;
+              let currentDrawableIndex = 0;
 
-                  const textureVariationCount = GetNumberOfPedTextureVariations(
-                    currentPed,
+              for (let i = 0; i < drawableLimit; i++) {
+                const stringDrawable = drawables[i];
+                if (!isScreenshotProcessRunning) break; // Check before processing drawable
+                const drawable = parseInt(stringDrawable);
+                const textureCount = componentVariations[stringDrawable];
+                currentDrawableIndex++;
+
+                // Send NUI progress update
+                SendNUIMessage({
+                  action: 'progressUpdate',
+                  data: {
+                    command: 'newscreenshot',
+                    type: componentName,
+                    value: currentDrawableIndex, // Use index for progress
+                    max: drawableLimit, // Use limited count of drawables
+                  },
+                });
+
+                // --- Screenshot Base (Texture 0) ---
+                if (textureCount > 0) {
+                  if (
+                    !(await LoadComponentVariation(
+                      currentPed,
+                      component,
+                      drawable,
+                      0
+                    ))
+                  ) {
+                    console.warn(
+                      `Failed to load base texture 0 for CLOTHING ${component}-${drawable}. Skipping.`
+                    );
+                    continue; // Skip this drawable if base fails to load
+                  }
+                  await takeScreenshotForPedItem(
+                    pedType,
+                    'CLOTHING',
                     component,
-                    drawable
+                    drawable,
+                    0,
+                    cameraInfo
+                  ); // Pass cameraInfo, texture 0
+                } else {
+                  console.warn(
+                    `WARN: Drawable ${drawable} for component ${component} has 0 textures listed in variations.json. Skipping base screenshot.`
                   );
-                  if (config.includeTextures) {
-                    // Limit textures if variationsPerItem is set
-                    const textureLimit =
-                      variationsPerItem !== null
-                        ? Math.min(textureVariationCount, variationsPerItem)
-                        : textureVariationCount;
+                  continue; // Skip this drawable if no textures listed
+                }
 
-                    for (let texture = 0; texture < textureLimit; texture++) {
-                      if (!isScreenshotProcessRunning) break; // Check before processing texture
-                      if (
-                        !(await LoadComponentVariation(
-                          currentPed,
-                          component,
-                          drawable,
-                          texture
-                        ))
-                      )
-                        continue;
-                      await takeScreenshotForPedItem(
-                        pedType,
-                        type,
-                        component,
-                        drawable,
-                        texture
+                // --- Screenshot Texture Variations (if enabled and available) ---
+                if (config.debug)
+                  console.log(
+                    `DEBUG CLOTHING [${component}-${drawable}]: Checking texture variations. includeTextures=${config.includeTextures}, textureCount=${textureCount}`
+                  );
+                if (config.includeTextures && textureCount > 1) {
+                  // Only loop if more than texture 0 exists
+                  // Limit textures if variationsPerItem is set
+                  const textureLimit =
+                    variationsPerItem !== null
+                      ? Math.min(textureCount, variationsPerItem)
+                      : textureCount;
+                  // Start loop from 1, up to textureLimit
+                  for (let texture = 1; texture < textureLimit; texture++) {
+                    if (config.debug)
+                      console.log(
+                        `DEBUG CLOTHING [${component}-${drawable}]: Entering texture loop for texture ${texture}`
                       );
-                    }
-                  } else {
+                    if (!isScreenshotProcessRunning) break; // Check before processing texture
                     if (
                       !(await LoadComponentVariation(
                         currentPed,
                         component,
-                        drawable
+                        drawable,
+                        texture
                       ))
-                    )
-                      continue;
+                    ) {
+                      console.warn(
+                        `Failed to load texture ${texture} for CLOTHING ${component}-${drawable}. Skipping.`
+                      );
+                      continue; // Skip this specific texture if loading fails
+                    }
+                    if (config.debug)
+                      console.log(
+                        `DEBUG CLOTHING [${component}-${drawable}]: Taking screenshot for texture ${texture}`
+                      );
                     await takeScreenshotForPedItem(
                       pedType,
-                      type,
+                      'CLOTHING',
                       component,
                       drawable,
-                      null
-                    );
+                      texture,
+                      cameraInfo
+                    ); // Pass cameraInfo
                   }
                 }
+                // --- End Texture Variations ---
+              } // End drawable loop
 
-                // Reset ALL components after completing a component group
-                // This is the key fix - ensure ALL components are reset between camera positions
-                await ResetAllComponentsToDefault(currentPed);
-                await Delay(config.delayAfterComponentReset || 100);
-              } else if (type === 'PROPS') {
-                const propVariationCount = GetNumberOfPedPropDrawableVariations(
-                  currentPed,
-                  component
+              // Reset ALL components after completing a component group
+              await ResetAllComponentsToDefault(currentPed);
+              await Delay(config.delayAfterComponentReset || 100);
+            }
+          }
+
+          // Iterate through PROPS defined in variations.json
+          if (pedVariations.PROPS) {
+            for (const stringComponent of Object.keys(pedVariations.PROPS)) {
+              if (!isScreenshotProcessRunning) break; // Check before processing component
+              const component = parseInt(stringComponent);
+              const componentVariations = pedVariations.PROPS[component];
+              const componentName =
+                config.cameraSettings.PROPS?.[component]?.name ||
+                `Prop ${component}`; // Still use config for name/camera
+
+              // Check if camera settings exist for this component from variations
+              const cameraInfo = config.cameraSettings.PROPS?.[component];
+              if (!cameraInfo) {
+                console.warn(
+                  `WARN: Missing camera settings in config for PROPS component ${component} found in variations.json. Skipping.`
                 );
-                // Limit props if itemsPerPosition is set (adjusting for the -1 "none" case)
-                const propLimit =
-                  itemsPerPosition !== null
-                    ? Math.min(propVariationCount, itemsPerPosition)
-                    : propVariationCount;
+                continue;
+              }
 
-                for (let prop = -1; prop < propLimit; prop++) {
-                  if (!isScreenshotProcessRunning) break; // Check before processing prop
-                  SendNUIMessage({
-                    action: 'progressUpdate',
-                    data: {
-                      command: 'newscreenshot',
-                      type: componentName,
-                      value: prop + 1,
-                      max: propVariationCount + 1,
-                    },
-                  });
+              // Use Object.keys to get props and calculate max for progress
+              const props = Object.keys(componentVariations);
+              // Limit props if itemsPerPosition is set (adjusting for the -1 "none" case)
+              const propLimit =
+                itemsPerPosition !== null
+                  ? Math.min(props.length, itemsPerPosition)
+                  : props.length;
+              let currentPropIndex = 0;
 
-                  if (prop === -1) {
-                    ClearPedProp(currentPed, component);
-                    await Delay(config.delayAfterPropClear || 50);
-                    // Optional: Screenshot "none" state if desired and configured
-                    // await takeScreenshotForPedItem(pedType, type, component, -1, null);
-                    continue;
+              for (let i = 0; i < propLimit; i++) {
+                const stringProp = props[i];
+                if (!isScreenshotProcessRunning) break; // Check before processing prop
+                const prop = parseInt(stringProp);
+                const textureCount = componentVariations[stringProp];
+                currentPropIndex++;
+
+                // Send NUI progress update
+                SendNUIMessage({
+                  action: 'progressUpdate',
+                  data: {
+                    command: 'newscreenshot',
+                    type: componentName,
+                    value: currentPropIndex, // Use index for progress
+                    max: propLimit, // Use limited count of props
+                  },
+                });
+
+                if (prop === -1) {
+                  ClearPedProp(currentPed, component);
+                  await Delay(config.delayAfterPropClear || 50);
+                  // Optional: Screenshot "none" state if desired and configured
+                  // We assume variations.json lists -1 if "none" should be screenshotted.
+                  // If prop -1 exists in variations.json, textureCount should be 0.
+                  if (textureCount === 0) {
+                    // Take screenshot for "none" if it's in variations.json
+                    // await takeScreenshotForPedItem(pedType, 'PROPS', component, -1, null, cameraInfo);
                   }
+                  continue;
+                }
 
-                  const textureVariationCount =
-                    GetNumberOfPedPropTextureVariations(
-                      currentPed,
-                      component,
-                      prop
+                // --- Screenshot Base Prop (Texture 0) ---
+                if (textureCount > 0) {
+                  if (
+                    !(await LoadPropVariation(currentPed, component, prop, 0))
+                  ) {
+                    console.warn(
+                      `Failed to load base texture 0 for PROP ${component}-${prop}. Skipping.`
                     );
-                  if (config.includeTextures) {
-                    // Limit textures if variationsPerItem is set
-                    const textureLimit =
-                      variationsPerItem !== null
-                        ? Math.min(textureVariationCount, variationsPerItem)
-                        : textureVariationCount;
+                    continue; // Skip if base fails to load
+                  }
+                  await takeScreenshotForPedItem(
+                    pedType,
+                    'PROPS',
+                    component,
+                    prop,
+                    0,
+                    cameraInfo
+                  ); // Pass cameraInfo, texture 0
+                } else {
+                  console.warn(
+                    `WARN: Prop ${prop} for component ${component} has 0 textures listed in variations.json. Skipping base screenshot.`
+                  );
+                  continue; // Skip this prop if no textures listed
+                }
 
-                    for (let texture = 0; texture < textureLimit; texture++) {
-                      if (!isScreenshotProcessRunning) break; // Check before processing prop texture
-                      if (
-                        !(await LoadPropVariation(
-                          currentPed,
-                          component,
-                          prop,
-                          texture
-                        ))
-                      )
-                        continue;
-                      await takeScreenshotForPedItem(
-                        pedType,
-                        type,
+                // --- Screenshot Prop Texture Variations (if enabled and available) ---
+                if (config.debug)
+                  console.log(
+                    `DEBUG PROP [${component}-${prop}]: Checking texture variations. includeTextures=${config.includeTextures}, textureCount=${textureCount}`
+                  );
+                if (config.includeTextures && textureCount > 1) {
+                  // Only loop if more than texture 0 exists
+                  // Limit textures if variationsPerItem is set
+                  const textureLimit =
+                    variationsPerItem !== null
+                      ? Math.min(textureCount, variationsPerItem)
+                      : textureCount;
+                  // Start loop from 1, up to textureLimit
+                  for (let texture = 1; texture < textureLimit; texture++) {
+                    if (config.debug)
+                      console.log(
+                        `DEBUG PROP [${component}-${prop}]: Entering texture loop for texture ${texture}`
+                      );
+                    if (!isScreenshotProcessRunning) break; // Check before processing prop texture
+                    if (
+                      !(await LoadPropVariation(
+                        currentPed,
                         component,
                         prop,
                         texture
+                      ))
+                    ) {
+                      console.warn(
+                        `Failed to load texture ${texture} for PROP ${component}-${prop}. Skipping.`
                       );
+                      continue; // Skip this specific texture if loading fails
                     }
-                  } else {
-                    if (!(await LoadPropVariation(currentPed, component, prop)))
-                      continue;
+                    if (config.debug)
+                      console.log(
+                        `DEBUG PROP [${component}-${prop}]: Taking screenshot for texture ${texture}`
+                      );
                     await takeScreenshotForPedItem(
                       pedType,
-                      type,
+                      'PROPS',
                       component,
                       prop,
-                      null
-                    );
+                      texture,
+                      cameraInfo
+                    ); // Pass cameraInfo
                   }
                 }
-                ClearPedProp(currentPed, component);
-                await Delay(config.delayAfterPropClear || 50);
-              }
+                // --- End Prop Texture Variations ---
+              } // End prop loop
+              ClearPedProp(currentPed, component);
+              await Delay(config.delayAfterPropClear || 50);
             }
           }
+
           // Cleanup after processing a model
           cleanupPedAfterScreenshot(currentPed, taskInterval);
           taskInterval = null;
