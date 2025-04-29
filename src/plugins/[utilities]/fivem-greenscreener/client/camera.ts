@@ -43,27 +43,7 @@ export async function setupCameraForComponent(
 
     destroyCamera(); // Destroy existing cam before creating a new one, this nullifies global camInfo
 
-    // Ensure ped is in the correct initial position and rotation for camera setup
-    SetEntityRotation(
-      ped,
-      config.greenScreenRotation.x,
-      config.greenScreenRotation.y,
-      config.greenScreenRotation.z,
-      0,
-      false
-    );
-    SetEntityCoordsNoOffset(
-      ped,
-      config.greenScreenPosition.x,
-      config.greenScreenPosition.y,
-      config.greenScreenPosition.z,
-      false,
-      false,
-      false
-    );
-
-    await Delay(50); // Allow time for position update
-
+    // Get current entity coords - we don't need to reset them since setupPedForScreenshot already did that
     const [playerX, playerY, playerZ] = GetEntityCoords(ped);
     const [fwdX, fwdY, fwdZ] = GetEntityForwardVector(ped);
 
@@ -100,18 +80,11 @@ export async function setupCameraForComponent(
       console.log('DEBUG: Reusing existing component camera setup.');
   }
 
-  // Apply final rotation after camera is potentially set up, using the correct settings for this run
-  const currentRotation = camInfo?.rotation || cameraInfoConfig.rotation; // Use global if exists, else the new one
-  SetEntityRotation(
-    ped,
-    currentRotation.x,
-    currentRotation.y,
-    currentRotation.z,
-    2, // Rotation order might be important
-    false
-  );
+  // IMPORTANT: We've removed the second SetEntityRotation call that was overriding
+  // the rotation set in setupPedForScreenshot. This will allow the character to
+  // remain facing the camera as initially set in setupPedForScreenshot.
 
-  await Delay(50); // Allow time for rotation update
+  await Delay(50); // Allow time for camera update
 }
 
 export async function setupCameraForObject(object: number, hash: number) {
