@@ -70,28 +70,95 @@ async function takeScreenshotForPedItem(
   await Delay(config.screenshotDelay || 500); // Use configurable delay
 }
 
+// Helper function to map category name to component ID
+function getCategoryComponentId(
+  categoryName: string
+): { type: 'CLOTHING' | 'PROPS'; id: number } | null {
+  // Map of category names to their component types and IDs
+  const categoryMap: Record<
+    string,
+    { type: 'CLOTHING' | 'PROPS'; id: number }
+  > = {
+    // Clothing components
+    'masks': { type: 'CLOTHING', id: 1 },
+    'torsos': { type: 'CLOTHING', id: 3 },
+    'legs': { type: 'CLOTHING', id: 4 },
+    'bags': { type: 'CLOTHING', id: 5 },
+    'shoes': { type: 'CLOTHING', id: 6 },
+    'accessories': { type: 'CLOTHING', id: 7 },
+    'undershirts': { type: 'CLOTHING', id: 8 },
+    'bodyarmors': { type: 'CLOTHING', id: 9 },
+    'tops': { type: 'CLOTHING', id: 11 },
+
+    // Props
+    'hats': { type: 'PROPS', id: 0 },
+    'glasses': { type: 'PROPS', id: 1 },
+    'ears': { type: 'PROPS', id: 2 },
+    'watches': { type: 'PROPS', id: 6 },
+    'bracelets': { type: 'PROPS', id: 7 },
+  };
+
+  // Convert to lowercase for case-insensitive matching
+  const normalizedCategory = categoryName.toLowerCase();
+  return categoryMap[normalizedCategory] || null;
+}
+
 // Main function to initialize the new command
 export function initializeNewPedCommands() {
   RegisterCommand(
     'newscreenshot', // *** Renamed command ***
-    async (source: number, args: string[]) => {
+    async (_source: number, args: string[]) => {
       // Parse optional arguments
-      const itemsPerPositionArg = args[0] ? parseInt(args[0]) : undefined;
-      const variationsPerItemArg = args[1] ? parseInt(args[1]) : undefined;
+      let argIndex = 0;
+      let sex = 'both';
+      let category: { type: 'CLOTHING' | 'PROPS'; id: number } | null = null;
+      let itemsPerPosition: number | null = null;
+      let variationsPerItem: number | null = null;
 
-      // Use provided value or null (process all) if invalid/missing
-      const itemsPerPosition =
-        itemsPerPositionArg !== undefined && !isNaN(itemsPerPositionArg)
-          ? itemsPerPositionArg
-          : null;
-      const variationsPerItem =
-        variationsPerItemArg !== undefined && !isNaN(variationsPerItemArg)
-          ? variationsPerItemArg
-          : null;
+      // Process arguments
+      if (args.length > 0) {
+        // Check if first argument is a sex specification
+        if (['male', 'female', 'both'].includes(args[0].toLowerCase())) {
+          sex = args[0].toLowerCase();
+          argIndex++;
+
+          // Check if second argument is a category
+          if (args.length > argIndex) {
+            category = getCategoryComponentId(args[argIndex]);
+            if (category) {
+              argIndex++;
+            }
+          }
+        } else {
+          // Check if first argument is a category
+          category = getCategoryComponentId(args[0]);
+          if (category) {
+            argIndex++;
+          }
+        }
+
+        // Parse remaining arguments as numeric limits
+        if (args.length > argIndex) {
+          const itemsPerPositionArg = parseInt(args[argIndex]);
+          if (!isNaN(itemsPerPositionArg)) {
+            itemsPerPosition = itemsPerPositionArg;
+            argIndex++;
+
+            if (args.length > argIndex) {
+              const variationsPerItemArg = parseInt(args[argIndex]);
+              if (!isNaN(variationsPerItemArg)) {
+                variationsPerItem = variationsPerItemArg;
+              }
+            }
+          }
+        }
+      }
 
       if (config.debug) {
         console.log(
-          `DEBUG: /newscreenshot called with itemsPerPosition=${itemsPerPosition}, variationsPerItem=${variationsPerItem}`
+          `DEBUG: /newscreenshot called with sex=${sex}, category=${
+            category ? `${category.type} ${category.id}` : 'all'
+          }, itemsPerPosition=${itemsPerPosition}, variationsPerItem=${variationsPerItem}`
         );
       }
 
@@ -102,10 +169,14 @@ export function initializeNewPedCommands() {
       }
       isScreenshotProcessRunning = true; // Set flag to true
 
-      const modelHashes = [
-        GetHashKey('mp_m_freemode_01'),
-        GetHashKey('mp_f_freemode_01'),
-      ];
+      // Determine which model hashes to process based on sex parameter
+      let modelHashes: number[] = [];
+      if (sex === 'male' || sex === 'both') {
+        modelHashes.push(GetHashKey('mp_m_freemode_01'));
+      }
+      if (sex === 'female' || sex === 'both') {
+        modelHashes.push(GetHashKey('mp_f_freemode_01'));
+      }
 
       SendNUIMessage({ action: 'start', command: 'newscreenshot' }); // Indicate start, specify command
       if (!stopWeatherResource()) return;
@@ -163,9 +234,24 @@ export function initializeNewPedCommands() {
 
           // Iterate through CLOTHING defined in variations.json
           if (pedVariations.CLOTHING) {
-            for (const stringComponent of Object.keys(pedVariations.CLOTHING)) {
+            // If a specific category is provided and it's a CLOTHING type, only process that component
+            const clothingComponents =
+              category && category.type === 'CLOTHING'
+                ? [category.id.toString()]
+                : Object.keys(pedVariations.CLOTHING);
+
+            for (const stringComponent of clothingComponents) {
               if (!isScreenshotProcessRunning) break; // Check before processing component
               const component = parseInt(stringComponent);
+
+              // Skip if the component doesn't exist in variations data
+              if (!pedVariations.CLOTHING[component]) {
+                console.warn(
+                  `WARN: Component ${component} not found in variations data for ${pedType}. Skipping.`
+                );
+                continue;
+              }
+
               const componentVariations = pedVariations.CLOTHING[component];
               const componentName =
                 config.cameraSettings.CLOTHING?.[component]?.name ||
@@ -294,9 +380,24 @@ export function initializeNewPedCommands() {
 
           // Iterate through PROPS defined in variations.json
           if (pedVariations.PROPS) {
-            for (const stringComponent of Object.keys(pedVariations.PROPS)) {
+            // If a specific category is provided and it's a PROPS type, only process that component
+            const propsComponents =
+              category && category.type === 'PROPS'
+                ? [category.id.toString()]
+                : Object.keys(pedVariations.PROPS);
+
+            for (const stringComponent of propsComponents) {
               if (!isScreenshotProcessRunning) break; // Check before processing component
               const component = parseInt(stringComponent);
+
+              // Skip if the component doesn't exist in variations data
+              if (!pedVariations.PROPS[component]) {
+                console.warn(
+                  `WARN: Prop component ${component} not found in variations data for ${pedType}. Skipping.`
+                );
+                continue;
+              }
+
               const componentVariations = pedVariations.PROPS[component];
               const componentName =
                 config.cameraSettings.PROPS?.[component]?.name ||
@@ -468,7 +569,7 @@ export function initializeNewPedCommands() {
 
   RegisterCommand(
     'stopscreenshot',
-    (source: number, args: string[]) => {
+    (_source: number, _args: string[]) => {
       if (!isScreenshotProcessRunning) {
         console.log('INFO: Screenshot process is not running.');
         // Optionally send chat message

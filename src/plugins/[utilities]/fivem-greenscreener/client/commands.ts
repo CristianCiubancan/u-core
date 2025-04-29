@@ -16,8 +16,16 @@ export function initializeCommands() {
     emit('chat:addSuggestions', [
       {
         name: '/newscreenshot',
-        help: 'Generate clothing & prop screenshots with optional limits.',
+        help: 'Generate clothing & prop screenshots with optional parameters.',
         params: [
+          {
+            name: 'sex',
+            help: '(Optional) Gender to process: male, female, or both (default).',
+          },
+          {
+            name: 'category',
+            help: '(Optional) Category to process: tops, legs, shoes, etc.',
+          },
           {
             name: 'items_per_position',
             help: '(Optional) Max drawables/props per component.',
