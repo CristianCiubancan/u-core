@@ -83,6 +83,73 @@ export const getClothingImageFallback = (
 };
 
 /**
+ * Get the thumbnail image path for a clothing item
+ *
+ * @param model The character model (male/female)
+ * @param componentId The clothing component ID
+ * @param drawableId The drawable ID (style)
+ * @param textureId The texture ID
+ * @param quality The image quality level (high, medium, low, tiny)
+ * @returns The path to the clothing thumbnail image
+ */
+export const getClothingThumbnail = (
+  model: string,
+  componentId: number,
+  drawableId: number,
+  textureId: number = 0,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
+): string => {
+  // Determine if male or female
+  const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
+
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+
+  // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
+  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+
+  // Create the thumbnail path with texture ID
+  const thumbnailPath = isProp
+    ? `${assetServerUrl}/thumbnails/${quality}/${gender}_prop_${componentId}_${drawableId}_${textureId}.png`
+    : `${assetServerUrl}/thumbnails/${quality}/${gender}_${componentId}_${drawableId}_${textureId}.png`;
+
+  // Return the path
+  return thumbnailPath;
+};
+
+/**
+ * Get the fallback thumbnail image path (without texture ID)
+ *
+ * @param model The character model (male/female)
+ * @param componentId The clothing component ID
+ * @param drawableId The drawable ID (style)
+ * @param quality The image quality level (high, medium, low, tiny)
+ * @returns The fallback path to the clothing thumbnail image
+ */
+export const getClothingThumbnailFallback = (
+  model: string,
+  componentId: number,
+  drawableId: number,
+  quality: 'high' | 'medium' | 'low' | 'tiny' = 'medium'
+): string => {
+  // Determine if male or female
+  const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
+
+  // Get the asset server URL from environment variables
+  const assetServerUrl =
+    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+
+  // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
+  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+
+  // Create a fallback thumbnail path without texture ID
+  return isProp
+    ? `${assetServerUrl}/thumbnails/${quality}/${gender}_prop_${componentId}_${drawableId}_0.png`
+    : `${assetServerUrl}/thumbnails/${quality}/${gender}_${componentId}_${drawableId}_0.png`;
+};
+
+/**
  * Maps clothing keys from the UI to component IDs in FiveM
  *
  * @param key The clothing key from the UI

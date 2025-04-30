@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  getClothingImage,
-  getClothingImageFallback,
+  getClothingThumbnail,
+  getClothingThumbnailFallback,
   getMaxTexturesForItem,
 } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
@@ -38,11 +38,11 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   const hasVariations = maxTextures > 1;
 
   useEffect(() => {
-    // Use tiny quality for grid items to improve performance
+    // Always use tiny quality for thumbnails
     const quality = 'tiny';
 
-    // Get the image path from the asset server with texture ID
-    const path = getClothingImage(
+    // Get the thumbnail path from the asset server with texture ID
+    const path = getClothingThumbnail(
       model,
       componentId,
       drawableId,
@@ -56,7 +56,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
     img.onload = () => setImageLoaded(true);
     img.onerror = () => {
       // Try fallback with texture ID 0
-      const fallbackPath = getClothingImageFallback(
+      const fallbackPath = getClothingThumbnailFallback(
         model,
         componentId,
         drawableId,

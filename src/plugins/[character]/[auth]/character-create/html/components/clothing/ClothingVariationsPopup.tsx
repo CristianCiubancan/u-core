@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  getClothingImage,
-  getClothingImageFallback,
+  getClothingThumbnail,
+  getClothingThumbnailFallback,
 } from '../../utils/getClothingImage';
 import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 
@@ -171,11 +171,11 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
   const [imagePath, setImagePath] = useState('');
 
   useEffect(() => {
-    // Use tiny quality for better performance
+    // Always use tiny quality for thumbnails
     const quality = 'tiny';
 
-    // Get the image path from the asset server with texture ID
-    const path = getClothingImage(
+    // Get the thumbnail path from the asset server with texture ID
+    const path = getClothingThumbnail(
       model,
       componentId,
       drawableId,
@@ -189,7 +189,7 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
     img.onload = () => setImageLoaded(true);
     img.onerror = () => {
       // Try fallback with texture ID 0
-      const fallbackPath = getClothingImageFallback(
+      const fallbackPath = getClothingThumbnailFallback(
         model,
         componentId,
         drawableId,
