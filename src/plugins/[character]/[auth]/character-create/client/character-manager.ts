@@ -1,5 +1,3 @@
-/// <reference types="@citizenfx/client" />
-
 import {
   FaceData,
   HairData,
@@ -7,6 +5,7 @@ import {
   ClothingData,
 } from '../shared/types';
 import { getCharacterData, getCameraState, store } from '../shared/store';
+import { Delay } from './utils';
 
 /**
  * Character Manager for handling all character customization
@@ -16,7 +15,7 @@ class CharacterManager {
    * Load and set the player model
    * @param {string} model - The model to set
    */
-  async loadAndSetModel(model: string): Promise<void> {
+  async loadAndSetModel(model: string): Promise<boolean> {
     console.log(`[Character Create] Loading and setting model: ${model}`);
 
     // Update our character data
@@ -27,29 +26,43 @@ class CharacterManager {
     RequestModel(modelHash);
 
     // Wait for the model to load with improved timeout handling
-    const startTime = GetGameTimer();
     let modelLoaded = false;
+    let attempts = 0;
+    const maxAttempts = 10; // More attempts with shorter intervals
 
-    while (!modelLoaded && GetGameTimer() - startTime < 5000) {
+    while (!modelLoaded && attempts < maxAttempts) {
       if (HasModelLoaded(modelHash)) {
         modelLoaded = true;
       } else {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+        console.log(
+          `[Character Create] Waiting for model to load (attempt ${attempts}/${maxAttempts})`
+        );
+        await Delay(500); // Shorter delay between checks
       }
     }
 
     if (!modelLoaded) {
       console.error(`[Character Create] Failed to load model: ${model}`);
-      return;
+      return false;
     }
 
     // Set the player model
     SetPlayerModel(PlayerId(), modelHash);
     SetModelAsNoLongerNeeded(modelHash);
 
+    // Force entity to be visible
+    const playerPed = PlayerPedId();
+    SetEntityVisible(playerPed, true, false);
+
     // Reset appearance after model change
-    SetPedDefaultComponentVariation(PlayerPedId());
-    ClearAllPedProps(PlayerPedId());
+    SetPedDefaultComponentVariation(playerPed);
+    ClearAllPedProps(playerPed);
+
+    console.log(
+      `[Character Create] Model ${model} loaded and applied successfully`
+    );
+    return true;
   }
 
   /**
@@ -59,6 +72,9 @@ class CharacterManager {
   applyFullCharacterData(): void {
     const characterData = getCharacterData();
     const playerPed = PlayerPedId();
+
+    // Ensure player is visible
+    SetEntityVisible(playerPed, true, false);
 
     // First apply head blend data (ethnicity, parents, etc)
     SetPedHeadBlendData(
@@ -93,6 +109,8 @@ class CharacterManager {
     if (characterData.props) {
       this.applyProps(characterData.props);
     }
+
+    console.log('[Character Create] Full character data applied successfully');
   }
 
   /**

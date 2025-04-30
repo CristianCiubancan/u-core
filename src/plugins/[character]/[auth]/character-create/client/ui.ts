@@ -7,12 +7,16 @@ import {
   applyFullCharacterData,
   faceCamera,
 } from './character-manager';
+import { Delay } from './utils';
 
 /**
  * UI Manager for character creation
  * Handles UI visibility and setup/cleanup
  */
 class UiManager {
+  private _isSettingUp: boolean = false;
+  private _isCleaningUp: boolean = false;
+
   /**
    * Toggle UI visibility
    * @param {boolean} state - The state to set the UI to (true = visible, false = hidden)
@@ -21,6 +25,14 @@ class UiManager {
     console.log(
       `[Character Create] Toggling UI to ${state ? 'visible' : 'hidden'}`
     );
+
+    // Prevent concurrent setup/cleanup operations
+    if ((state && this._isSettingUp) || (!state && this._isCleaningUp)) {
+      console.log(
+        '[Character Create] Setup/cleanup already in progress, ignoring toggle'
+      );
+      return;
+    }
 
     setUiVisible(state);
 
@@ -37,7 +49,7 @@ class UiManager {
     if (state) {
       await this.setup();
     } else {
-      this.cleanup();
+      await this.cleanup();
     }
   }
 
@@ -45,27 +57,73 @@ class UiManager {
    * Set up the character creation environment
    */
   private async setup(): Promise<void> {
+    this._isSettingUp = true;
     console.log('[Character Create] Setting up character creation environment');
 
-    // Always ensure we have a valid character model when opening the UI
-    const characterData = getCharacterData();
-    await loadAndSetModel(characterData.model);
+    try {
+      // Ensure player is visible
+      SetEntityVisible(PlayerPedId(), true, false);
 
-    // Apply all customizations in the proper order
-    applyFullCharacterData();
+      // Always ensure we have a valid character model when opening the UI
+      const characterData = getCharacterData();
+      const modelLoaded = await loadAndSetModel(characterData.model);
 
-    // Set up camera
-    setupCamera();
+      if (!modelLoaded) {
+        console.error(
+          '[Character Create] Failed to load model, retrying with default model'
+        );
+        // Try with the default male model as fallback
+        await loadAndSetModel('mp_m_freemode_01');
+      }
 
-    // Make the character face the camera
-    faceCamera();
+      // Short delay to ensure model is properly loaded
+      await Delay(500);
+
+      // Apply all customizations in the proper order
+      applyFullCharacterData();
+
+      // Set up camera
+      setupCamera();
+
+      // Short delay to ensure camera is set up
+      await Delay(100);
+
+      // Make the character face the camera
+      faceCamera();
+
+      console.log('[Character Create] Setup completed successfully');
+    } catch (error) {
+      console.error('[Character Create] Setup failed:', error);
+    } finally {
+      this._isSettingUp = false;
+    }
   }
 
   /**
    * Clean up the character creation environment
    */
-  private cleanup(): void {
-    cleanupCamera();
+  private async cleanup(): Promise<void> {
+    this._isCleaningUp = true;
+    console.log(
+      '[Character Create] Cleaning up character creation environment'
+    );
+
+    try {
+      // First clean up camera
+      cleanupCamera();
+
+      // Short delay to ensure cleanup completes
+      await Delay(100);
+
+      // Ensure player is visible after cleanup
+      SetEntityVisible(PlayerPedId(), true, false);
+
+      console.log('[Character Create] Cleanup completed successfully');
+    } catch (error) {
+      console.error('[Character Create] Cleanup failed:', error);
+    } finally {
+      this._isCleaningUp = false;
+    }
   }
 }
 
