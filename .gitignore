@@ -7,6 +7,7 @@ server.txt
 .replxx_history
 
 asset-server/public/*
+asset-server/original/*
 
 # node_modules
 node_modules
