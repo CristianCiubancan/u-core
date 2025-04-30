@@ -4,6 +4,7 @@ import {
   getClothingThumbnailFallback,
 } from '../../utils/getClothingImage';
 import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
+import Spinner from '../../../../../../../webview/components/ui/Spinner';
 
 // Helper function to map component IDs to their respective clothing keys
 const getClothingKeyFromComponentId = (componentId: number): string => {
@@ -170,7 +171,13 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imagePath, setImagePath] = useState('');
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   useEffect(() => {
+    // Reset states when props change
+    setImageLoaded(false);
+    setLoadFailed(false);
+
     // Always use tiny quality for thumbnails
     const quality = 'tiny';
 
@@ -186,7 +193,10 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
 
     // Preload the image
     const img = new Image();
-    img.onload = () => setImageLoaded(true);
+    img.onload = () => {
+      setImageLoaded(true);
+      setLoadFailed(false);
+    };
     img.onerror = () => {
       // Try fallback with texture ID 0
       const fallbackPath = getClothingThumbnailFallback(
@@ -198,9 +208,13 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
       const fallbackImg = new Image();
       fallbackImg.onload = () => {
         setImageLoaded(true);
+        setLoadFailed(false);
         setImagePath(fallbackPath);
       };
-      fallbackImg.onerror = () => setImageLoaded(false);
+      fallbackImg.onerror = () => {
+        setImageLoaded(false);
+        setLoadFailed(true);
+      };
       fallbackImg.src = fallbackPath;
     };
     img.src = path;
@@ -221,9 +235,13 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
           alt={`Texture ${textureId}`}
           className="w-full h-full object-cover"
         />
+      ) : loadFailed ? (
+        <div className="w-full h-full flex items-center justify-center bg-black/30">
+          <span className="text-xs text-center">{textureId}</span>
+        </div>
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-xs text-center bg-black/30">
-          {textureId}
+        <div className="w-full h-full flex items-center justify-center bg-black/30">
+          <Spinner size="sm" color="brand" />
         </div>
       )}
     </div>

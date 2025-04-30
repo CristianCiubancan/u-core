@@ -5,6 +5,7 @@ import {
   getMaxTexturesForItem,
 } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
+import Spinner from '../../../../../../../webview/components/ui/Spinner';
 
 interface ClothingItemProps {
   model: string;
@@ -37,7 +38,13 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   // Determine if this item has multiple textures
   const hasVariations = maxTextures > 1;
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   useEffect(() => {
+    // Reset states when props change
+    setImageLoaded(false);
+    setLoadFailed(false);
+
     // Always use tiny quality for thumbnails
     const quality = 'tiny';
 
@@ -53,7 +60,10 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
 
     // Preload the image
     const img = new Image();
-    img.onload = () => setImageLoaded(true);
+    img.onload = () => {
+      setImageLoaded(true);
+      setLoadFailed(false);
+    };
     img.onerror = () => {
       // Try fallback with texture ID 0
       const fallbackPath = getClothingThumbnailFallback(
@@ -65,9 +75,13 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
       const fallbackImg = new Image();
       fallbackImg.onload = () => {
         setImageLoaded(true);
+        setLoadFailed(false);
         setImagePath(fallbackPath);
       };
-      fallbackImg.onerror = () => setImageLoaded(false);
+      fallbackImg.onerror = () => {
+        setImageLoaded(false);
+        setLoadFailed(true);
+      };
       fallbackImg.src = fallbackPath;
     };
     img.src = path;
@@ -112,9 +126,13 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
             alt={`Clothing item ${drawableId}`}
             className="w-full h-full object-cover"
           />
+        ) : loadFailed ? (
+          <div className="w-full h-full flex items-center justify-center flex-col">
+            <span className="text-xs text-center">{drawableId}</span>
+          </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-center">
-            {drawableId}
+          <div className="w-full h-full flex items-center justify-center">
+            <Spinner size="sm" color="brand" />
           </div>
         )}
 
