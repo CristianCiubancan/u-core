@@ -18,6 +18,7 @@ import {
   getMaxItemsForComponent,
   ClothingCategory,
 } from '../../utils/getClothingImage';
+import { ClothingItem } from '../clothing/ClothingItem';
 
 // Custom clothing category button component
 interface ClothingCategoryButtonProps {
@@ -103,87 +104,6 @@ const createClothingCategories = (model: string): ClothingCategory[] => [
   },
 ];
 
-// ClothingItem component for the grid
-interface ClothingItemProps {
-  model: string;
-  componentId: number;
-  drawableId: number;
-  textureId: number;
-  isSelected: boolean;
-  onClick: () => void;
-}
-
-const ClothingItem: React.FC<ClothingItemProps> = ({
-  model,
-  componentId,
-  drawableId,
-  textureId,
-  isSelected,
-  onClick,
-}) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imagePath, setImagePath] = useState('');
-
-  useEffect(() => {
-    // Use tiny quality for grid items to improve performance
-    const quality = 'tiny';
-
-    // Get the image path from the asset server with texture ID
-    const path = getClothingImage(
-      model,
-      componentId,
-      drawableId,
-      textureId,
-      quality
-    );
-    setImagePath(path);
-
-    // Preload the image
-    const img = new Image();
-    img.onload = () => setImageLoaded(true);
-    img.onerror = () => {
-      // Try fallback with texture ID 0
-      const fallbackPath = getClothingImageFallback(
-        model,
-        componentId,
-        drawableId,
-        quality
-      );
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => {
-        setImageLoaded(true);
-        setImagePath(fallbackPath);
-      };
-      fallbackImg.onerror = () => setImageLoaded(false);
-      fallbackImg.src = fallbackPath;
-    };
-    img.src = path;
-  }, [model, componentId, drawableId, textureId]);
-
-  return (
-    <div
-      className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        isSelected
-          ? 'ring-2 ring-brand-500 scale-105 glass-brand-dark'
-          : 'hover:scale-105 glass-dark'
-      }`}
-      onClick={onClick}
-    >
-      {imageLoaded ? (
-        <img
-          src={imagePath}
-          alt={`Clothing item ${drawableId}`}
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-xs text-center">
-          {drawableId}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // Texture Navigation component
 interface TextureNavigationProps {
   currentTexture: number;
@@ -227,7 +147,7 @@ const TextureNavigation: React.FC<TextureNavigationProps> = ({
 
 // ClothingGrid component for each category
 interface ClothingGridProps {
-  category: (typeof CLOTHING_CATEGORIES)[0];
+  category: ClothingCategory;
   model: string;
   selectedDrawable: number;
   selectedTexture: number;
@@ -295,7 +215,8 @@ const ClothingGrid: React.FC<ClothingGridProps> = ({
               drawableId={drawableId}
               textureId={selectedTexture}
               isSelected={selectedDrawable === drawableId}
-              onClick={() => onSelectDrawable(drawableId)}
+              onSelectDrawable={() => onSelectDrawable(drawableId)}
+              onSelectTexture={onSelectTexture}
             />
           ))}
         </div>
