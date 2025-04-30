@@ -40,7 +40,7 @@ export const getClothingImage = (
     process.env.ASSET_SERVER_URL || 'http://localhost:3000'; // Corrected protocol to http
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
-  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+  const isProp = [0, 1, 2].includes(componentId);
 
   // Create the image path with texture ID
   const imagePath = isProp
@@ -74,7 +74,7 @@ export const getClothingImageFallback = (
     process.env.ASSET_SERVER_URL || 'http://localhost:3000'; // Corrected protocol to http
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
-  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+  const isProp = [0, 1, 2].includes(componentId);
 
   // Create a fallback path without texture ID
   return isProp
@@ -107,7 +107,7 @@ export const getClothingThumbnail = (
     process.env.ASSET_SERVER_URL || 'http://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
-  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+  const isProp = [0, 1, 2].includes(componentId);
 
   // Create the thumbnail path with texture ID
   const thumbnailPath = isProp
@@ -141,7 +141,7 @@ export const getClothingThumbnailFallback = (
     process.env.ASSET_SERVER_URL || 'http://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
-  const isProp = [0, 1, 2, 6, 7].includes(componentId);
+  const isProp = [0, 1, 2].includes(componentId);
 
   // Create a fallback thumbnail path without texture ID
   return isProp
@@ -228,7 +228,7 @@ export const getMaxTexturesForItem = (
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
 
   // Determine if this is a prop or clothing
-  const category = [0, 1, 2, 6, 7].includes(componentId) ? 'PROPS' : 'CLOTHING';
+  const category = [0, 1, 2].includes(componentId) ? 'PROPS' : 'CLOTHING';
 
   try {
     // Convert numeric IDs to strings for object access
@@ -270,7 +270,7 @@ export const getMaxItemsForComponent = (
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
 
   // Determine if this is a prop or clothing
-  const category = [0, 1, 2, 6, 7].includes(componentId) ? 'PROPS' : 'CLOTHING';
+  const category = [0, 1, 2].includes(componentId) ? 'PROPS' : 'CLOTHING';
 
   try {
     // Convert numeric ID to string for object access
