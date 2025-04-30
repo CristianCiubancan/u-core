@@ -31,7 +31,7 @@ interface ClothingVariationsPopupProps {
   drawableId: number;
   maxTextures: number;
   selectedTexture: number;
-  onSelectTexture: (textureId: number) => void;
+  onSelectTexture: (textureId: number) => void; // Kept for API compatibility
   onClose: () => void;
   position: { x: number; y: number };
 }
@@ -44,7 +44,7 @@ export const ClothingVariationsPopup: React.FC<
   drawableId,
   maxTextures,
   selectedTexture,
-  onSelectTexture,
+  // onSelectTexture is not used directly in this component
   onClose,
   position,
 }) => {
