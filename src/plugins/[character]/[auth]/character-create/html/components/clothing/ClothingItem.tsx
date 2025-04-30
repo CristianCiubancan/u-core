@@ -5,7 +5,6 @@ import {
   getMaxTexturesForItem,
 } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
-import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 
 interface ClothingItemProps {
   model: string;
@@ -74,7 +73,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
     img.src = path;
   }, [model, componentId, drawableId, textureId]);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     if (hasVariations && isSelected) {
       // If already selected and has variations, show the variations popup
       const rect = itemRef.current?.getBoundingClientRect();
