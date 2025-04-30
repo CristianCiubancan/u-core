@@ -35,11 +35,52 @@ npm run optimize
 ```
 
 This will:
+
 - Scan all images in the `original` directory recursively
 - Create optimized versions in the `public` directory with different quality levels
 - Print statistics about the optimization process
 
-### 2. Start the Server
+### 2. Generate Thumbnails
+
+Run the thumbnail generation script to create thumbnails for the optimized images:
+
+```bash
+npm run thumbnails
+```
+
+This will:
+
+- Scan all images in the `public/high`, `public/medium`, and `public/low` directories
+- Create thumbnail versions in corresponding `-thumbnail` directories (e.g., `public/high-thumbnail`)
+- Preserve the aspect ratio while scaling down to thumbnail size
+- Print statistics about the thumbnail generation process
+
+#### Additional Thumbnail Options
+
+The thumbnail generator supports several options:
+
+```bash
+# Generate thumbnails for tiny quality images (with smaller width)
+npm run thumbnails:tiny
+
+# Generate thumbnails for all quality levels (high, medium, low, tiny)
+npm run thumbnails:all
+
+# Force regeneration of all thumbnails (overwrite existing)
+npm run thumbnails:force
+```
+
+You can also run the script directly with custom options:
+
+```bash
+# Custom quality levels and width
+node scaledown.js --quality=high,tiny --width=120
+
+# Show help information
+node scaledown.js --help
+```
+
+### 3. Start the Server
 
 Start the web server to serve the optimized images:
 
@@ -69,6 +110,22 @@ Where `{quality}` is one of: high, medium, low, tiny
 
 Uses the default quality level (configured in .env)
 
+### Thumbnails with Specific Quality
+
+```
+/thumbnails/{quality}/{path}
+```
+
+Where `{quality}` is one of: high, medium, low, tiny
+
+### Thumbnails with Default Quality
+
+```
+/thumbnails/{path}
+```
+
+Uses the default quality level (configured in .env)
+
 ### Examples
 
 - High quality: `/assets/high/images/clothing/female_11_0.png`
@@ -76,6 +133,8 @@ Uses the default quality level (configured in .env)
 - Low quality: `/assets/low/images/clothing/female_11_0.png`
 - Tiny quality: `/assets/tiny/images/clothing/female_11_0.png`
 - Default quality: `/assets/images/clothing/female_11_0.png`
+- High quality thumbnail: `/thumbnails/high/images/clothing/female_11_0.png`
+- Default quality thumbnail: `/thumbnails/images/clothing/female_11_0.png`
 
 ## Configuration
 

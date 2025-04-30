@@ -5,6 +5,10 @@
   "main": "server.js",
   "scripts": {
     "optimize": "node optimize.js",
+    "thumbnails": "node scaledown.js",
+    "thumbnails:tiny": "node scaledown.js --quality=tiny --width=100",
+    "thumbnails:all": "node scaledown.js --quality=high,medium,low,tiny",
+    "thumbnails:force": "node scaledown.js --force",
     "start": "node server.js"
   },
   "author": "",
