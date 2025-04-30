@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getClothingImage, getClothingImageFallback, getMaxTexturesForItem } from '../../utils/getClothingImage';
+import {
+  getClothingImage,
+  getClothingImageFallback,
+  getMaxTexturesForItem,
+} from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
+import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 
 interface ClothingItemProps {
   model: string;
@@ -26,10 +31,10 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   const [showVariations, setShowVariations] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const itemRef = useRef<HTMLDivElement>(null);
-  
+
   // Get the maximum number of textures for this item
   const maxTextures = getMaxTexturesForItem(model, componentId, drawableId);
-  
+
   // Determine if this item has multiple textures
   const hasVariations = maxTextures > 1;
 
@@ -113,14 +118,16 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
             {drawableId}
           </div>
         )}
-        
+
         {/* Indicator for items with variations */}
         {hasVariations && (
-          <div className="absolute top-1 right-1 w-2 h-2 bg-brand-500 rounded-full" 
-               title="This item has multiple variations"></div>
+          <div
+            className="absolute top-1 right-1 w-2 h-2 bg-brand-500 rounded-full"
+            title="This item has multiple variations"
+          ></div>
         )}
       </div>
-      
+
       {/* Variations popup */}
       {showVariations && (
         <ClothingVariationsPopup
