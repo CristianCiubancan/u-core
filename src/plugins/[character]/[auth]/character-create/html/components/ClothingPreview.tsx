@@ -4,6 +4,7 @@ import {
   getClothingThumbnailFallback,
   getComponentIdFromKey,
 } from '../utils/getClothingImage';
+import Spinner from '../../../../../../webview/components/ui/Spinner';
 
 interface ClothingPreviewProps {
   model: string;
@@ -24,10 +25,13 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
   const [usingFallback, setUsingFallback] = useState(false);
   const componentId = getComponentIdFromKey(clothingKey);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   useEffect(() => {
-    // Reset image loaded state when props change
+    // Reset states when props change
     setImageLoaded(false);
     setUsingFallback(false);
+    setLoadFailed(false);
 
     // Always use tiny quality for thumbnails
     const quality = 'tiny';
@@ -56,6 +60,7 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
     img.onload = () => {
       setImageLoaded(true);
       setUsingFallback(false);
+      setLoadFailed(false);
     };
     img.onerror = () => {
       // If primary image fails to load, try the fallback
@@ -63,10 +68,12 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
       fallbackImg.onload = () => {
         setImageLoaded(true);
         setUsingFallback(true);
+        setLoadFailed(false);
       };
       fallbackImg.onerror = () => {
         // If both fail, show the no preview message
         setImageLoaded(false);
+        setLoadFailed(true);
       };
       fallbackImg.src = backupPath;
     };
@@ -87,13 +94,18 @@ export const ClothingPreview: React.FC<ClothingPreviewProps> = ({
           className="max-h-full max-w-full object-contain"
           onError={handleImageError}
         />
-      ) : (
-        <div className="text-center text-gray-400">
+      ) : loadFailed ? (
+        <div className="text-center text-gray-400 flex flex-col items-center justify-center">
           <p>No preview available</p>
           <p className="text-sm mt-1">
             Item: {clothingKey} #{drawableId}
           </p>
           <p className="text-xs mt-1">Texture: {textureId}</p>
+        </div>
+      ) : (
+        <div className="text-center text-gray-400 flex flex-col items-center justify-center">
+          <Spinner size="md" color="brand" className="mb-3" />
+          <p>Loading preview...</p>
         </div>
       )}
     </div>
