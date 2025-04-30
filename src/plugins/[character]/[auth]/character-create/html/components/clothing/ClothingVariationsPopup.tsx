@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getClothingImage, getClothingImageFallback } from '../../utils/getClothingImage';
+import {
+  getClothingImage,
+  getClothingImageFallback,
+} from '../../utils/getClothingImage';
+import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
+
+// Helper function to map component IDs to their respective clothing keys
+const getClothingKeyFromComponentId = (componentId: number): string => {
+  switch (componentId) {
+    case 11:
+      return 'tops';
+    case 8:
+      return 'undershirt';
+    case 4:
+      return 'legs';
+    case 6:
+      return 'shoes';
+    case 7:
+      return 'accessories';
+    case 3:
+      return 'torso';
+    default:
+      return 'tops';
+  }
+};
 
 interface ClothingVariationsPopupProps {
   model: string;
@@ -12,7 +36,9 @@ interface ClothingVariationsPopupProps {
   position: { x: number; y: number };
 }
 
-export const ClothingVariationsPopup: React.FC<ClothingVariationsPopupProps> = ({
+export const ClothingVariationsPopup: React.FC<
+  ClothingVariationsPopupProps
+> = ({
   model,
   componentId,
   drawableId,
@@ -34,20 +60,20 @@ export const ClothingVariationsPopup: React.FC<ClothingVariationsPopupProps> = (
       const rect = popupRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      
+
       let newX = position.x;
       let newY = position.y;
-      
+
       // Adjust horizontal position if needed
       if (newX + rect.width > viewportWidth) {
         newX = viewportWidth - rect.width - 10;
       }
-      
+
       // Adjust vertical position if needed
       if (newY + rect.height > viewportHeight) {
         newY = viewportHeight - rect.height - 10;
       }
-      
+
       setAdjustedPosition({ x: newX, y: newY });
     }
   }, [position, popupRef]);
@@ -55,7 +81,10 @@ export const ClothingVariationsPopup: React.FC<ClothingVariationsPopupProps> = (
   // Close popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     };
@@ -96,7 +125,21 @@ export const ClothingVariationsPopup: React.FC<ClothingVariationsPopupProps> = (
               textureId={textureId}
               isSelected={textureId === selectedTexture}
               onClick={() => {
-                onSelectTexture(textureId);
+                // Get the clothing key for this component
+                const clothingKey = getClothingKeyFromComponentId(componentId);
+
+                // Update only the in-game character without changing UI state
+                fetchNui('character-create:update-clothing', {
+                  key: `${clothingKey}Texture`,
+                  value: textureId,
+                }).catch((error: any) => {
+                  console.error(
+                    '[UI] Failed to update clothing texture:',
+                    error
+                  );
+                });
+
+                // Close the popup without calling onSelectTexture to avoid UI updates
                 onClose();
               }}
             />

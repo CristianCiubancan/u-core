@@ -287,11 +287,15 @@ export const ClothingTab: React.FC<ClothingTabProps> = ({
   // Handle drawable selection
   const handleDrawableSelect = (value: number) => {
     const key = activeCategory;
+
+    // Update the game character
     onClothingChange(key, value);
   };
 
   // Handle texture selection
   const handleTextureSelect = (value: number) => {
+    // This is only used for texture navigation in the main UI
+    // For variations popup, we directly update the game without using this
     const key = `${activeCategory}Texture`;
     onClothingChange(key, value);
   };
