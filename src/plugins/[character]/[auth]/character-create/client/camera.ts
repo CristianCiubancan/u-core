@@ -15,12 +15,16 @@ import { faceCamera } from './character-manager';
  * Handles all camera-related functionality
  */
 class CameraManager {
+  private _spectatorModeActive: boolean = false;
+
   /**
    * Set up the camera for character creation
    */
   setup(): void {
     // Disable rendering of the player's camera while in character creation
     NetworkSetInSpectatorMode(true, PlayerPedId());
+    this._spectatorModeActive = true;
+    console.log('[Camera Manager] Spectator mode enabled');
 
     // Create a camera pointing at the player
     this.updatePosition();
@@ -79,6 +83,7 @@ class CameraManager {
       SetCamActive(camera, true);
       RenderScriptCams(true, false, 0, true, true);
       setCharacterCreationCamera(camera);
+      console.log('[Camera Manager] New camera created');
     } else {
       SetCamCoord(
         characterCreationCamera,
@@ -144,8 +149,12 @@ class CameraManager {
   cleanup(): void {
     const { characterCreationCamera } = getCameraState();
 
-    // Disable spectator mode
-    NetworkSetInSpectatorMode(false, PlayerPedId());
+    // Disable spectator mode if it's active
+    if (this._spectatorModeActive) {
+      NetworkSetInSpectatorMode(false, PlayerPedId());
+      this._spectatorModeActive = false;
+      console.log('[Camera Manager] Spectator mode disabled');
+    }
 
     // Destroy the camera
     if (characterCreationCamera) {
@@ -153,7 +162,12 @@ class CameraManager {
       DestroyCam(characterCreationCamera, true);
       RenderScriptCams(false, false, 0, true, true);
       setCharacterCreationCamera(null);
+      console.log('[Camera Manager] Camera destroyed');
     }
+
+    // Double-check to make sure player is visible
+    SetEntityVisible(PlayerPedId(), true, false);
+    console.log('[Camera Manager] Ensured player visibility');
   }
 }
 

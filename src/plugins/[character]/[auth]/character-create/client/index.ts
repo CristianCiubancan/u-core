@@ -22,7 +22,7 @@ import { characterManager } from './character-manager';
 registerEvents();
 
 // Initialize UI as hidden on resource start
-AddEventHandler('onClientResourceStart', (resourceName: string) => {
+AddEventHandler('onClientResourceStart', async (resourceName: string) => {
   if (resourceName === GetCurrentResourceName()) {
     console.log('[Character Create] Resource started');
 
@@ -31,21 +31,25 @@ AddEventHandler('onClientResourceStart', (resourceName: string) => {
 
     // Pre-load character models to ensure they're available when needed
     const maleModel = 'mp_m_freemode_01';
-    const femaleModel = 'mp_f_freemode_01';
 
     console.log('[Character Create] Pre-loading character models');
-    characterManager.loadAndSetModel(maleModel).then(() => {
+    try {
+      await characterManager.loadAndSetModel(maleModel);
       console.log('[Character Create] Male model loaded');
-    });
-    RequestModel(GetHashKey(femaleModel));
 
-    // Auto-open character creation for new players
+      // Ensure player is visible
+      SetEntityVisible(PlayerPedId(), true, false);
+    } catch (error) {
+      console.error('[Character Create] Failed to pre-load models:', error);
+    }
+
+    // Auto-open character creation for new players with a longer delay
     setTimeout(async () => {
       console.log('[Character Create] Auto-opening character creation UI');
-      // Use Delay utility for timeout
-      await Delay(2000);
+      // Use longer delay to ensure everything is loaded properly
+      await Delay(3000);
       toggleUI(true);
-    }, 0); // setTimeout with 0ms delay to run after current execution context
+    }, 0);
   }
 });
 
