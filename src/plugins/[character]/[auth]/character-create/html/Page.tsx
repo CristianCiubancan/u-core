@@ -26,7 +26,8 @@ function CharacterCreationContent() {
   const [isOpen, setIsOpen] = useState(isEnvBrowser());
 
   // Get all data and functions from context
-  const { activeTab, setActiveTab, handleCloseUi } = useCharacterData();
+  const { activeTab, setActiveTab, handleCloseUi, setActiveFocus } =
+    useCharacterData();
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data: any) => {
@@ -44,6 +45,28 @@ function CharacterCreationContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCloseUi]);
+
+  const handleSetActiveTab = (tab: string) => {
+    if (tab === activeTab) return;
+    switch (tab) {
+      case 'face':
+        setActiveFocus('head');
+        break;
+      case 'hair':
+        setActiveFocus('head');
+        break;
+      case 'appearance':
+        setActiveFocus('body');
+        break;
+      case 'clothing':
+        setActiveFocus('body');
+        break;
+      default:
+        break;
+    }
+
+    setActiveTab(tab as any);
+  };
 
   // Render UI
   return isOpen ? (
@@ -64,28 +87,28 @@ function CharacterCreationContent() {
               activeTab={activeTab}
               label="Face"
               icon={<FaFaceSmile />}
-              onClick={setActiveTab}
+              onClick={handleSetActiveTab}
             />
             <TabButton
               tab="hair"
               activeTab={activeTab}
               label="Hair"
               icon={<FaScissors />}
-              onClick={setActiveTab}
+              onClick={handleSetActiveTab}
             />
             <TabButton
               tab="appearance"
               activeTab={activeTab}
               label="Appearance"
               icon={<MdOutlineColorLens />}
-              onClick={setActiveTab}
+              onClick={handleSetActiveTab}
             />
             <TabButton
               tab="clothing"
               activeTab={activeTab}
               label="Clothing"
               icon={<GiClothes />}
-              onClick={setActiveTab}
+              onClick={handleSetActiveTab}
             />
           </div>
         </div>
