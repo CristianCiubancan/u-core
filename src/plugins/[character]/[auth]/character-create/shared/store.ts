@@ -32,7 +32,7 @@ const initialState: StoreState = {
   uiVisible: false,
   cameraRotation: 0,
   cameraZoom: 1.5,
-  cameraFocus: 'body',
+  cameraFocus: 'head',
   characterCreationCamera: null,
   characterData: DEFAULT_CHARACTER,
 };

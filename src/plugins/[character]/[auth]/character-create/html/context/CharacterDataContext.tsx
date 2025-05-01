@@ -68,7 +68,7 @@ interface CharacterDataContextType extends CharacterState {
 const initialState: CharacterState = {
   characterData: DEFAULT_CHARACTER,
   activeTab: 'face',
-  activeFocus: 'body',
+  activeFocus: 'head',
 };
 
 // Create the context with a default undefined value
