@@ -44,11 +44,6 @@ export const CameraControls: React.FC<CameraControlsProps> = (props) => {
       props.onFocus(focus);
     } else {
       setActiveFocus(focus);
-      fetchNui('character-create:focus-camera', { focus }).catch(
-        (error: any) => {
-          console.error('[UI] Failed to focus camera:', error);
-        }
-      );
     }
   };
 
