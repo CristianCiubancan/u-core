@@ -206,6 +206,11 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({
 
   const setActiveFocus = useCallback((focus: CameraFocus) => {
     dispatch({ type: 'SET_ACTIVE_FOCUS', payload: focus });
+
+    // Send focus change to client
+    fetchNui('character-create:focus-camera', { focus }).catch(
+      handleNuiError('Failed to focus camera')
+    );
   }, []);
 
   // Handle model change
