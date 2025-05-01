@@ -27,62 +27,32 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = ({
     setActiveCategory(categoryId);
   };
 
-  // Get the drawable ID and texture ID for the currently selected category
-  const getDrawableAndTexture = () => {
+  // Get the drawable ID for the currently selected category
+  const getSelectedDrawable = () => {
     switch (activeCategory) {
       case 'tops':
-        return {
-          drawableId: clothingData.tops,
-          textureId: clothingData.topsTexture,
-        };
+        return clothingData.tops;
       case 'undershirt':
-        return {
-          drawableId: clothingData.undershirt,
-          textureId: clothingData.undershirtTexture,
-        };
+        return clothingData.undershirt;
       case 'legs':
-        return {
-          drawableId: clothingData.legs,
-          textureId: clothingData.legsTexture,
-        };
+        return clothingData.legs;
       case 'shoes':
-        return {
-          drawableId: clothingData.shoes,
-          textureId: clothingData.shoesTexture,
-        };
+        return clothingData.shoes;
       case 'accessories':
-        return {
-          drawableId: clothingData.accessories,
-          textureId: clothingData.accessoriesTexture,
-        };
+        return clothingData.accessories;
       case 'torso':
-        return {
-          drawableId: clothingData.torso,
-          textureId: clothingData.torsoTexture,
-        };
+        return clothingData.torso;
       default:
-        return {
-          drawableId: clothingData.tops,
-          textureId: clothingData.topsTexture,
-        };
+        return clothingData.tops;
     }
   };
 
-  const { drawableId, textureId } = getDrawableAndTexture();
+  const selectedDrawable = getSelectedDrawable();
 
   // Handle drawable selection
   const handleDrawableSelect = (value: number) => {
     const key = activeCategory;
-
     // Update the game character
-    onClothingChange(key, value);
-  };
-
-  // Handle texture selection
-  const handleTextureSelect = (value: number) => {
-    // This is only used for texture navigation in the main UI
-    // For variations popup, we directly update the game without using this
-    const key = `${activeCategory}Texture`;
     onClothingChange(key, value);
   };
 
@@ -113,10 +83,8 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = ({
           <ClothingGrid
             category={currentCategory}
             model={model}
-            selectedDrawable={drawableId}
-            selectedTexture={textureId}
+            selectedDrawable={selectedDrawable}
             onSelectDrawable={handleDrawableSelect}
-            onSelectTexture={handleTextureSelect}
           />
         </div>
       </div>

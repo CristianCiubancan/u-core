@@ -3,36 +3,15 @@ import {
   getClothingThumbnail,
   getClothingThumbnailFallback,
 } from '../../utils/getClothingImage';
-import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 import Spinner from '../../../../../../../webview/components/ui/Spinner';
-
-// Helper function to map component IDs to their respective clothing keys
-const getClothingKeyFromComponentId = (componentId: number): string => {
-  switch (componentId) {
-    case 11:
-      return 'tops';
-    case 8:
-      return 'undershirt';
-    case 4:
-      return 'legs';
-    case 6:
-      return 'shoes';
-    case 7:
-      return 'accessories';
-    case 3:
-      return 'torso';
-    default:
-      return 'tops';
-  }
-};
 
 interface ClothingVariationsPopupProps {
   model: string;
   componentId: number;
   drawableId: number;
-  maxTextures: number;
+  verifiedTextures: number[]; // Array of verified texture IDs
   selectedTexture: number;
-  onSelectTexture: (textureId: number) => void; // Kept for API compatibility
+  onSelectTexture: (textureId: number) => void;
   onClose: () => void;
   position: { x: number; y: number };
 }
@@ -43,17 +22,14 @@ export const ClothingVariationsPopup: React.FC<
   model,
   componentId,
   drawableId,
-  maxTextures,
+  verifiedTextures,
   selectedTexture,
-  // onSelectTexture is not used directly in this component
+  onSelectTexture,
   onClose,
   position,
 }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
-
-  // Generate array of texture IDs
-  const textureIds = Array.from({ length: maxTextures }, (_, i) => i);
 
   // Adjust position to ensure popup stays within viewport
   useEffect(() => {
@@ -96,6 +72,17 @@ export const ClothingVariationsPopup: React.FC<
     };
   }, [onClose]);
 
+  // Safety check - if we have no textures, close the popup
+  useEffect(() => {
+    if (verifiedTextures.length === 0) {
+      console.warn('No verified textures available, closing popup');
+      onClose();
+    }
+  }, [verifiedTextures, onClose]);
+
+  // Sort the textures to ensure they appear in a logical order
+  const sortedTextures = [...verifiedTextures].sort((a, b) => a - b);
+
   return (
     <div
       ref={popupRef}
@@ -117,7 +104,7 @@ export const ClothingVariationsPopup: React.FC<
           </button>
         </div>
         <div className="grid grid-cols-4 gap-2 max-w-[240px]">
-          {textureIds.map((textureId) => (
+          {sortedTextures.map((textureId) => (
             <TextureVariationItem
               key={textureId}
               model={model}
@@ -126,21 +113,10 @@ export const ClothingVariationsPopup: React.FC<
               textureId={textureId}
               isSelected={textureId === selectedTexture}
               onClick={() => {
-                // Get the clothing key for this component
-                const clothingKey = getClothingKeyFromComponentId(componentId);
-
-                // Update only the in-game character without changing UI state
-                fetchNui('character-create:update-clothing', {
-                  key: `${clothingKey}Texture`,
-                  value: textureId,
-                }).catch((error: any) => {
-                  console.error(
-                    '[UI] Failed to update clothing texture:',
-                    error
-                  );
-                });
-
-                // Close the popup without calling onSelectTexture to avoid UI updates
+                // Update the parent component's state through the callback
+                onSelectTexture(textureId);
+                
+                // Close the popup after selection
                 onClose();
               }}
             />
@@ -170,7 +146,6 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imagePath, setImagePath] = useState('');
-
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -178,7 +153,7 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
     setImageLoaded(false);
     setLoadFailed(false);
 
-    // Always use tiny quality for thumbnails
+    // Always use tiny quality for variations thumbnails
     const quality = 'tiny';
 
     // Get the thumbnail path from the asset server with texture ID
