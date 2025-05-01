@@ -10,6 +10,7 @@ import {
   CameraZoomData,
   CameraFocusData,
   PlayerRotationData,
+  CameraDragData,
   SaveCharacterData,
   NuiCallback,
   NUI_EVENT,
@@ -24,7 +25,12 @@ import {
   updateClothing,
   rotatePlayer,
 } from './character-manager';
-import { rotateCamera, zoomCamera, focusCamera } from './camera';
+import {
+  rotateCamera,
+  zoomCamera,
+  focusCamera,
+  zoomCameraByAmount,
+} from './camera';
 
 // Constants
 const COMMAND_NAME = 'character-create:toggle_ui';
@@ -192,6 +198,48 @@ export function registerEvents(): void {
     rotatePlayer(data.direction);
     cb({ status: 'ok' });
   }) as NuiCallback<PlayerRotationData>);
+
+  // Handle camera drag (for rotation and zoom)
+  RegisterNuiCallback('character-create:drag-camera', ((
+    data: CameraDragData,
+    cb: (data: any) => void
+  ) => {
+    console.log(
+      '[Character Create] Camera drag request:',
+      JSON.stringify(data)
+    );
+
+    // Use deltaX for player rotation (not camera rotation)
+    // Use deltaY for camera zoom
+    const zoomAmount = data.deltaY * 0.05; // Scale down for smoother zoom
+
+    // Apply player rotation based on deltaX
+    // Determine rotation direction based on deltaX
+    // Note: We invert the direction to make it feel more natural
+    // When dragging right, the character should rotate right (clockwise)
+    if (Math.abs(data.deltaX) > 5) {
+      // Add a small threshold to prevent tiny movements
+      const direction = data.deltaX > 0 ? 'right' : 'left';
+      rotatePlayer(direction);
+    }
+
+    // Apply zoom based on deltaY
+    if (Math.abs(zoomAmount) > 0.01) {
+      zoomCameraByAmount(zoomAmount);
+    }
+
+    cb({ status: 'ok' });
+  }) as NuiCallback<CameraDragData>);
+
+  // Handle drag end
+  RegisterNuiCallback('character-create:drag-end', ((
+    data: any,
+    cb: (data: any) => void
+  ) => {
+    console.log('[Character Create] Drag end request');
+    // Nothing to do here for now, but we could stop any ongoing animations
+    cb({ status: 'ok' });
+  }) as NuiCallback<any>);
 
   /**
    * =======================================================
