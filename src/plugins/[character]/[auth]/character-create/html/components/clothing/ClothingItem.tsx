@@ -46,7 +46,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
     setLoadFailed(false);
 
     // Always use tiny quality for thumbnails
-    const quality = 'tiny';
+    const quality = 'low';
 
     // Get the thumbnail path from the asset server with texture ID
     const path = getClothingThumbnail(
