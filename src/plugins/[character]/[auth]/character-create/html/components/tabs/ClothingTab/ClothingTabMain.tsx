@@ -15,7 +15,8 @@ interface ClothingTabProps {
 
 export const ClothingTabMain: React.FC<ClothingTabProps> = (props) => {
   // Get data from context
-  const { characterData, handleClothingChange } = useCharacterData();
+  const { characterData, handleClothingChange, setActiveFocus } =
+    useCharacterData();
 
   // Use props if provided (for backward compatibility), otherwise use context
   const clothingData = props.clothingData || characterData.clothing;
@@ -30,6 +31,25 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = (props) => {
   // Function to handle clicking on a clothing category
   const handleCategorySelect = (categoryId: string) => {
     setActiveCategory(categoryId);
+
+    switch (categoryId) {
+      case 'tops':
+      case 'undershirt':
+      case 'torso':
+      case 'accessories':
+        setActiveFocus('body');
+        // Focus on the body for these categories
+        break;
+      case 'legs':
+      case 'shoes':
+        setActiveFocus('legs');
+        // Focus on the legs for these categories
+        break;
+      default:
+        setActiveFocus('body');
+        // Default focus (if needed)
+        break;
+    }
   };
 
   // Get the drawable ID for the currently selected category

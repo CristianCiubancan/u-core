@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { fetchNui } from '../../../../../../webview/utils/fetchNui';
 import {
   CharacterData,
@@ -7,6 +13,7 @@ import {
   FaceData,
   HairData,
   AppearanceData,
+  AppearanceOverlay,
   ClothingData,
   CameraFocus,
   TabType,
@@ -24,8 +31,14 @@ type CharacterAction =
   | { type: 'SET_MODEL'; payload: string }
   | { type: 'SET_FACE'; payload: { key: keyof FaceData; value: number } }
   | { type: 'SET_HAIR'; payload: { key: keyof HairData; value: number } }
-  | { type: 'SET_APPEARANCE'; payload: { category: keyof AppearanceData; key: string; value: number } }
-  | { type: 'SET_CLOTHING'; payload: { key: keyof ClothingData; value: number } }
+  | {
+      type: 'SET_APPEARANCE';
+      payload: { category: keyof AppearanceData; key: string; value: number };
+    }
+  | {
+      type: 'SET_CLOTHING';
+      payload: { key: keyof ClothingData; value: number };
+    }
   | { type: 'SET_ACTIVE_TAB'; payload: TabType }
   | { type: 'SET_ACTIVE_FOCUS'; payload: CameraFocus };
 
@@ -34,14 +47,18 @@ interface CharacterDataContextType extends CharacterState {
   // Update functions
   setActiveTab: (tab: TabType) => void;
   setActiveFocus: (focus: CameraFocus) => void;
-  
+
   // Character data update functions
   handleModelChange: (modelId: string) => void;
   handleFaceChange: (key: keyof FaceData, value: number) => void;
   handleHairChange: (key: keyof HairData, value: number) => void;
-  handleAppearanceChange: (category: keyof AppearanceData, key: string, value: number) => void;
+  handleAppearanceChange: (
+    category: keyof AppearanceData,
+    key: string,
+    value: number
+  ) => void;
   handleClothingChange: (key: keyof ClothingData, value: number) => void;
-  
+
   // Save and close functions
   handleSaveCharacter: () => Promise<void>;
   handleCloseUi: () => Promise<void>;
@@ -55,16 +72,22 @@ const initialState: CharacterState = {
 };
 
 // Create the context with a default undefined value
-const CharacterDataContext = createContext<CharacterDataContextType | undefined>(undefined);
+const CharacterDataContext = createContext<
+  CharacterDataContextType | undefined
+>(undefined);
 
 // Reducer function
-function characterReducer(state: CharacterState, action: CharacterAction): CharacterState {
+function characterReducer(
+  state: CharacterState,
+  action: CharacterAction
+): CharacterState {
   switch (action.type) {
     case 'SET_MODEL': {
-      const defaultData = action.payload === 'mp_f_freemode_01'
-        ? DEFAULT_FEMALE_CHARACTER
-        : DEFAULT_CHARACTER;
-        
+      const defaultData =
+        action.payload === 'mp_f_freemode_01'
+          ? DEFAULT_FEMALE_CHARACTER
+          : DEFAULT_CHARACTER;
+
       return {
         ...state,
         characterData: {
@@ -73,7 +96,7 @@ function characterReducer(state: CharacterState, action: CharacterAction): Chara
         },
       };
     }
-    
+
     case 'SET_FACE':
       return {
         ...state,
@@ -85,7 +108,7 @@ function characterReducer(state: CharacterState, action: CharacterAction): Chara
           },
         },
       };
-      
+
     case 'SET_HAIR':
       return {
         ...state,
@@ -97,8 +120,23 @@ function characterReducer(state: CharacterState, action: CharacterAction): Chara
           },
         },
       };
-      
+
     case 'SET_APPEARANCE':
+      // Handle the special case for eyeColor which is a number, not an object
+      if (action.payload.category === 'eyeColor') {
+        return {
+          ...state,
+          characterData: {
+            ...state.characterData,
+            appearance: {
+              ...state.characterData.appearance,
+              [action.payload.category]: action.payload.value,
+            },
+          },
+        };
+      }
+
+      // For object-type appearance properties (like eyebrows, beard, etc.)
       return {
         ...state,
         characterData: {
@@ -106,13 +144,15 @@ function characterReducer(state: CharacterState, action: CharacterAction): Chara
           appearance: {
             ...state.characterData.appearance,
             [action.payload.category]: {
-              ...state.characterData.appearance[action.payload.category],
+              ...(state.characterData.appearance[
+                action.payload.category
+              ] as AppearanceOverlay),
               [action.payload.key]: action.payload.value,
             },
           },
         },
       };
-      
+
     case 'SET_CLOTHING':
       return {
         ...state,
@@ -124,19 +164,19 @@ function characterReducer(state: CharacterState, action: CharacterAction): Chara
           },
         },
       };
-      
+
     case 'SET_ACTIVE_TAB':
       return {
         ...state,
         activeTab: action.payload,
       };
-      
+
     case 'SET_ACTIVE_FOCUS':
       return {
         ...state,
         activeFocus: action.payload,
       };
-      
+
     default:
       return state;
   }
@@ -153,15 +193,17 @@ const handleNuiError = (message: string) => (error: any) => {
 };
 
 // Provider component
-export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({ children }) => {
+export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({
+  children,
+}) => {
   // Use reducer instead of multiple useState calls
   const [state, dispatch] = useReducer(characterReducer, initialState);
-  
+
   // UI state updaters
   const setActiveTab = useCallback((tab: TabType) => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
   }, []);
-  
+
   const setActiveFocus = useCallback((focus: CameraFocus) => {
     dispatch({ type: 'SET_ACTIVE_FOCUS', payload: focus });
   }, []);
@@ -171,45 +213,51 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({ ch
     dispatch({ type: 'SET_MODEL', payload: modelId });
 
     // Send model change to client
-    fetchNui('character-create:update-model', { model: modelId })
-      .catch(handleNuiError('Failed to update model'));
+    fetchNui('character-create:update-model', { model: modelId }).catch(
+      handleNuiError('Failed to update model')
+    );
   }, []);
 
   // Handle face change
   const handleFaceChange = useCallback((key: keyof FaceData, value: number) => {
-    dispatch({ 
-      type: 'SET_FACE', 
-      payload: { key, value }
+    dispatch({
+      type: 'SET_FACE',
+      payload: { key, value },
     });
 
     // Send face change to client
-    fetchNui('character-create:update-face', { key, value })
-      .catch(handleNuiError('Failed to update face'));
+    fetchNui('character-create:update-face', { key, value }).catch(
+      handleNuiError('Failed to update face')
+    );
   }, []);
 
   // Handle hair change
   const handleHairChange = useCallback((key: keyof HairData, value: number) => {
-    dispatch({ 
-      type: 'SET_HAIR', 
-      payload: { key, value }
+    dispatch({
+      type: 'SET_HAIR',
+      payload: { key, value },
     });
 
     // Send hair change to client
-    fetchNui('character-create:update-hair', { key, value })
-      .catch(handleNuiError('Failed to update hair'));
+    fetchNui('character-create:update-hair', { key, value }).catch(
+      handleNuiError('Failed to update hair')
+    );
   }, []);
 
   // Handle appearance change
   const handleAppearanceChange = useCallback(
     (category: keyof AppearanceData, key: string, value: number) => {
-      dispatch({ 
-        type: 'SET_APPEARANCE', 
-        payload: { category, key, value }
+      dispatch({
+        type: 'SET_APPEARANCE',
+        payload: { category, key, value },
       });
 
       // Send appearance change to client
-      fetchNui('character-create:update-appearance', { category, key, value })
-        .catch(handleNuiError('Failed to update appearance'));
+      fetchNui('character-create:update-appearance', {
+        category,
+        key,
+        value,
+      }).catch(handleNuiError('Failed to update appearance'));
     },
     []
   );
@@ -217,14 +265,15 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({ ch
   // Handle clothing change
   const handleClothingChange = useCallback(
     (key: keyof ClothingData, value: number) => {
-      dispatch({ 
-        type: 'SET_CLOTHING', 
-        payload: { key, value }
+      dispatch({
+        type: 'SET_CLOTHING',
+        payload: { key, value },
       });
 
       // Send clothing change to client
-      fetchNui('character-create:update-clothing', { key, value })
-        .catch(handleNuiError('Failed to update clothing'));
+      fetchNui('character-create:update-clothing', { key, value }).catch(
+        handleNuiError('Failed to update clothing')
+      );
     },
     []
   );
@@ -274,10 +323,12 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({ ch
 // Custom hook to use the character data context
 export const useCharacterData = (): CharacterDataContextType => {
   const context = useContext(CharacterDataContext);
-  
+
   if (context === undefined) {
-    throw new Error('useCharacterData must be used within a CharacterDataProvider');
+    throw new Error(
+      'useCharacterData must be used within a CharacterDataProvider'
+    );
   }
-  
+
   return context;
 };
