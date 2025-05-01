@@ -1,6 +1,7 @@
 import React from 'react';
 import { useImageLoader } from '../../hooks';
 import Spinner from '../../../../../../../webview/components/ui/Spinner';
+import { getClothingThumbnail, getClothingThumbnailFallback } from '../../utils/getClothingImage';
 
 interface ClothingImageProps {
   model: string;
@@ -19,12 +20,13 @@ export const ClothingImage: React.FC<ClothingImageProps> = ({
   quality,
   fallbackSrc,
 }) => {
-  // Construct image path based on properties
-  const mainSrc = `/assets/clothing/${model}/${componentId}/${drawableId}/${textureId}_${quality}.png`;
+  // Get the proper image path using the existing utility function
+  const mainSrc = getClothingThumbnail(model, componentId, drawableId, textureId, quality);
   
   // Use our custom image loader hook
   const { imageSrc, isLoading, isError } = useImageLoader(mainSrc, {
-    fallbackSrc: fallbackSrc,
+    // If a fallback was provided use it, otherwise generate one
+    fallbackSrc: fallbackSrc || getClothingThumbnailFallback(model, componentId, drawableId, quality),
   });
 
   if (isLoading) {

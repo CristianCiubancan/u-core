@@ -136,8 +136,7 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
   isSelected,
   onClick,
 }) => {
-  // Construct fallback path
-  const fallbackSrc = `/assets/clothing/${model}/${componentId}/${drawableId}/0_tiny.png`;
+  // Let the ClothingImage component handle the fallback
 
   return (
     <div
@@ -154,7 +153,6 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
         drawableId={drawableId}
         textureId={textureId}
         quality="tiny"
-        fallbackSrc={fallbackSrc}
       />
     </div>
   );
