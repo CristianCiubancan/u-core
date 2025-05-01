@@ -130,8 +130,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
     setShowVariations(false);
   }, []);
 
-  // Construct fallback image path (texture 0)
-  const fallbackSrc = `/assets/clothing/${model}/${componentId}/${drawableId}/0_low.png`;
+  // We'll let the ClothingImage component handle the fallback automatically
 
   return (
     <div className="relative" style={{ zIndex: showVariations ? 10 : 'auto' }}>
@@ -150,7 +149,6 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
           drawableId={drawableId}
           textureId={selectedTexture}
           quality="low"
-          fallbackSrc={fallbackSrc}
         />
 
         {/* Indicator for items with variations */}

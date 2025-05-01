@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ImageLoaderOptions {
   fallbackSrc?: string;
@@ -18,14 +18,14 @@ export const useImageLoader = (
   const [imageSrc, setImageSrc] = useState<string>(src);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
-  const [usedFallback, setUsedFallback] = useState<boolean>(false);
+  const fallbackAttemptedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Reset states when src changes
     setIsLoading(true);
     setIsError(false);
-    setUsedFallback(false);
     setImageSrc(src);
+    fallbackAttemptedRef.current = false;
 
     // Create new image to check loading
     const img = new Image();
@@ -38,13 +38,13 @@ export const useImageLoader = (
     
     img.onerror = () => {
       // If we have a fallback and haven't tried it yet
-      if (fallbackSrc && !usedFallback) {
-        setUsedFallback(true);
-        setImageSrc(fallbackSrc);
+      if (fallbackSrc && !fallbackAttemptedRef.current) {
+        fallbackAttemptedRef.current = true;
         
         // Try the fallback
         const fallbackImg = new Image();
         fallbackImg.onload = () => {
+          setImageSrc(fallbackSrc);
           setIsLoading(false);
           setIsError(false);
           onLoad?.();
@@ -72,12 +72,11 @@ export const useImageLoader = (
       img.onload = null;
       img.onerror = null;
     };
-  }, [src, fallbackSrc, onLoad, onError, usedFallback]);
+  }, [src, fallbackSrc, onLoad, onError]);
 
   return {
     imageSrc,
     isLoading,
-    isError,
-    usedFallback
+    isError
   };
 };
