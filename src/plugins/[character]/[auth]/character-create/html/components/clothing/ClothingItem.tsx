@@ -139,7 +139,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         {/* Indicator for items with variations */}
         {hasVariations && (
           <div
-            className="absolute top-1 right-1 w-2 h-2 bg-brand-500 rounded-full"
+            className="absolute top-1 right-1 w-4 h-4 bg-brand-500 rounded-full"
             title="This item has multiple variations"
           ></div>
         )}

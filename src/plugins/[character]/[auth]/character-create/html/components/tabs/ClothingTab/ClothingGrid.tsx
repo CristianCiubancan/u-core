@@ -67,7 +67,7 @@ export const ClothingGrid: React.FC<ClothingGridProps> = ({
       {/* Scrollable grid container */}
       <div className="overflow-y-scroll overflow-x-hidden scrollbar-brand-dark flex-grow">
         {/* Clothing grid with more columns for demonstrating scrolling */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2 p-2">
           {drawableIds.map((drawableId) => (
             <ClothingItem
               key={`${category.id}-${drawableId}`}
