@@ -83,3 +83,4 @@ crawl.py
 crawled.txt
 
 fivem-binaries
+**/.claude/settings.local.json

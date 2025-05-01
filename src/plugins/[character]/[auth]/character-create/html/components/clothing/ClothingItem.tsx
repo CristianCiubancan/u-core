@@ -1,15 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  getClothingThumbnail,
-  getClothingThumbnailFallback,
-  getMaxTexturesForItem,
-} from '../../utils/getClothingImage';
-import {
-  quickCheckHasVariations,
-  verifyTextures,
-} from '../../utils/textureVerification';
+import React, { useCallback, useRef, useState } from 'react';
+import { getMaxTexturesForItem } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
-import Spinner from '../../../../../../../webview/components/ui/Spinner';
+import { ClothingImage } from './ClothingImage';
+import { useTextureVerification } from '../../hooks';
 import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 
 interface ClothingItemProps {
@@ -47,30 +40,28 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   isSelected,
   onSelectDrawable,
 }) => {
-  // Each item maintains its own local texture state
-  const [selectedTexture, setSelectedTexture] = useState<number>(0);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imagePath, setImagePath] = useState('');
+  // Refs and UI state
+  const itemRef = useRef<HTMLDivElement>(null);
   const [showVariations, setShowVariations] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
-  const itemRef = useRef<HTMLDivElement>(null);
 
   // Get the maximum number of textures for this item
   const maxTextures = getMaxTexturesForItem(model, componentId, drawableId);
 
-  // State for variation detection
-  const [variationsChecked, setVariationsChecked] = useState(false);
-  const [hasVariations, setHasVariations] = useState(false);
-  const [verifiedTextures, setVerifiedTextures] = useState<number[]>([]);
+  // Use our texture verification hook
+  const {
+    selectedTexture,
+    hasVariations,
+    verifiedTextures,
+    selectTexture,
+    verifyAllTextures,
+  } = useTextureVerification(model, componentId, drawableId, maxTextures, {
+    // Auto-verify textures when the item is selected
+    autoVerify: isSelected,
+  });
 
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  // Handle texture selection internally
-  const handleSelectTexture = (textureId: number) => {
-    // Update the local state
-    setSelectedTexture(textureId);
-
-    // Only update the game character if this item is currently selected
+  // Update game character when texture changes
+  const updateGameCharacter = useCallback((textureId: number) => {
     if (isSelected) {
       const clothingKey = getClothingKeyFromComponentId(componentId);
       fetchNui('character-create:update-clothing', {
@@ -80,139 +71,32 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         console.error('[UI] Failed to update clothing texture:', error);
       });
     }
-  };
+  }, [isSelected, componentId]);
 
-  // When an item becomes selected, update the game with its stored texture
-  useEffect(() => {
+  // Handle texture selection
+  const handleSelectTexture = useCallback((textureId: number) => {
+    selectTexture(textureId);
+    updateGameCharacter(textureId);
+  }, [selectTexture, updateGameCharacter]);
+
+  // When item becomes selected, update the game with current texture
+  React.useEffect(() => {
     if (isSelected) {
-      // Update the game character with this item's selected texture
-      const clothingKey = getClothingKeyFromComponentId(componentId);
-      fetchNui('character-create:update-clothing', {
-        key: `${clothingKey}Texture`,
-        value: selectedTexture,
-      }).catch((error: any) => {
-        console.error(
-          '[UI] Failed to update clothing texture on selection:',
-          error
-        );
-      });
+      updateGameCharacter(selectedTexture);
     }
-  }, [isSelected, componentId, selectedTexture]);
+  }, [isSelected, selectedTexture, updateGameCharacter]);
 
-  // Effect to load the clothing image
-  useEffect(() => {
-    // Reset states when props change
-    setImageLoaded(false);
-    setLoadFailed(false);
-
-    // Always use low quality for grid thumbnails
-    const quality = 'low';
-
-    // Get the thumbnail path from the asset server with texture ID
-    const path = getClothingThumbnail(
-      model,
-      componentId,
-      drawableId,
-      selectedTexture,
-      quality
-    );
-    setImagePath(path);
-
-    // Preload the image
-    const img = new Image();
-    img.onload = () => {
-      setImageLoaded(true);
-      setLoadFailed(false);
-    };
-    img.onerror = () => {
-      // Try fallback with texture ID 0
-      const fallbackPath = getClothingThumbnailFallback(
-        model,
-        componentId,
-        drawableId,
-        quality
-      );
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => {
-        setImageLoaded(true);
-        setLoadFailed(false);
-        setImagePath(fallbackPath);
-      };
-      fallbackImg.onerror = () => {
-        setImageLoaded(false);
-        setLoadFailed(true);
-      };
-      fallbackImg.src = fallbackPath;
-    };
-    img.src = path;
-  }, [model, componentId, drawableId, selectedTexture]);
-
-  // Reset variations check and texture selection when drawable ID changes
-  useEffect(() => {
-    setVariationsChecked(false);
-    setHasVariations(false);
-    setVerifiedTextures([]);
-    // Reset texture selection to 0 when the drawableId changes
-    setSelectedTexture(0);
-  }, [drawableId]);
-
-  // Quick check for variations after initial render
-  useEffect(() => {
-    if (!variationsChecked && maxTextures > 1) {
-      // First quickly check if item might have variations
-      quickCheckHasVariations(model, componentId, drawableId).then(
-        (mightHaveVariations) => {
-          setHasVariations(mightHaveVariations);
-          setVariationsChecked(true);
-        }
-      );
-    }
-  }, [model, componentId, drawableId, maxTextures, variationsChecked]);
-
-  // Full verification when item is selected
-  useEffect(() => {
-    if (isSelected && hasVariations && verifiedTextures.length === 0) {
-      // Perform full verification of all textures
-      verifyTextures(model, componentId, drawableId, maxTextures).then(
-        (textures) => {
-          setVerifiedTextures(textures);
-          // Update hasVariations based on verified results
-          setHasVariations(textures.length > 1);
-
-          // If the current texture isn't in the verified list, reset to first valid texture
-          if (textures.length > 0 && !textures.includes(selectedTexture)) {
-            setSelectedTexture(textures[0]);
-          }
-        }
-      );
-    }
-  }, [
-    isSelected,
-    hasVariations,
-    model,
-    componentId,
-    drawableId,
-    maxTextures,
-    verifiedTextures.length,
-    selectedTexture,
-  ]);
-
-  const handleClick = () => {
+  // Handle click on clothing item
+  const handleClick = useCallback(() => {
     if (hasVariations && isSelected) {
       // If we haven't verified textures yet, do it now
       if (verifiedTextures.length === 0) {
-        verifyTextures(model, componentId, drawableId, maxTextures).then(
-          (textures) => {
-            setVerifiedTextures(textures);
-            // Only show popup if we actually have variations
-            if (textures.length > 1) {
-              showVariationsPopup();
-            } else {
-              // No variations after all, update state
-              setHasVariations(false);
-            }
+        verifyAllTextures().then(() => {
+          // Only show popup if we actually have variations
+          if (verifiedTextures.length > 1) {
+            showVariationsPopup();
           }
-        );
+        });
       } else if (verifiedTextures.length > 1) {
         // We have verified textures, show the popup
         showVariationsPopup();
@@ -221,24 +105,33 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
       // Otherwise, select this drawable
       onSelectDrawable();
     }
-  };
+  }, [
+    hasVariations, 
+    isSelected, 
+    verifiedTextures.length, 
+    verifyAllTextures, 
+    onSelectDrawable
+  ]);
 
-  const showVariationsPopup = () => {
+  // Position and show the variations popup
+  const showVariationsPopup = useCallback(() => {
     const rect = itemRef.current?.getBoundingClientRect();
     if (rect) {
-      // Position the popup relative to the item using absolute coordinates
-      // This ensures the popup appears directly below the grid item that triggered it
       setPopupPosition({
-        x: rect.left, // Position at the left edge of the grid item
-        y: rect.bottom + 5, // Position below the item with a small gap
+        x: rect.left,
+        y: rect.bottom + 5,
       });
       setShowVariations(true);
     }
-  };
+  }, []);
 
-  const handleCloseVariations = () => {
+  // Close the variations popup
+  const handleCloseVariations = useCallback(() => {
     setShowVariations(false);
-  };
+  }, []);
+
+  // Construct fallback image path (texture 0)
+  const fallbackSrc = `/assets/clothing/${model}/${componentId}/${drawableId}/0_low.png`;
 
   return (
     <div className="relative" style={{ zIndex: showVariations ? 10 : 'auto' }}>
@@ -251,31 +144,24 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         }`}
         onClick={handleClick}
       >
-        {imageLoaded ? (
-          <img
-            src={imagePath}
-            alt={`Clothing item ${drawableId}`}
-            className="w-full h-full object-cover"
-          />
-        ) : loadFailed ? (
-          <div className="w-full h-full flex items-center justify-center flex-col">
-            <span className="text-xs text-center">{drawableId}</span>
-          </div>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Spinner size="sm" color="brand" />
-          </div>
-        )}
+        <ClothingImage
+          model={model}
+          componentId={componentId}
+          drawableId={drawableId}
+          textureId={selectedTexture}
+          quality="low"
+          fallbackSrc={fallbackSrc}
+        />
 
         {/* Indicator for items with variations */}
         {hasVariations && (
           <div
             className="absolute top-1 right-1 w-4 h-4 bg-brand-500 rounded-full"
             title="This item has multiple variations"
-          ></div>
+          />
         )}
 
-        {/* Small indicator for selected texture if it's not the default */}
+        {/* Indicator for selected texture */}
         {selectedTexture > 0 && (
           <div
             className="absolute bottom-1 right-1 text-xs bg-brand-500/80 rounded-full w-5 h-5 flex items-center justify-center"
@@ -286,7 +172,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         )}
       </div>
 
-      {/* Variations popup - only show if we have verified textures */}
+      {/* Variations popup */}
       {showVariations && verifiedTextures.length > 1 && (
         <ClothingVariationsPopup
           model={model}
