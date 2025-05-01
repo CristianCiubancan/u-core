@@ -4,18 +4,23 @@ import { TabLayout } from '../../common';
 import { ClothingCategoryButton } from './ClothingCategoryButton';
 import { ClothingGrid } from './ClothingGrid';
 import { createClothingCategories } from './ClothingCategories';
+import { useCharacterData } from '../../../context/CharacterDataContext';
 
+// Keep props interface for backward compatibility
 interface ClothingTabProps {
-  clothingData: CharacterData['clothing'];
-  onClothingChange: (key: string, value: number) => void;
-  model: string;
+  clothingData?: CharacterData['clothing'];
+  onClothingChange?: (key: string, value: number) => void;
+  model?: string;
 }
 
-export const ClothingTabMain: React.FC<ClothingTabProps> = ({
-  clothingData,
-  onClothingChange,
-  model,
-}) => {
+export const ClothingTabMain: React.FC<ClothingTabProps> = (props) => {
+  // Get data from context
+  const { characterData, handleClothingChange } = useCharacterData();
+
+  // Use props if provided (for backward compatibility), otherwise use context
+  const clothingData = props.clothingData || characterData.clothing;
+  const onClothingChange = props.onClothingChange || handleClothingChange;
+  const model = props.model || characterData.model;
   // State to track which clothing category is currently active
   const [activeCategory, setActiveCategory] = useState<string>('tops');
 
@@ -53,7 +58,7 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = ({
   const handleDrawableSelect = (value: number) => {
     const key = activeCategory;
     // Update the game character
-    onClothingChange(key, value);
+    onClothingChange(key as any, value);
   };
 
   // Find the current active category object

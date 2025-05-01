@@ -1,13 +1,22 @@
 import React from 'react';
 import { HairData } from '../../../shared/types';
 import { Slider, TabLayout } from '../common';
+import { useCharacterData } from '../../context/CharacterDataContext';
 
+// Keep props interface for backward compatibility
 interface HairTabProps {
-  hairData: HairData;
-  onHairChange: (key: string, value: number) => void;
+  hairData?: HairData;
+  onHairChange?: (key: string, value: number) => void;
 }
 
-export const HairTab: React.FC<HairTabProps> = ({ hairData, onHairChange }) => {
+export const HairTab: React.FC<HairTabProps> = (props) => {
+  // Get data from context
+  const { characterData, handleHairChange } = useCharacterData();
+
+  // Use props if provided (for backward compatibility), otherwise use context
+  const hairData = props.hairData || characterData.hair;
+  const onHairChange = props.onHairChange || handleHairChange;
+
   return (
     <TabLayout title="Hair Customization">
       <Slider

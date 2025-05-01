@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNuiEvent } from '../../../../../webview/hooks/useNuiEvent';
-import { fetchNui } from '../../../../../webview/utils/fetchNui';
 import { isEnvBrowser } from '../../../../../webview/utils/misc';
 import { FaFaceSmile } from 'react-icons/fa6';
 import { FaScissors } from 'react-icons/fa6';
@@ -16,211 +15,23 @@ import {
   DraggableArea,
 } from './components';
 import { TabButton } from './components/common';
+import { NUI_EVENT } from '../shared/types';
 import {
-  CharacterData,
-  DEFAULT_CHARACTER,
-  DEFAULT_FEMALE_CHARACTER,
-  NUI_EVENT,
-  TabType,
-  AppearanceOverlay,
-  CameraFocus,
-} from '../shared/types';
+  CharacterDataProvider,
+  useCharacterData,
+} from './context/CharacterDataContext';
 
-export default function Page() {
+// Main content component that uses the context
+function CharacterCreationContent() {
   const [isOpen, setIsOpen] = useState(isEnvBrowser());
-  const [activeTab, setActiveTab] = useState<TabType>('face');
-  const [activeFocus, setActiveFocus] = useState<CameraFocus>('body');
-  const [characterData, setCharacterData] =
-    useState<CharacterData>(DEFAULT_CHARACTER);
+
+  // Get all data and functions from context
+  const { activeTab, setActiveTab, handleCloseUi } = useCharacterData();
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data: any) => {
     setIsOpen(!!data);
   });
-
-  // Handle close button click
-  const handleCloseUi = useCallback(async () => {
-    try {
-      await fetchNui(NUI_EVENT, { close: true });
-      setIsOpen(false);
-    } catch (error: any) {
-      console.error('[UI] Failed to close UI:', error);
-    }
-  }, []);
-
-  // Handle model change
-  const handleModelChange = useCallback((modelId: string) => {
-    // Use the appropriate default character data based on the model
-    const defaultData =
-      modelId === 'mp_f_freemode_01'
-        ? DEFAULT_FEMALE_CHARACTER
-        : DEFAULT_CHARACTER;
-
-    // Update with the default data for the selected model
-    setCharacterData({
-      ...defaultData,
-      model: modelId,
-    });
-
-    // Send model change to client
-    fetchNui('character-create:update-model', { model: modelId }).catch(
-      (error: any) => {
-        console.error('[UI] Failed to update model:', error);
-      }
-    );
-  }, []);
-
-  // Handle face change
-  const handleFaceChange = useCallback((key: string, value: number) => {
-    setCharacterData((prev) => ({
-      ...prev,
-      face: {
-        ...prev.face,
-        [key]: value,
-      },
-    }));
-
-    // Send face change to client
-    fetchNui('character-create:update-face', {
-      key,
-      value,
-    }).catch((error: any) => {
-      console.error('[UI] Failed to update face:', error);
-    });
-  }, []);
-
-  // Handle hair change
-  const handleHairChange = useCallback((key: string, value: number) => {
-    setCharacterData((prev) => ({
-      ...prev,
-      hair: {
-        ...prev.hair,
-        [key]: value,
-      },
-    }));
-
-    // Send hair change to client
-    fetchNui('character-create:update-hair', {
-      key,
-      value,
-    }).catch((error: any) => {
-      console.error('[UI] Failed to update hair:', error);
-    });
-  }, []);
-
-  // Handle appearance change
-  const handleAppearanceChange = useCallback(
-    (category: string, key: string, value: number) => {
-      setCharacterData((prev) => {
-        // Get the current category data
-        const categoryData = prev.appearance[category] as AppearanceOverlay;
-
-        if (!categoryData) {
-          console.error(`Category ${category} not found in appearance data`);
-          return prev;
-        }
-
-        return {
-          ...prev,
-          appearance: {
-            ...prev.appearance,
-            [category]: {
-              ...categoryData,
-              [key]: value,
-            },
-          },
-        };
-      });
-
-      // Send appearance change to client
-      fetchNui('character-create:update-appearance', {
-        category,
-        key,
-        value,
-      }).catch((error: any) => {
-        console.error('[UI] Failed to update appearance:', error);
-      });
-    },
-    []
-  );
-
-  // Handle eye color change
-  const handleEyeColorChange = useCallback((value: number) => {
-    setCharacterData((prev) => ({
-      ...prev,
-      appearance: {
-        ...prev.appearance,
-        eyeColor: value,
-      },
-    }));
-
-    // Send eye color change to client
-    fetchNui('character-create:update-appearance', {
-      category: 'eyeColor',
-      value,
-    }).catch((error: any) => {
-      console.error('[UI] Failed to update eye color:', error);
-    });
-  }, []);
-
-  // Handle clothing change
-  const handleClothingChange = useCallback((key: string, value: number) => {
-    setCharacterData((prev) => ({
-      ...prev,
-      clothing: {
-        ...prev.clothing,
-        [key]: value,
-      },
-    }));
-
-    // Send clothing change to client
-    fetchNui('character-create:update-clothing', {
-      key,
-      value,
-    }).catch((error: any) => {
-      console.error('[UI] Failed to update clothing:', error);
-    });
-  }, []);
-
-  // Handle camera rotation
-  const handleRotateCamera = useCallback((direction: 'left' | 'right') => {
-    fetchNui('character-create:rotate-camera', { direction }).catch(
-      (error: any) => {
-        console.error('[UI] Failed to rotate camera:', error);
-      }
-    );
-  }, []);
-
-  // Handle camera zoom
-  const handleZoomCamera = useCallback((direction: 'in' | 'out') => {
-    fetchNui('character-create:zoom-camera', { direction }).catch(
-      (error: any) => {
-        console.error('[UI] Failed to zoom camera:', error);
-      }
-    );
-  }, []);
-
-  // Handle camera focus
-  const handleFocusCamera = useCallback(
-    (focus: CameraFocus) => {
-      setActiveFocus(focus);
-      fetchNui('character-create:focus-camera', { focus }).catch(
-        (error: any) => {
-          console.error('[UI] Failed to focus camera:', error);
-        }
-      );
-    },
-    [setActiveFocus]
-  );
-
-  // Handle player rotation
-  const handleRotatePlayer = useCallback((direction: 'left' | 'right') => {
-    fetchNui('character-create:rotate-player', { direction }).catch(
-      (error: any) => {
-        console.error('[UI] Failed to rotate player:', error);
-      }
-    );
-  }, []);
 
   useEffect(() => {
     // listen for F3 key press
@@ -245,10 +56,7 @@ export default function Page() {
           <div className="text-center text-xl font-bold text-white text-shadow mb-4">
             Character Creation
           </div>
-          <ModelPicker
-            currentModel={characterData.model}
-            onModelChange={handleModelChange}
-          />
+          <ModelPicker />
           {/* Tabs */}
           <div className="grid grid-cols-4 gap-4 mt-4">
             <TabButton
@@ -283,44 +91,16 @@ export default function Page() {
         </div>
         {/* Right content - Tab content */}
         <div className="flex-1 p-4 min-h-0 flex flex-col text-responsive-base">
-          {activeTab === 'face' && (
-            <FaceTab
-              faceData={characterData.face}
-              onFaceChange={handleFaceChange}
-            />
-          )}
-          {activeTab === 'hair' && (
-            <HairTab
-              hairData={characterData.hair}
-              onHairChange={handleHairChange}
-            />
-          )}
-          {activeTab === 'appearance' && (
-            <AppearanceTab
-              appearanceData={characterData.appearance}
-              onAppearanceChange={handleAppearanceChange}
-              onEyeColorChange={handleEyeColorChange}
-            />
-          )}
-          {activeTab === 'clothing' && (
-            <ClothingTab
-              clothingData={characterData.clothing}
-              onClothingChange={handleClothingChange}
-              model={characterData.model}
-            />
-          )}
+          {activeTab === 'face' && <FaceTab />}
+          {activeTab === 'hair' && <HairTab />}
+          {activeTab === 'appearance' && <AppearanceTab />}
+          {activeTab === 'clothing' && <ClothingTab />}
         </div>
       </div>
 
       {/* Camera controls panel */}
       <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
-        <CameraControls
-          onRotate={handleRotateCamera}
-          onZoom={handleZoomCamera}
-          onFocus={handleFocusCamera}
-          onRotatePlayer={handleRotatePlayer}
-          activeFocus={activeFocus}
-        />
+        <CameraControls />
       </div>
 
       {/* Draggable area for character rotation and zoom */}
@@ -329,4 +109,13 @@ export default function Page() {
       </div>
     </div>
   ) : null;
+}
+
+// Wrap the main component with the provider
+export default function Page() {
+  return (
+    <CharacterDataProvider>
+      <CharacterCreationContent />
+    </CharacterDataProvider>
+  );
 }

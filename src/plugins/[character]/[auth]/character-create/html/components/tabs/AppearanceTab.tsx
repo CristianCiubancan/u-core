@@ -1,17 +1,28 @@
 import React from 'react';
 import { AppearanceData } from '../../../shared/types';
+import { useCharacterData } from '../../context/CharacterDataContext';
 
+// Keep props interface for backward compatibility
 interface AppearanceTabProps {
-  appearanceData: AppearanceData;
-  onAppearanceChange: (category: string, key: string, value: number) => void;
-  onEyeColorChange: (value: number) => void;
+  appearanceData?: AppearanceData;
+  onAppearanceChange?: (category: string, key: string, value: number) => void;
+  onEyeColorChange?: (value: number) => void;
 }
 
-export const AppearanceTab: React.FC<AppearanceTabProps> = ({
-  appearanceData,
-  onAppearanceChange,
-  onEyeColorChange,
-}) => {
+export const AppearanceTab: React.FC<AppearanceTabProps> = (props) => {
+  // Get data from context
+  const { characterData, handleAppearanceChange } = useCharacterData();
+
+  // Use props if provided (for backward compatibility), otherwise use context
+  const appearanceData = props.appearanceData || characterData.appearance;
+  const onAppearanceChange = props.onAppearanceChange || handleAppearanceChange;
+
+  // Handle eye color change (special case)
+  const onEyeColorChange =
+    props.onEyeColorChange ||
+    ((value: number) => {
+      handleAppearanceChange('eyeColor', '', value);
+    });
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Appearance Customization</h2>
