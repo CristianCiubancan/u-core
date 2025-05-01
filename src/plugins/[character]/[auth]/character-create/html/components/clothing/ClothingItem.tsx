@@ -4,9 +4,9 @@ import {
   getClothingThumbnailFallback,
   getMaxTexturesForItem,
 } from '../../utils/getClothingImage';
-import { 
+import {
   quickCheckHasVariations,
-  verifyTextures 
+  verifyTextures,
 } from '../../utils/textureVerification';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
 import Spinner from '../../../../../../../webview/components/ui/Spinner';
@@ -23,13 +23,20 @@ interface ClothingItemProps {
 // Helper function to map component IDs to their respective clothing keys
 const getClothingKeyFromComponentId = (componentId: number): string => {
   switch (componentId) {
-    case 11: return 'tops';
-    case 8: return 'undershirt';
-    case 4: return 'legs';
-    case 6: return 'shoes';
-    case 7: return 'accessories';
-    case 3: return 'torso';
-    default: return 'tops';
+    case 11:
+      return 'tops';
+    case 8:
+      return 'undershirt';
+    case 4:
+      return 'legs';
+    case 6:
+      return 'shoes';
+    case 7:
+      return 'accessories';
+    case 3:
+      return 'torso';
+    default:
+      return 'tops';
   }
 };
 
@@ -55,14 +62,14 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   const [variationsChecked, setVariationsChecked] = useState(false);
   const [hasVariations, setHasVariations] = useState(false);
   const [verifiedTextures, setVerifiedTextures] = useState<number[]>([]);
-  
+
   const [loadFailed, setLoadFailed] = useState(false);
 
   // Handle texture selection internally
   const handleSelectTexture = (textureId: number) => {
     // Update the local state
     setSelectedTexture(textureId);
-    
+
     // Only update the game character if this item is currently selected
     if (isSelected) {
       const clothingKey = getClothingKeyFromComponentId(componentId);
@@ -84,7 +91,10 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         key: `${clothingKey}Texture`,
         value: selectedTexture,
       }).catch((error: any) => {
-        console.error('[UI] Failed to update clothing texture on selection:', error);
+        console.error(
+          '[UI] Failed to update clothing texture on selection:',
+          error
+        );
       });
     }
   }, [isSelected, componentId, selectedTexture]);
@@ -168,7 +178,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
           setVerifiedTextures(textures);
           // Update hasVariations based on verified results
           setHasVariations(textures.length > 1);
-          
+
           // If the current texture isn't in the verified list, reset to first valid texture
           if (textures.length > 0 && !textures.includes(selectedTexture)) {
             setSelectedTexture(textures[0]);
@@ -176,7 +186,16 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
         }
       );
     }
-  }, [isSelected, hasVariations, model, componentId, drawableId, maxTextures, verifiedTextures.length, selectedTexture]);
+  }, [
+    isSelected,
+    hasVariations,
+    model,
+    componentId,
+    drawableId,
+    maxTextures,
+    verifiedTextures.length,
+    selectedTexture,
+  ]);
 
   const handleClick = () => {
     if (hasVariations && isSelected) {
@@ -207,10 +226,11 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   const showVariationsPopup = () => {
     const rect = itemRef.current?.getBoundingClientRect();
     if (rect) {
-      // Position the popup near the clicked item
+      // Position the popup relative to the item using absolute coordinates
+      // This ensures the popup appears directly below the grid item that triggered it
       setPopupPosition({
-        x: rect.left,
-        y: rect.bottom + 5, // 5px below the item
+        x: rect.left, // Position at the left edge of the grid item
+        y: rect.bottom + 5, // Position below the item with a small gap
       });
       setShowVariations(true);
     }
@@ -221,7 +241,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
   };
 
   return (
-    <>
+    <div className="relative" style={{ zIndex: showVariations ? 10 : 'auto' }}>
       <div
         ref={itemRef}
         className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
@@ -254,7 +274,7 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
             title="This item has multiple variations"
           ></div>
         )}
-        
+
         {/* Small indicator for selected texture if it's not the default */}
         {selectedTexture > 0 && (
           <div
@@ -279,6 +299,6 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
           position={popupPosition}
         />
       )}
-    </>
+    </div>
   );
 };

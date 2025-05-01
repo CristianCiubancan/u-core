@@ -140,18 +140,78 @@ export const DEFAULT_CHARACTER: CharacterData = {
     lipstick: { style: 0, color: 0, opacity: 0.0 },
   },
   clothing: {
-    torso: 0,
+    torso: 15, // Bare torso
     torsoTexture: 0,
-    legs: 0,
+    legs: 14, // Underwear/boxers
     legsTexture: 0,
-    shoes: 0,
+    shoes: 34, // Barefoot
     shoesTexture: 0,
-    accessories: 0,
+    accessories: 0, // None
     accessoriesTexture: 0,
-    undershirt: 0,
+    undershirt: 15, // None
     undershirtTexture: 0,
-    tops: 0,
+    tops: 15, // None (Torso 2/Outer top)
     topsTexture: 0,
+    mask: 0, // None
+    maskTexture: 0,
+    bags: 0, // None
+    bagsTexture: 0,
+    armor: 0, // None
+    armorTexture: 0,
+    decals: 0, // None
+    decalsTexture: 0,
+  },
+};
+
+/**
+ * Default female character data
+ */
+export const DEFAULT_FEMALE_CHARACTER: CharacterData = {
+  model: 'mp_f_freemode_01',
+  face: {
+    fatherIndex: 0,
+    motherIndex: 0,
+    shapeMix: 0.5,
+    skinMix: 0.5,
+  },
+  hair: {
+    style: 0,
+    color: 0,
+    highlight: 0,
+  },
+  appearance: {
+    eyebrows: { style: 0, color: 0, opacity: 1.0 },
+    beard: { style: 0, color: 0, opacity: 0.0 },
+    eyeColor: 0,
+    blemishes: { style: 0, opacity: 0.0 },
+    ageing: { style: 0, opacity: 0.0 },
+    complexion: { style: 0, opacity: 0.0 },
+    moles: { style: 0, opacity: 0.0 },
+    sunDamage: { style: 0, opacity: 0.0 },
+    makeUp: { style: 0, color: 0, opacity: 0.0 },
+    lipstick: { style: 0, color: 0, opacity: 0.0 },
+  },
+  clothing: {
+    torso: 15, // Basic
+    torsoTexture: 0,
+    legs: 15, // Underwear
+    legsTexture: 0,
+    shoes: 35, // Barefoot
+    shoesTexture: 0,
+    accessories: 0, // None
+    accessoriesTexture: 0,
+    undershirt: 2, // Basic
+    undershirtTexture: 0,
+    tops: 15, // None (Torso 2/Outer top)
+    topsTexture: 0,
+    mask: 0, // None
+    maskTexture: 0,
+    bags: 0, // None
+    bagsTexture: 0,
+    armor: 0, // None
+    armorTexture: 0,
+    decals: 0, // None
+    decalsTexture: 0,
   },
 };
 

@@ -19,6 +19,7 @@ import { TabButton } from './components/common';
 import {
   CharacterData,
   DEFAULT_CHARACTER,
+  DEFAULT_FEMALE_CHARACTER,
   NUI_EVENT,
   TabType,
   AppearanceOverlay,
@@ -49,10 +50,17 @@ export default function Page() {
 
   // Handle model change
   const handleModelChange = useCallback((modelId: string) => {
-    setCharacterData((prev) => ({
-      ...prev,
+    // Use the appropriate default character data based on the model
+    const defaultData =
+      modelId === 'mp_f_freemode_01'
+        ? DEFAULT_FEMALE_CHARACTER
+        : DEFAULT_CHARACTER;
+
+    // Update with the default data for the selected model
+    setCharacterData({
+      ...defaultData,
       model: modelId,
-    }));
+    });
 
     // Send model change to client
     fetchNui('character-create:update-model', { model: modelId }).catch(
