@@ -5,7 +5,6 @@ import {
   CharacterData,
   CameraFocus,
   DEFAULT_CHARACTER,
-  DEFAULT_FEMALE_CHARACTER,
   NUI_EVENT,
 } from './types';
 
