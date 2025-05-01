@@ -43,12 +43,21 @@ export const ClothingVariationsPopup: React.FC<
 
       // Adjust horizontal position if needed
       if (newX + rect.width > viewportWidth) {
-        newX = viewportWidth - rect.width - 10;
+        // If popup would go off the right edge, align to right side of the grid item
+        // We estimate the grid item width as approximately the popup width
+        newX = Math.max(10, newX - rect.width / 2);
+      }
+
+      // Make sure popup doesn't go off the left edge
+      if (newX < 10) {
+        newX = 10;
       }
 
       // Adjust vertical position if needed
       if (newY + rect.height > viewportHeight) {
-        newY = viewportHeight - rect.height - 10;
+        // If popup would go off the bottom, position it above the grid item instead
+        // We use position.y - rect.height - 10 to position above with a small gap
+        newY = Math.max(10, position.y - rect.height - 10);
       }
 
       setAdjustedPosition({ x: newX, y: newY });
@@ -115,7 +124,7 @@ export const ClothingVariationsPopup: React.FC<
               onClick={() => {
                 // Update the parent component's state through the callback
                 onSelectTexture(textureId);
-                
+
                 // Close the popup after selection
                 onClose();
               }}

@@ -3,6 +3,8 @@ import {
   HairData,
   AppearanceData,
   ClothingData,
+  DEFAULT_CHARACTER,
+  DEFAULT_FEMALE_CHARACTER,
 } from '../shared/types';
 import { getCharacterData, getCameraState, store } from '../shared/store';
 import { Delay } from './utils';
@@ -18,8 +20,17 @@ class CharacterManager {
   async loadAndSetModel(model: string): Promise<boolean> {
     console.log(`[Character Create] Loading and setting model: ${model}`);
 
-    // Update our character data
-    store.updateCharacterData({ model });
+    // Determine which default character data to use based on the model
+    const defaultData =
+      model === 'mp_f_freemode_01'
+        ? DEFAULT_FEMALE_CHARACTER
+        : DEFAULT_CHARACTER;
+
+    // Update our character data with the appropriate default, but keep the model
+    store.updateCharacterData({
+      ...defaultData,
+      model,
+    });
 
     // Request the model
     const modelHash = GetHashKey(model);
@@ -397,7 +408,7 @@ class CharacterManager {
   async updateModel(model: string): Promise<void> {
     console.log(`[Character Create] Updating player model to: ${model}`);
 
-    // Update the model
+    // Update the model with the appropriate default character data
     await this.loadAndSetModel(model);
 
     // After model is changed, we need to reapply all customizations
