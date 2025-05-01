@@ -273,7 +273,7 @@ export default function Page() {
           </div>
         </div>
         {/* Right content - Tab content */}
-        <div className="flex-1 p-4 min-h-0 flex flex-col text-readable text-responsive-base">
+        <div className="flex-1 p-4 min-h-0 flex flex-col text-responsive-base">
           {activeTab === 'face' && (
             <FaceTab
               faceData={characterData.face}
