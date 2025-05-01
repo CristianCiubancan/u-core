@@ -9,22 +9,61 @@ import {
   ZoomDirection,
   CameraFocus,
 } from '../../shared/types';
+import { useCharacterData } from '../context/CharacterDataContext';
+import { fetchNui } from '../../../../../../webview/utils/fetchNui';
 
+// Keep props interface for backward compatibility
 interface CameraControlsProps {
-  onRotate: (direction: CameraDirection) => void;
-  onZoom: (direction: ZoomDirection) => void;
-  onFocus: (focus: CameraFocus) => void;
+  onRotate?: (direction: CameraDirection) => void;
+  onZoom?: (direction: ZoomDirection) => void;
+  onFocus?: (focus: CameraFocus) => void;
   onRotatePlayer?: (direction: CameraDirection) => void;
-  activeFocus: CameraFocus;
+  activeFocus?: CameraFocus;
 }
 
-export const CameraControls: React.FC<CameraControlsProps> = ({
-  // onRotate,
-  onZoom,
-  onFocus,
-  onRotatePlayer,
-  activeFocus,
-}) => {
+export const CameraControls: React.FC<CameraControlsProps> = (props) => {
+  // Get data from context
+  const { activeFocus, setActiveFocus } = useCharacterData();
+
+  // Camera zoom handler
+  const handleZoom = (direction: ZoomDirection) => {
+    if (props.onZoom) {
+      props.onZoom(direction);
+    } else {
+      fetchNui('character-create:zoom-camera', { direction }).catch(
+        (error: any) => {
+          console.error('[UI] Failed to zoom camera:', error);
+        }
+      );
+    }
+  };
+
+  // Camera focus handler
+  const handleFocus = (focus: CameraFocus) => {
+    if (props.onFocus) {
+      props.onFocus(focus);
+    } else {
+      setActiveFocus(focus);
+      fetchNui('character-create:focus-camera', { focus }).catch(
+        (error: any) => {
+          console.error('[UI] Failed to focus camera:', error);
+        }
+      );
+    }
+  };
+
+  // Player rotation handler
+  const handleRotatePlayer = (direction: CameraDirection) => {
+    if (props.onRotatePlayer) {
+      props.onRotatePlayer(direction);
+    } else {
+      fetchNui('character-create:rotate-player', { direction }).catch(
+        (error: any) => {
+          console.error('[UI] Failed to rotate player:', error);
+        }
+      );
+    }
+  };
   return (
     <div className="text-sm w-full">
       <div className="flex flex-col gap-4">
@@ -33,20 +72,8 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
             Camera Controls
           </h3>
           <div className="grid grid-cols-1 gap-2">
-            {/* <Button
-              onClick={() => onRotate('right')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
-            >
-              ← Move Camera
-            </Button>
             <Button
-              onClick={() => onRotate('left')}
-              className="py-1 px-2 text-xs flex justify-center items-center"
-            >
-              Move Camera →
-            </Button> */}
-            <Button
-              onClick={() => onZoom('in')}
+              onClick={() => handleZoom('in')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
               <IconWrapper className="mr-2">
@@ -55,7 +82,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
               Zoom In
             </Button>
             <Button
-              onClick={() => onZoom('out')}
+              onClick={() => handleZoom('out')}
               className="py-1 px-2 text-xs flex justify-center items-center"
             >
               <IconWrapper className="mr-2">
@@ -66,33 +93,31 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           </div>
         </div>
 
-        {onRotatePlayer && (
-          <div>
-            <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
-              Character Rotation
-            </h3>
-            <div className="grid grid-cols-1 gap-2">
-              <Button
-                onClick={() => onRotatePlayer('left')}
-                className="py-1 px-2 text-xs flex justify-center items-center"
-              >
-                <IconWrapper className="mr-2">
-                  <FaArrowRotateLeft />
-                </IconWrapper>
-                Rotate Left
-              </Button>
-              <Button
-                onClick={() => onRotatePlayer('right')}
-                className="py-1 px-2 text-xs flex justify-center items-center"
-              >
-                <IconWrapper className="mr-2">
-                  <FaArrowRotateRight />
-                </IconWrapper>
-                Rotate Right
-              </Button>
-            </div>
+        <div>
+          <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
+            Character Rotation
+          </h3>
+          <div className="grid grid-cols-1 gap-2">
+            <Button
+              onClick={() => handleRotatePlayer('left')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              <IconWrapper className="mr-2">
+                <FaArrowRotateLeft />
+              </IconWrapper>
+              Rotate Left
+            </Button>
+            <Button
+              onClick={() => handleRotatePlayer('right')}
+              className="py-1 px-2 text-xs flex justify-center items-center"
+            >
+              <IconWrapper className="mr-2">
+                <FaArrowRotateRight />
+              </IconWrapper>
+              Rotate Right
+            </Button>
           </div>
-        )}
+        </div>
 
         <div>
           <h3 className="text-on-dark font-semibold mb-2 text-center md:text-left text-xs">
@@ -100,7 +125,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
           </h3>
           <div className="grid grid-cols-1 gap-2">
             <Button
-              onClick={() => onFocus('head')}
+              onClick={() => handleFocus('head')}
               className={`py-1 px-2 text-xs flex justify-center items-center ${
                 activeFocus === 'head' ? 'glass-brand' : 'glass-brand-dark'
               }`}
@@ -111,7 +136,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
               Head
             </Button>
             <Button
-              onClick={() => onFocus('body')}
+              onClick={() => handleFocus('body')}
               className={`py-1 px-2 text-xs flex justify-center items-center ${
                 activeFocus === 'body' ? 'glass-brand' : 'glass-brand-dark'
               }`}
@@ -122,7 +147,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
               Body
             </Button>
             <Button
-              onClick={() => onFocus('legs')}
+              onClick={() => handleFocus('legs')}
               className={`py-1 px-2 text-xs flex justify-center items-center ${
                 activeFocus === 'legs' ? 'glass-brand' : 'glass-brand-dark'
               }`}

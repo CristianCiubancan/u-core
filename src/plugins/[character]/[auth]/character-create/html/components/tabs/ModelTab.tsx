@@ -3,16 +3,22 @@ import Button from '../../../../../../../webview/components/ui/Button';
 import { FaMars, FaVenus } from 'react-icons/fa6';
 import { IconWrapper } from '../common';
 import { MODELS } from '../../../shared/types';
+import { useCharacterData } from '../../context/CharacterDataContext';
 
+// We can keep the props interface for backward compatibility
 interface ModelPickerProps {
-  currentModel: string;
-  onModelChange: (modelId: string) => void;
+  currentModel?: string;
+  onModelChange?: (modelId: string) => void;
 }
 
-export const ModelPicker: React.FC<ModelPickerProps> = ({
-  currentModel,
-  onModelChange,
-}) => {
+export const ModelPicker: React.FC<ModelPickerProps> = (props) => {
+  // Get data from context
+  const { characterData, handleModelChange } = useCharacterData();
+
+  // Use props if provided (for backward compatibility), otherwise use context
+  const currentModel = props.currentModel || characterData.model;
+  const onModelChange = props.onModelChange || handleModelChange;
+
   return (
     <div>
       <div className="grid grid-cols-2 gap-4">

@@ -8,7 +8,7 @@ server.txt
 
 asset-server/public/*
 asset-server/original/*
-
+*-bkp
 # node_modules
 node_modules
 package-lock.json

@@ -1,13 +1,22 @@
 import React from 'react';
 import { FaceData } from '../../../shared/types';
 import { Slider, TabLayout } from '../common';
+import { useCharacterData } from '../../context/CharacterDataContext';
 
+// Keep props interface for backward compatibility
 interface FaceTabProps {
-  faceData: FaceData;
-  onFaceChange: (key: string, value: number) => void;
+  faceData?: FaceData;
+  onFaceChange?: (key: string, value: number) => void;
 }
 
-export const FaceTab: React.FC<FaceTabProps> = ({ faceData, onFaceChange }) => {
+export const FaceTab: React.FC<FaceTabProps> = (props) => {
+  // Get data from context
+  const { characterData, handleFaceChange } = useCharacterData();
+
+  // Use props if provided (for backward compatibility), otherwise use context
+  const faceData = props.faceData || characterData.face;
+  const onFaceChange = props.onFaceChange || handleFaceChange;
+
   return (
     <TabLayout title="Face Customization">
       <Slider
