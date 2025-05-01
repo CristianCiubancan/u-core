@@ -1,24 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  getClothingThumbnail,
-  getClothingThumbnailFallback,
-} from '../../utils/getClothingImage';
-import Spinner from '../../../../../../../webview/components/ui/Spinner';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ClothingImage } from './ClothingImage';
 
 interface ClothingVariationsPopupProps {
   model: string;
   componentId: number;
   drawableId: number;
-  verifiedTextures: number[]; // Array of verified texture IDs
+  verifiedTextures: number[];
   selectedTexture: number;
   onSelectTexture: (textureId: number) => void;
   onClose: () => void;
   position: { x: number; y: number };
 }
 
-export const ClothingVariationsPopup: React.FC<
-  ClothingVariationsPopupProps
-> = ({
+export const ClothingVariationsPopup: React.FC<ClothingVariationsPopupProps> = ({
   model,
   componentId,
   drawableId,
@@ -31,57 +25,46 @@ export const ClothingVariationsPopup: React.FC<
   const popupRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
 
-  // Adjust position to ensure popup stays within viewport
+  // Adjust position to keep popup within viewport
   useEffect(() => {
-    if (popupRef.current) {
-      const rect = popupRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+    if (!popupRef.current) return;
+    
+    const rect = popupRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
 
-      let newX = position.x;
-      let newY = position.y;
+    let newX = position.x;
+    let newY = position.y;
 
-      // Adjust horizontal position if needed
-      if (newX + rect.width > viewportWidth) {
-        // If popup would go off the right edge, align to right side of the grid item
-        // We estimate the grid item width as approximately the popup width
-        newX = Math.max(10, newX - rect.width / 2);
-      }
-
-      // Make sure popup doesn't go off the left edge
-      if (newX < 10) {
-        newX = 10;
-      }
-
-      // Adjust vertical position if needed
-      if (newY + rect.height > viewportHeight) {
-        // If popup would go off the bottom, position it above the grid item instead
-        // We use position.y - rect.height - 10 to position above with a small gap
-        newY = Math.max(10, position.y - rect.height - 10);
-      }
-
-      setAdjustedPosition({ x: newX, y: newY });
+    // Adjust horizontal position
+    if (newX + rect.width > viewportWidth) {
+      newX = Math.max(10, newX - rect.width / 2);
     }
-  }, [position, popupRef]);
+    
+    // Don't go off left edge
+    newX = Math.max(10, newX);
+
+    // Adjust vertical position
+    if (newY + rect.height > viewportHeight) {
+      newY = Math.max(10, position.y - rect.height - 10);
+    }
+
+    setAdjustedPosition({ x: newX, y: newY });
+  }, [position]);
 
   // Close popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(event.target as Node)
-      ) {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  // Safety check - if we have no textures, close the popup
+  // Safety check for empty textures array
   useEffect(() => {
     if (verifiedTextures.length === 0) {
       console.warn('No verified textures available, closing popup');
@@ -89,7 +72,12 @@ export const ClothingVariationsPopup: React.FC<
     }
   }, [verifiedTextures, onClose]);
 
-  // Sort the textures to ensure they appear in a logical order
+  const handleSelectVariation = useCallback((textureId: number) => {
+    onSelectTexture(textureId);
+    onClose();
+  }, [onSelectTexture, onClose]);
+
+  // Sort textures numerically
   const sortedTextures = [...verifiedTextures].sort((a, b) => a - b);
 
   return (
@@ -112,6 +100,7 @@ export const ClothingVariationsPopup: React.FC<
             ×
           </button>
         </div>
+        
         <div className="grid grid-cols-4 gap-2 max-w-[240px]">
           {sortedTextures.map((textureId) => (
             <TextureVariationItem
@@ -121,13 +110,7 @@ export const ClothingVariationsPopup: React.FC<
               drawableId={drawableId}
               textureId={textureId}
               isSelected={textureId === selectedTexture}
-              onClick={() => {
-                // Update the parent component's state through the callback
-                onSelectTexture(textureId);
-
-                // Close the popup after selection
-                onClose();
-              }}
+              onClick={() => handleSelectVariation(textureId)}
             />
           ))}
         </div>
@@ -153,56 +136,8 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
   isSelected,
   onClick,
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imagePath, setImagePath] = useState('');
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  useEffect(() => {
-    // Reset states when props change
-    setImageLoaded(false);
-    setLoadFailed(false);
-
-    // Always use tiny quality for variations thumbnails
-    const quality = 'tiny';
-
-    // Get the thumbnail path from the asset server with texture ID
-    const path = getClothingThumbnail(
-      model,
-      componentId,
-      drawableId,
-      textureId,
-      quality
-    );
-    setImagePath(path);
-
-    // Preload the image
-    const img = new Image();
-    img.onload = () => {
-      setImageLoaded(true);
-      setLoadFailed(false);
-    };
-    img.onerror = () => {
-      // Try fallback with texture ID 0
-      const fallbackPath = getClothingThumbnailFallback(
-        model,
-        componentId,
-        drawableId,
-        quality
-      );
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => {
-        setImageLoaded(true);
-        setLoadFailed(false);
-        setImagePath(fallbackPath);
-      };
-      fallbackImg.onerror = () => {
-        setImageLoaded(false);
-        setLoadFailed(true);
-      };
-      fallbackImg.src = fallbackPath;
-    };
-    img.src = path;
-  }, [model, componentId, drawableId, textureId]);
+  // Construct fallback path
+  const fallbackSrc = `/assets/clothing/${model}/${componentId}/${drawableId}/0_tiny.png`;
 
   return (
     <div
@@ -213,21 +148,14 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
       }`}
       onClick={onClick}
     >
-      {imageLoaded ? (
-        <img
-          src={imagePath}
-          alt={`Texture ${textureId}`}
-          className="w-full h-full object-cover"
-        />
-      ) : loadFailed ? (
-        <div className="w-full h-full flex items-center justify-center bg-black/30">
-          <span className="text-xs text-center">{textureId}</span>
-        </div>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-black/30">
-          <Spinner size="sm" color="brand" />
-        </div>
-      )}
+      <ClothingImage
+        model={model}
+        componentId={componentId}
+        drawableId={drawableId}
+        textureId={textureId}
+        quality="tiny"
+        fallbackSrc={fallbackSrc}
+      />
     </div>
   );
 };
