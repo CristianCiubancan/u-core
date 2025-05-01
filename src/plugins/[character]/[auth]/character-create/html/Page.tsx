@@ -13,6 +13,7 @@ import {
   ClothingTab,
   CameraControls,
   ModelPicker,
+  DraggableArea,
 } from './components';
 import { TabButton } from './components/common';
 import {
@@ -302,8 +303,9 @@ export default function Page() {
           )}
         </div>
       </div>
+
+      {/* Camera controls panel */}
       <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
-        {/* Camera controls in vertical layout */}
         <CameraControls
           onRotate={handleRotateCamera}
           onZoom={handleZoomCamera}
@@ -311,6 +313,11 @@ export default function Page() {
           onRotatePlayer={handleRotatePlayer}
           activeFocus={activeFocus}
         />
+      </div>
+
+      {/* Draggable area for character rotation and zoom */}
+      <div className="flex-1 flex items-center justify-center">
+        <DraggableArea className="w-full h-[70vh] glass-dark/30 rounded-lg" />
       </div>
     </div>
   ) : null;

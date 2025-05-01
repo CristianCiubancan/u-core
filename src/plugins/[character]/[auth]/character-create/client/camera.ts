@@ -31,6 +31,33 @@ class CameraManager {
   }
 
   /**
+   * Rotate the camera by a specific amount
+   * @param {number} amount - The amount to rotate (positive = right, negative = left)
+   */
+  rotateByAmount(amount: number): void {
+    const { cameraRotation } = getCameraState();
+    // Calculate new rotation by adding the amount
+    const newRotation = (cameraRotation + amount) % 360;
+    setCameraRotation(newRotation);
+    this.updatePosition();
+
+    // Make the character face the camera after rotation
+    faceCamera();
+  }
+
+  /**
+   * Zoom the camera by a specific amount
+   * @param {number} amount - The amount to zoom (positive = out, negative = in)
+   */
+  zoomByAmount(amount: number): void {
+    const { cameraZoom } = getCameraState();
+    // Calculate new zoom by adding the amount, with limits
+    const newZoom = Math.max(0.5, Math.min(3.0, cameraZoom + amount));
+    setCameraZoom(newZoom);
+    this.updatePosition();
+  }
+
+  /**
    * Update the camera position based on current rotation, zoom, and focus
    */
   updatePosition(): void {
@@ -183,3 +210,7 @@ export const zoomCamera = (direction: ZoomDirection) =>
   cameraManager.zoom(direction);
 export const focusCamera = (focus: CameraFocus) => cameraManager.focus(focus);
 export const cleanupCamera = () => cameraManager.cleanup();
+export const rotateCameraByAmount = (amount: number) =>
+  cameraManager.rotateByAmount(amount);
+export const zoomCameraByAmount = (amount: number) =>
+  cameraManager.zoomByAmount(amount);

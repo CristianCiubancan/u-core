@@ -226,6 +226,11 @@ export interface PlayerRotationData {
   direction: CameraDirection;
 }
 
+export interface CameraDragData {
+  deltaX: number;
+  deltaY: number;
+}
+
 export interface SaveCharacterData {
   close?: boolean;
   save?: boolean;
