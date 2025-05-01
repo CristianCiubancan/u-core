@@ -22,6 +22,11 @@ const DraggableArea: React.FC<DraggableAreaProps> = ({ className = '' }) => {
     lastX: 0,
     lastY: 0,
   });
+  // Track if the user has ever dragged (persisted in localStorage)
+  const [hasEverDragged, setHasEverDragged] = useState<boolean>(() => {
+    // Check localStorage for saved state
+    return localStorage.getItem('character-create:has-dragged') === 'true';
+  });
   const animationFrameRef = useRef<number | null>(null);
 
   // Handle mouse down / touch start
@@ -54,6 +59,13 @@ const DraggableArea: React.FC<DraggableAreaProps> = ({ className = '' }) => {
         lastY: clientY,
       }));
 
+      // Mark that the user has dragged at least once
+      if (!hasEverDragged) {
+        setHasEverDragged(true);
+        // Save to localStorage
+        localStorage.setItem('character-create:has-dragged', 'true');
+      }
+
       // Send the drag event to the client
       // We'll use deltaX for character rotation and deltaY for camera zoom
       fetchNui('character-create:drag-camera', {
@@ -63,7 +75,7 @@ const DraggableArea: React.FC<DraggableAreaProps> = ({ className = '' }) => {
         console.error('[UI] Failed to send drag event:', error);
       });
     },
-    [dragState]
+    [dragState, hasEverDragged]
   );
 
   // Handle mouse up / touch end
@@ -183,6 +195,21 @@ const DraggableArea: React.FC<DraggableAreaProps> = ({ className = '' }) => {
     handleTouchEnd,
   ]);
 
+  // Add a function to reset the drag state (for testing)
+  useEffect(() => {
+    // Expose a function to reset the drag state
+    (window as any).resetDragPrompts = () => {
+      localStorage.removeItem('character-create:has-dragged');
+      setHasEverDragged(false);
+      console.log('[Character Create] Drag prompts have been reset');
+    };
+
+    return () => {
+      // Clean up the global function
+      delete (window as any).resetDragPrompts;
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -192,14 +219,16 @@ const DraggableArea: React.FC<DraggableAreaProps> = ({ className = '' }) => {
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
     >
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-white/70 pointer-events-none">
-          <div className="text-2xl mb-2">↔️</div>
-          <div className="text-sm">Drag left/right to rotate character</div>
-          <div className="mt-4 text-2xl mb-2">↕️</div>
-          <div className="text-sm">Drag up/down to zoom camera</div>
+      {!hasEverDragged && (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center text-white/70 pointer-events-none">
+            <div className="text-2xl mb-2">↔️</div>
+            <div className="text-sm">Drag left/right to rotate character</div>
+            <div className="mt-4 text-2xl mb-2">↕️</div>
+            <div className="text-sm">Drag up/down to zoom camera</div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
