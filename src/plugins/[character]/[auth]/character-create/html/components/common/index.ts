@@ -4,5 +4,8 @@ import TabButton from '../../../../../../../webview/components/ui/TabButton';
 import TabLayout from '../../../../../../../webview/components/ui/TabLayout';
 import IconWrapper from '../../../../../../../webview/components/ui/IconWrapper';
 
+// Local components
+import { LoadingIndicator } from './LoadingIndicator';
+
 // Export for use in this plugin
-export { Slider, TabButton, TabLayout, IconWrapper };
+export { Slider, TabButton, TabLayout, IconWrapper, LoadingIndicator };

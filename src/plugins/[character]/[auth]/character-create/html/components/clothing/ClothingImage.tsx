@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useImageLoader } from '../../hooks';
 import Spinner from '../../../../../../../webview/components/ui/Spinner';
 import { getClothingThumbnail, getClothingThumbnailFallback } from '../../utils/getClothingImage';
@@ -12,7 +12,7 @@ interface ClothingImageProps {
   fallbackSrc?: string;
 }
 
-export const ClothingImage: React.FC<ClothingImageProps> = ({
+const ClothingImageBase: React.FC<ClothingImageProps> = ({
   model,
   componentId,
   drawableId,
@@ -53,3 +53,15 @@ export const ClothingImage: React.FC<ClothingImageProps> = ({
     />
   );
 };
+
+// Memoized version of the component to avoid unnecessary re-renders
+export const ClothingImage = memo(ClothingImageBase, (prevProps, nextProps) => {
+  // Only re-render if any of these props change
+  return (
+    prevProps.model === nextProps.model &&
+    prevProps.componentId === nextProps.componentId &&
+    prevProps.drawableId === nextProps.drawableId &&
+    prevProps.textureId === nextProps.textureId &&
+    prevProps.quality === nextProps.quality
+  );
+});
