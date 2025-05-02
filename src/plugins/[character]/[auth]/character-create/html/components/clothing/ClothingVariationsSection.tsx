@@ -23,9 +23,7 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
   return (
     <div
       className={`relative w-full aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        isSelected
-          ? 'ring-2 ring-brand-500 scale-105'
-          : 'hover:scale-105 hover:ring-1 hover:ring-brand-300'
+        isSelected ? 'glass-brand-dark' : 'glass-dark'
       }`}
       onClick={onClick}
     >
@@ -56,7 +54,7 @@ export const ClothingVariationsSection: React.FC = () => {
     selectedClothingItem.verifiedTextures.length <= 1
   ) {
     return (
-      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex items-center justify-center overflow-hidden">
+      <div className="glass-dark p-4 rounded-lg text-center h-full flex items-center justify-center overflow-hidden">
         <p className="text-sm text-gray-400">
           {!selectedClothingItem
             ? 'Select a clothing item to view variations'
@@ -69,7 +67,7 @@ export const ClothingVariationsSection: React.FC = () => {
   // If we're still verifying textures, show a loading indicator
   if (isVerifyingTextures) {
     return (
-      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex flex-col items-center justify-center overflow-hidden">
+      <div className="glass-dark p-4 rounded-lg text-center h-full flex flex-col items-center justify-center overflow-hidden">
         <LoadingIndicator size="medium" />
         <p className="text-sm text-gray-400 mt-2">Loading variations...</p>
       </div>
@@ -82,8 +80,8 @@ export const ClothingVariationsSection: React.FC = () => {
     selectedClothingItem;
 
   return (
-    <div className="glass-brand-dark p-4 rounded-lg h-full flex flex-col">
-      <div className="flex justify-between items-center mb-3 flex-shrink-0">
+    <div className="glass-dark p-4 rounded-lg h-full flex flex-col">
+      <div className="flex flex-col gap-2 items-center mb-3 flex-shrink-0">
         <h3 className="text-on-dark font-semibold text-xs">Variations</h3>
         <span className="text-xs text-gray-400">
           {verifiedTextures.length} available
