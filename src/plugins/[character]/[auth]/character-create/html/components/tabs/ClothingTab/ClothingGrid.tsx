@@ -9,6 +9,7 @@ interface ClothingGridProps {
   category: ClothingCategory;
   model: string;
   selectedDrawable: number;
+  selectedTexture?: number;
   onSelectDrawable: (value: number) => void;
 }
 
@@ -16,6 +17,7 @@ export const ClothingGrid: React.FC<ClothingGridProps> = ({
   category,
   model,
   selectedDrawable,
+  selectedTexture = 0,
   onSelectDrawable,
 }) => {
   // Generate a range of drawable IDs for the grid
@@ -70,6 +72,7 @@ export const ClothingGrid: React.FC<ClothingGridProps> = ({
               componentId={category.componentId}
               drawableId={drawableId}
               isSelected={selectedDrawable === drawableId}
+              initialTexture={selectedDrawable === drawableId ? selectedTexture : 0}
               onSelectDrawable={() => onSelectDrawable(drawableId)}
             />
           ))}
