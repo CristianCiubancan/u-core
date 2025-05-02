@@ -23,6 +23,7 @@ export const useTextureVerification = (
 ) => {
   const { autoVerify = false, onVerificationComplete } = options;
   
+  // We'll initialize with the default value but let the component update it
   const [selectedTexture, setSelectedTexture] = useState<number>(0);
   const [verifiedTextures, setVerifiedTextures] = useState<number[]>([]);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -80,13 +81,13 @@ export const useTextureVerification = (
     }
   }, [autoVerify, hasVariations, verifiedTextures.length, verifyAllTextures]);
 
-  // Reset verification when drawable changes
+  // Reset verification when drawable changes, but not for other prop changes
   useEffect(() => {
     setVariationsChecked(false);
     setHasVariations(false);
     setVerifiedTextures([]);
     setSelectedTexture(0);
-  }, [drawableId]);
+  }, [model, componentId, drawableId]);
 
   // Utility functions for navigating textures
   const selectNextTexture = useCallback(() => {

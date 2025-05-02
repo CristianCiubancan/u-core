@@ -72,7 +72,28 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = (props) => {
     }
   };
 
+  // Get the texture ID for the currently selected category
+  const getSelectedTexture = () => {
+    switch (activeCategory) {
+      case 'tops':
+        return clothingData.topsTexture;
+      case 'undershirt':
+        return clothingData.undershirtTexture;
+      case 'legs':
+        return clothingData.legsTexture;
+      case 'shoes':
+        return clothingData.shoesTexture;
+      case 'accessories':
+        return clothingData.accessoriesTexture;
+      case 'torso':
+        return clothingData.torsoTexture;
+      default:
+        return clothingData.topsTexture;
+    }
+  };
+
   const selectedDrawable = getSelectedDrawable();
+  const selectedTexture = getSelectedTexture();
 
   // Handle drawable selection
   const handleDrawableSelect = (value: number) => {
@@ -109,6 +130,7 @@ export const ClothingTabMain: React.FC<ClothingTabProps> = (props) => {
             category={currentCategory}
             model={model}
             selectedDrawable={selectedDrawable}
+            selectedTexture={selectedTexture}
             onSelectDrawable={handleDrawableSelect}
           />
         </div>

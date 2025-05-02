@@ -31,7 +31,7 @@ function CharacterCreationContent() {
 
   // Listen for toggle events from the client script
   useNuiEvent(NUI_EVENT, (data: any) => {
-    setIsOpen(!!data);
+    setIsOpen(data?.data);
   });
 
   useEffect(() => {

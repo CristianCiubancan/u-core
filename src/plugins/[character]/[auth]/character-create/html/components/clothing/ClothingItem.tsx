@@ -1,15 +1,19 @@
-import React, { useCallback, useRef, useState, memo } from 'react';
+import React, { useCallback, useRef, useState, memo, useEffect } from 'react';
 import { getMaxTexturesForItem } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
 import { ClothingImage } from './ClothingImage';
 import { useTextureVerification } from '../../hooks';
 import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
 
+// Global cache to persist texture selections across tab navigations
+const textureSelectionCache = new Map<string, number>();
+
 interface ClothingItemProps {
   model: string;
   componentId: number;
   drawableId: number;
   isSelected: boolean;
+  initialTexture?: number;
   onSelectDrawable: () => void;
 }
 
@@ -39,6 +43,7 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
   componentId,
   drawableId,
   isSelected,
+  initialTexture = 0,
   onSelectDrawable,
 }) => {
   // Refs and UI state
@@ -49,6 +54,9 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
   // Get the maximum number of textures for this item
   const maxTextures = getMaxTexturesForItem(model, componentId, drawableId);
 
+  // Create a unique ID for this clothing item to use in the cache
+  const cacheKey = `${model}-${componentId}-${drawableId}`;
+  
   // Use our texture verification hook
   const {
     selectedTexture,
@@ -60,6 +68,30 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
     // Auto-verify textures when the item is selected
     autoVerify: isSelected,
   });
+  
+  // Initialize from cache or props, when the component mounts
+  useEffect(() => {
+    // If we have a value from the cache, use that
+    if (textureSelectionCache.has(cacheKey)) {
+      const cachedTexture = textureSelectionCache.get(cacheKey) || 0;
+      selectTexture(cachedTexture);
+      
+      // Update game if selected
+      if (isSelected) {
+        updateGameCharacter(cachedTexture);
+      }
+    } 
+    // Otherwise, use initialTexture if it's provided and non-zero
+    else if (initialTexture > 0) {
+      selectTexture(initialTexture);
+      textureSelectionCache.set(cacheKey, initialTexture);
+      
+      // Update game if selected
+      if (isSelected) {
+        updateGameCharacter(initialTexture);
+      }
+    }
+  }, []);
 
   // Update game character when texture changes
   const updateGameCharacter = useCallback((textureId: number) => {
@@ -78,7 +110,10 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
   const handleSelectTexture = useCallback((textureId: number) => {
     selectTexture(textureId);
     updateGameCharacter(textureId);
-  }, [selectTexture, updateGameCharacter]);
+    
+    // Update the cache
+    textureSelectionCache.set(cacheKey, textureId);
+  }, [selectTexture, updateGameCharacter, cacheKey]);
 
   // When item becomes selected, update the game with current texture
   React.useEffect(() => {
@@ -196,6 +231,7 @@ export const ClothingItem = memo(ClothingItemBase, (prevProps, nextProps) => {
     prevProps.model === nextProps.model &&
     prevProps.componentId === nextProps.componentId &&
     prevProps.drawableId === nextProps.drawableId &&
-    prevProps.isSelected === nextProps.isSelected
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.initialTexture === nextProps.initialTexture
   );
 });

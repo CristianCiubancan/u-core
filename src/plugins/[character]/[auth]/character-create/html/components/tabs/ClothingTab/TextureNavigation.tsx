@@ -34,6 +34,9 @@ export const TextureNavigation: React.FC<TextureNavigationProps> = ({
   // If all required props for verified navigation are provided, use it
   const useVerifiedNavigation = !!(model && componentId !== undefined && drawableId !== undefined && onSetTexture);
   
+  // Create a cache key for this specific component/drawable combination
+  const cacheKey = useVerifiedNavigation ? `${model}-${componentId}-${drawableId}` : '';
+
   // Verify textures when props change
   useEffect(() => {
     if (useVerifiedNavigation && !isVerified && maxTextures > 1) {
@@ -45,6 +48,39 @@ export const TextureNavigation: React.FC<TextureNavigationProps> = ({
       });
     }
   }, [model, componentId, drawableId, maxTextures, useVerifiedNavigation, isVerified]);
+  
+  // Store verification results in sessionStorage to persist across tab changes
+  useEffect(() => {
+    if (useVerifiedNavigation && isVerified && verifiedTextures.length > 0) {
+      // Store the verified textures in session storage
+      try {
+        sessionStorage.setItem(
+          `verified-textures-${cacheKey}`, 
+          JSON.stringify(verifiedTextures)
+        );
+      } catch (err) {
+        console.warn('Failed to store verified textures in session storage', err);
+      }
+    }
+  }, [cacheKey, isVerified, verifiedTextures, useVerifiedNavigation]);
+  
+  // Load verification results from sessionStorage when component mounts
+  useEffect(() => {
+    if (useVerifiedNavigation && !isVerified && cacheKey) {
+      try {
+        const stored = sessionStorage.getItem(`verified-textures-${cacheKey}`);
+        if (stored) {
+          const parsedTextures = JSON.parse(stored);
+          if (Array.isArray(parsedTextures) && parsedTextures.length > 0) {
+            setVerifiedTextures(parsedTextures);
+            setIsVerified(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load verified textures from session storage', err);
+      }
+    }
+  }, [cacheKey, isVerified, useVerifiedNavigation]);
   
   // Get display values based on verification status
   const getDisplayValues = () => {
