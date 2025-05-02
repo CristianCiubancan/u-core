@@ -13,6 +13,7 @@ import {
   CameraControls,
   ModelPicker,
   DraggableArea,
+  ClothingVariationsSection,
 } from './components';
 import { TabButton } from './components/common';
 import { NUI_EVENT } from '../shared/types';
@@ -122,8 +123,15 @@ function CharacterCreationContent() {
       </div>
 
       {/* Camera controls panel */}
-      <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
-        <CameraControls />
+      <div className="w-[200px] h-full max-h-full overflow-hidden flex flex-col gap-2">
+        <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
+          <CameraControls />
+        </div>
+        {activeTab === 'clothing' && (
+          <div className="h-[300px] w-full max-h-full overflow-y-auto max-w-full">
+            <ClothingVariationsSection />
+          </div>
+        )}
       </div>
 
       {/* Draggable area for character rotation and zoom */}

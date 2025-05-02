@@ -19,11 +19,21 @@ import {
   TabType,
 } from '../../shared/types';
 
+// Define selected clothing item interface
+interface SelectedClothingItem {
+  componentId: number;
+  drawableId: number;
+  verifiedTextures: number[];
+  selectedTexture: number;
+}
+
 // Define state type
 interface CharacterState {
   characterData: CharacterData;
   activeTab: TabType;
   activeFocus: CameraFocus;
+  selectedClothingItem: SelectedClothingItem | null;
+  isVerifyingTextures: boolean;
 }
 
 // Define action types
@@ -40,7 +50,11 @@ type CharacterAction =
       payload: { key: keyof ClothingData; value: number };
     }
   | { type: 'SET_ACTIVE_TAB'; payload: TabType }
-  | { type: 'SET_ACTIVE_FOCUS'; payload: CameraFocus };
+  | { type: 'SET_ACTIVE_FOCUS'; payload: CameraFocus }
+  | { type: 'SET_SELECTED_CLOTHING_ITEM'; payload: SelectedClothingItem | null }
+  | { type: 'SET_VERIFIED_TEXTURES'; payload: number[] }
+  | { type: 'SET_SELECTED_TEXTURE'; payload: number }
+  | { type: 'SET_IS_VERIFYING_TEXTURES'; payload: boolean };
 
 // Define context type
 interface CharacterDataContextType extends CharacterState {
@@ -59,6 +73,12 @@ interface CharacterDataContextType extends CharacterState {
   ) => void;
   handleClothingChange: (key: keyof ClothingData, value: number) => void;
 
+  // Clothing variations functions
+  setSelectedClothingItem: (item: SelectedClothingItem | null) => void;
+  setVerifiedTextures: (textures: number[]) => void;
+  handleSelectTexture: (textureId: number) => void;
+  setIsVerifyingTextures: (isVerifying: boolean) => void;
+
   // Save and close functions
   handleSaveCharacter: () => Promise<void>;
   handleCloseUi: () => Promise<void>;
@@ -69,6 +89,8 @@ const initialState: CharacterState = {
   characterData: DEFAULT_CHARACTER,
   activeTab: 'face',
   activeFocus: 'head',
+  selectedClothingItem: null,
+  isVerifyingTextures: false,
 };
 
 // Create the context with a default undefined value
@@ -175,6 +197,38 @@ function characterReducer(
       return {
         ...state,
         activeFocus: action.payload,
+      };
+
+    case 'SET_SELECTED_CLOTHING_ITEM':
+      return {
+        ...state,
+        selectedClothingItem: action.payload,
+      };
+
+    case 'SET_VERIFIED_TEXTURES':
+      if (!state.selectedClothingItem) return state;
+      return {
+        ...state,
+        selectedClothingItem: {
+          ...state.selectedClothingItem,
+          verifiedTextures: action.payload,
+        },
+      };
+
+    case 'SET_SELECTED_TEXTURE':
+      if (!state.selectedClothingItem) return state;
+      return {
+        ...state,
+        selectedClothingItem: {
+          ...state.selectedClothingItem,
+          selectedTexture: action.payload,
+        },
+      };
+
+    case 'SET_IS_VERIFYING_TEXTURES':
+      return {
+        ...state,
+        isVerifyingTextures: action.payload,
       };
 
     default:
@@ -304,6 +358,65 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({
     }
   }, []);
 
+  // Clothing variations functions
+  const setSelectedClothingItem = useCallback(
+    (item: SelectedClothingItem | null) => {
+      dispatch({ type: 'SET_SELECTED_CLOTHING_ITEM', payload: item });
+    },
+    []
+  );
+
+  const setVerifiedTextures = useCallback((textures: number[]) => {
+    dispatch({ type: 'SET_VERIFIED_TEXTURES', payload: textures });
+  }, []);
+
+  const setIsVerifyingTextures = useCallback((isVerifying: boolean) => {
+    dispatch({ type: 'SET_IS_VERIFYING_TEXTURES', payload: isVerifying });
+  }, []);
+
+  const handleSelectTexture = useCallback(
+    (textureId: number) => {
+      dispatch({ type: 'SET_SELECTED_TEXTURE', payload: textureId });
+
+      // Get the current clothing category from the selected item
+      if (state.selectedClothingItem) {
+        const { componentId } = state.selectedClothingItem;
+
+        // Map component ID to texture key
+        let textureKey: keyof ClothingData | null = null;
+
+        // This mapping should match your component IDs to clothing keys
+        switch (componentId) {
+          case 11: // Tops
+            textureKey = 'topsTexture';
+            break;
+          case 8: // Undershirt
+            textureKey = 'undershirtTexture';
+            break;
+          case 4: // Legs
+            textureKey = 'legsTexture';
+            break;
+          case 6: // Shoes
+            textureKey = 'shoesTexture';
+            break;
+          case 7: // Accessories
+            textureKey = 'accessoriesTexture';
+            break;
+          case 3: // Torso
+            textureKey = 'torsoTexture';
+            break;
+          // Add other mappings as needed
+        }
+
+        // Update the texture in the character data if we have a valid mapping
+        if (textureKey) {
+          handleClothingChange(textureKey, textureId);
+        }
+      }
+    },
+    [state.selectedClothingItem, handleClothingChange]
+  );
+
   // Create the context value
   const contextValue: CharacterDataContextType = {
     ...state,
@@ -314,6 +427,10 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({
     handleHairChange,
     handleAppearanceChange,
     handleClothingChange,
+    setSelectedClothingItem,
+    setVerifiedTextures,
+    handleSelectTexture,
+    setIsVerifyingTextures,
     handleSaveCharacter,
     handleCloseUi,
   };

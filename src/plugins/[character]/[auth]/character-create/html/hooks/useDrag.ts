@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchNui } from '../../../../../../webview/utils/fetchNui';
 
 interface UseDragOptions {
   onDragStart?: (x: number, y: number) => void;
@@ -32,54 +31,61 @@ export const useDrag = ({
     lastX: 0,
     lastY: 0,
   });
-  
+
   // Store has-dragged state in localStorage to persist between sessions
   const [hasEverDragged, setHasEverDragged] = useState<boolean>(() => {
     return localStorage.getItem('character-create:has-dragged') === 'true';
   });
-  
+
   const animationFrameRef = useRef<number | null>(null);
 
   // Handle drag start
-  const handleDragStart = useCallback((clientX: number, clientY: number) => {
-    setDragState({
-      isDragging: true,
-      startX: clientX,
-      startY: clientY,
-      lastX: clientX,
-      lastY: clientY,
-    });
-    
-    onDragStart?.(clientX, clientY);
-  }, [onDragStart]);
+  const handleDragStart = useCallback(
+    (clientX: number, clientY: number) => {
+      setDragState({
+        isDragging: true,
+        startX: clientX,
+        startY: clientY,
+        lastX: clientX,
+        lastY: clientY,
+      });
+
+      onDragStart?.(clientX, clientY);
+    },
+    [onDragStart]
+  );
 
   // Handle drag movement
-  const handleDragMove = useCallback((clientX: number, clientY: number) => {
-    if (!dragState.isDragging) return;
+  const handleDragMove = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!dragState.isDragging) return;
 
-    // Calculate the delta from the last position
-    const deltaX = clientX - dragState.lastX;
-    const deltaY = clientY - dragState.lastY;
+      // Calculate the delta from the last position
+      const deltaX = clientX - dragState.lastX;
+      const deltaY = clientY - dragState.lastY;
 
-    // Only process significant movements to avoid jitter
-    if (Math.abs(deltaX) < minDragDelta && Math.abs(deltaY) < minDragDelta) return;
+      // Only process significant movements to avoid jitter
+      if (Math.abs(deltaX) < minDragDelta && Math.abs(deltaY) < minDragDelta)
+        return;
 
-    // Update the last position
-    setDragState((prev) => ({
-      ...prev,
-      lastX: clientX,
-      lastY: clientY,
-    }));
+      // Update the last position
+      setDragState((prev) => ({
+        ...prev,
+        lastX: clientX,
+        lastY: clientY,
+      }));
 
-    // Mark that the user has dragged at least once
-    if (!hasEverDragged) {
-      setHasEverDragged(true);
-      localStorage.setItem('character-create:has-dragged', 'true');
-    }
+      // Mark that the user has dragged at least once
+      if (!hasEverDragged) {
+        setHasEverDragged(true);
+        localStorage.setItem('character-create:has-dragged', 'true');
+      }
 
-    // Call the provided drag move handler
-    onDragMove?.(deltaX, deltaY);
-  }, [dragState, hasEverDragged, minDragDelta, onDragMove]);
+      // Call the provided drag move handler
+      onDragMove?.(deltaX, deltaY);
+    },
+    [dragState, hasEverDragged, minDragDelta, onDragMove]
+  );
 
   // Handle drag end
   const handleDragEnd = useCallback(() => {
@@ -92,59 +98,77 @@ export const useDrag = ({
   }, [onDragEnd]);
 
   // Mouse event handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    handleDragStart(e.clientX, e.clientY);
-  }, [handleDragStart]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      handleDragStart(e.clientX, e.clientY);
+    },
+    [handleDragStart]
+  );
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    handleDragStart(touch.clientX, touch.clientY);
-  }, [handleDragStart]);
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleDragStart(touch.clientX, touch.clientY);
+    },
+    [handleDragStart]
+  );
 
   // Global event handlers (attached when dragging)
-  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-    if (!dragState.isDragging) return;
-    e.preventDefault();
+  const handleGlobalMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!dragState.isDragging) return;
+      e.preventDefault();
 
-    // Use requestAnimationFrame to throttle the drag events
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+      // Use requestAnimationFrame to throttle the drag events
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
 
-    animationFrameRef.current = requestAnimationFrame(() => {
-      handleDragMove(e.clientX, e.clientY);
-    });
-  }, [dragState.isDragging, handleDragMove]);
+      animationFrameRef.current = requestAnimationFrame(() => {
+        handleDragMove(e.clientX, e.clientY);
+      });
+    },
+    [dragState.isDragging, handleDragMove]
+  );
 
-  const handleGlobalMouseUp = useCallback((e: MouseEvent) => {
-    if (!dragState.isDragging) return;
-    e.preventDefault();
-    handleDragEnd();
-  }, [dragState.isDragging, handleDragEnd]);
+  const handleGlobalMouseUp = useCallback(
+    (e: MouseEvent) => {
+      if (!dragState.isDragging) return;
+      e.preventDefault();
+      handleDragEnd();
+    },
+    [dragState.isDragging, handleDragEnd]
+  );
 
-  const handleGlobalTouchMove = useCallback((e: TouchEvent) => {
-    if (!dragState.isDragging || e.touches.length !== 1) return;
-    e.preventDefault();
+  const handleGlobalTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!dragState.isDragging || e.touches.length !== 1) return;
+      e.preventDefault();
 
-    // Use requestAnimationFrame to throttle the drag events
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+      // Use requestAnimationFrame to throttle the drag events
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
 
-    animationFrameRef.current = requestAnimationFrame(() => {
-      const touch = e.touches[0];
-      handleDragMove(touch.clientX, touch.clientY);
-    });
-  }, [dragState.isDragging, handleDragMove]);
+      animationFrameRef.current = requestAnimationFrame(() => {
+        const touch = e.touches[0];
+        handleDragMove(touch.clientX, touch.clientY);
+      });
+    },
+    [dragState.isDragging, handleDragMove]
+  );
 
-  const handleGlobalTouchEnd = useCallback((e: TouchEvent) => {
-    if (!dragState.isDragging) return;
-    e.preventDefault();
-    handleDragEnd();
-  }, [dragState.isDragging, handleDragEnd]);
+  const handleGlobalTouchEnd = useCallback(
+    (e: TouchEvent) => {
+      if (!dragState.isDragging) return;
+      e.preventDefault();
+      handleDragEnd();
+    },
+    [dragState.isDragging, handleDragEnd]
+  );
 
   // Set up and clean up event listeners
   useEffect(() => {
@@ -152,7 +176,9 @@ export const useDrag = ({
     if (dragState.isDragging) {
       window.addEventListener('mousemove', handleGlobalMouseMove);
       window.addEventListener('mouseup', handleGlobalMouseUp);
-      window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+      window.addEventListener('touchmove', handleGlobalTouchMove, {
+        passive: false,
+      });
       window.addEventListener('touchend', handleGlobalTouchEnd);
       window.addEventListener('touchcancel', handleGlobalTouchEnd);
     }
