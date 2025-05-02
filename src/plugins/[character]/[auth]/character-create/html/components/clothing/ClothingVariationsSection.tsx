@@ -1,0 +1,106 @@
+import React from 'react';
+import { useCharacterData } from '../../context/CharacterDataContext';
+import { ClothingImage } from './ClothingImage';
+import { LoadingIndicator } from '../common';
+
+interface TextureVariationItemProps {
+  model: string;
+  componentId: number;
+  drawableId: number;
+  textureId: number;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
+  model,
+  componentId,
+  drawableId,
+  textureId,
+  isSelected,
+  onClick,
+}) => {
+  return (
+    <div
+      className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
+        isSelected
+          ? 'ring-2 ring-brand-500 scale-105'
+          : 'hover:scale-105 hover:ring-1 hover:ring-brand-300'
+      }`}
+      onClick={onClick}
+    >
+      <ClothingImage
+        model={model}
+        componentId={componentId}
+        drawableId={drawableId}
+        textureId={textureId}
+        quality="tiny"
+      />
+    </div>
+  );
+};
+
+export const ClothingVariationsSection: React.FC = () => {
+  const {
+    characterData,
+    selectedClothingItem,
+    handleSelectTexture,
+    isVerifyingTextures,
+  } = useCharacterData();
+
+  // If no item is selected or no variations are available, show a message
+  if (
+    !selectedClothingItem ||
+    selectedClothingItem.verifiedTextures.length <= 1
+  ) {
+    return (
+      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex items-center justify-center">
+        <p className="text-sm text-gray-400">
+          {!selectedClothingItem
+            ? 'Select a clothing item to view variations'
+            : 'No variations available for this item'}
+        </p>
+      </div>
+    );
+  }
+
+  // If we're still verifying textures, show a loading indicator
+  if (isVerifyingTextures) {
+    return (
+      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex flex-col items-center justify-center">
+        <LoadingIndicator size="medium" />
+        <p className="text-sm text-gray-400 mt-2">Loading variations...</p>
+      </div>
+    );
+  }
+
+  // Get the current model from character data
+  const { model } = characterData;
+  const { componentId, drawableId, verifiedTextures, selectedTexture } =
+    selectedClothingItem;
+
+  return (
+    <div className="glass-brand-dark p-4 rounded-lg h-full flex flex-col">
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-on-dark font-semibold text-xs">Variations</h3>
+        <span className="text-xs text-gray-400">
+          {verifiedTextures.length} available
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 overflow-y-auto scrollbar-brand-dark">
+        {verifiedTextures.map((textureId) => (
+          <TextureVariationItem
+            key={textureId}
+            model={model}
+            componentId={componentId}
+            drawableId={drawableId}
+            textureId={textureId}
+            isSelected={textureId === selectedTexture}
+            onClick={() => handleSelectTexture(textureId)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};

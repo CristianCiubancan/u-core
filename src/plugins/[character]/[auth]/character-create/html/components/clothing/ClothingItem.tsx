@@ -1,9 +1,8 @@
-import React, { useCallback, useRef, useState, memo, useEffect } from 'react';
+import React, { useCallback, useRef, memo, useEffect } from 'react';
 import { getMaxTexturesForItem } from '../../utils/getClothingImage';
-import { ClothingVariationsPopup } from './ClothingVariationsPopup';
 import { ClothingImage } from './ClothingImage';
 import { useTextureVerification } from '../../hooks';
-import { fetchNui } from '../../../../../../../webview/utils/fetchNui';
+import { useCharacterData } from '../../context/CharacterDataContext';
 
 // Global cache to persist texture selections across tab navigations
 const textureSelectionCache = new Map<string, number>();
@@ -17,26 +16,6 @@ interface ClothingItemProps {
   onSelectDrawable: () => void;
 }
 
-// Helper function to map component IDs to their respective clothing keys
-const getClothingKeyFromComponentId = (componentId: number): string => {
-  switch (componentId) {
-    case 11:
-      return 'tops';
-    case 8:
-      return 'undershirt';
-    case 4:
-      return 'legs';
-    case 6:
-      return 'shoes';
-    case 7:
-      return 'accessories';
-    case 3:
-      return 'torso';
-    default:
-      return 'tops';
-  }
-};
-
 // Base component implementation
 const ClothingItemBase: React.FC<ClothingItemProps> = ({
   model,
@@ -46,17 +25,19 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
   initialTexture = 0,
   onSelectDrawable,
 }) => {
-  // Refs and UI state
+  // Refs
   const itemRef = useRef<HTMLDivElement>(null);
-  const [showVariations, setShowVariations] = useState(false);
-  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+
+  // Get context functions
+  const { setSelectedClothingItem, setIsVerifyingTextures } =
+    useCharacterData();
 
   // Get the maximum number of textures for this item
   const maxTextures = getMaxTexturesForItem(model, componentId, drawableId);
 
   // Create a unique ID for this clothing item to use in the cache
   const cacheKey = `${model}-${componentId}-${drawableId}`;
-  
+
   // Use our texture verification hook
   const {
     selectedTexture,
@@ -68,108 +49,92 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
     // Auto-verify textures when the item is selected
     autoVerify: isSelected,
   });
-  
+
   // Initialize from cache or props, when the component mounts
   useEffect(() => {
     // If we have a value from the cache, use that
     if (textureSelectionCache.has(cacheKey)) {
       const cachedTexture = textureSelectionCache.get(cacheKey) || 0;
       selectTexture(cachedTexture);
-      
-      // Update game if selected
-      if (isSelected) {
-        updateGameCharacter(cachedTexture);
-      }
-    } 
+    }
     // Otherwise, use initialTexture if it's provided and non-zero
     else if (initialTexture > 0) {
       selectTexture(initialTexture);
       textureSelectionCache.set(cacheKey, initialTexture);
-      
-      // Update game if selected
-      if (isSelected) {
-        updateGameCharacter(initialTexture);
-      }
     }
-  }, []);
+  }, [cacheKey, initialTexture, selectTexture]);
 
-  // Update game character when texture changes
-  const updateGameCharacter = useCallback((textureId: number) => {
-    if (isSelected) {
-      const clothingKey = getClothingKeyFromComponentId(componentId);
-      fetchNui('character-create:update-clothing', {
-        key: `${clothingKey}Texture`,
-        value: textureId,
-      }).catch((error: any) => {
-        console.error('[UI] Failed to update clothing texture:', error);
+  // When item becomes selected, update the selected clothing item in context
+  React.useEffect(() => {
+    if (isSelected && hasVariations && verifiedTextures.length > 0) {
+      setSelectedClothingItem({
+        componentId,
+        drawableId,
+        verifiedTextures,
+        selectedTexture,
       });
     }
-  }, [isSelected, componentId]);
-
-  // Handle texture selection
-  const handleSelectTexture = useCallback((textureId: number) => {
-    selectTexture(textureId);
-    updateGameCharacter(textureId);
-    
-    // Update the cache
-    textureSelectionCache.set(cacheKey, textureId);
-  }, [selectTexture, updateGameCharacter, cacheKey]);
-
-  // When item becomes selected, update the game with current texture
-  React.useEffect(() => {
-    if (isSelected) {
-      updateGameCharacter(selectedTexture);
-    }
-  }, [isSelected, selectedTexture, updateGameCharacter]);
+  }, [
+    isSelected,
+    hasVariations,
+    verifiedTextures,
+    selectedTexture,
+    componentId,
+    drawableId,
+    setSelectedClothingItem,
+  ]);
 
   // Handle click on clothing item
   const handleClick = useCallback(() => {
     if (hasVariations && isSelected) {
       // If we haven't verified textures yet, do it now
       if (verifiedTextures.length === 0) {
+        setIsVerifyingTextures(true);
         verifyAllTextures().then(() => {
-          // Only show popup if we actually have variations
-          if (verifiedTextures.length > 1) {
-            showVariationsPopup();
-          }
+          // Set the selected clothing item in the context with the updated verified textures
+          setSelectedClothingItem({
+            componentId,
+            drawableId,
+            verifiedTextures,
+            selectedTexture,
+          });
+          setIsVerifyingTextures(false);
         });
       } else if (verifiedTextures.length > 1) {
-        // We have verified textures, show the popup
-        showVariationsPopup();
+        // We have verified textures, update the context
+        setSelectedClothingItem({
+          componentId,
+          drawableId,
+          verifiedTextures,
+          selectedTexture,
+        });
       }
     } else {
       // Otherwise, select this drawable
       onSelectDrawable();
+
+      // Clear the selected clothing item when selecting a new item
+      if (!isSelected) {
+        setSelectedClothingItem(null);
+      }
     }
   }, [
-    hasVariations, 
-    isSelected, 
-    verifiedTextures.length, 
-    verifyAllTextures, 
-    onSelectDrawable
+    hasVariations,
+    isSelected,
+    verifiedTextures,
+    selectedTexture,
+    verifyAllTextures,
+    onSelectDrawable,
+    setSelectedClothingItem,
+    setIsVerifyingTextures,
+    componentId,
+    drawableId,
   ]);
-
-  // Position and show the variations popup
-  const showVariationsPopup = useCallback(() => {
-    const rect = itemRef.current?.getBoundingClientRect();
-    if (rect) {
-      setPopupPosition({
-        x: rect.left,
-        y: rect.bottom + 5,
-      });
-      setShowVariations(true);
-    }
-  }, []);
-
-  // Close the variations popup
-  const handleCloseVariations = useCallback(() => {
-    setShowVariations(false);
-  }, []);
 
   // We'll let the ClothingImage component handle the fallback automatically
 
   return (
-    <div className="relative" style={{ zIndex: showVariations ? 10 : 'auto' }}>
+    <div className="relative">
       <div
         ref={itemRef}
         className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
@@ -205,20 +170,6 @@ const ClothingItemBase: React.FC<ClothingItemProps> = ({
           </div>
         )}
       </div>
-
-      {/* Variations popup */}
-      {showVariations && verifiedTextures.length > 1 && (
-        <ClothingVariationsPopup
-          model={model}
-          componentId={componentId}
-          drawableId={drawableId}
-          verifiedTextures={verifiedTextures}
-          selectedTexture={selectedTexture}
-          onSelectTexture={handleSelectTexture}
-          onClose={handleCloseVariations}
-          position={popupPosition}
-        />
-      )}
     </div>
   );
 };
