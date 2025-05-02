@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, memo } from 'react';
 import { getMaxTexturesForItem } from '../../utils/getClothingImage';
 import { ClothingVariationsPopup } from './ClothingVariationsPopup';
 import { ClothingImage } from './ClothingImage';
@@ -33,7 +33,8 @@ const getClothingKeyFromComponentId = (componentId: number): string => {
   }
 };
 
-export const ClothingItem: React.FC<ClothingItemProps> = ({
+// Base component implementation
+const ClothingItemBase: React.FC<ClothingItemProps> = ({
   model,
   componentId,
   drawableId,
@@ -186,3 +187,15 @@ export const ClothingItem: React.FC<ClothingItemProps> = ({
     </div>
   );
 };
+
+// Memoized version of the component that only re-renders when props change
+// This significantly improves performance when rendering many items
+export const ClothingItem = memo(ClothingItemBase, (prevProps, nextProps) => {
+  // Only re-render if any of these props change
+  return (
+    prevProps.model === nextProps.model &&
+    prevProps.componentId === nextProps.componentId &&
+    prevProps.drawableId === nextProps.drawableId &&
+    prevProps.isSelected === nextProps.isSelected
+  );
+});

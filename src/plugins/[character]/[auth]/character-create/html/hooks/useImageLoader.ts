@@ -6,8 +6,12 @@ interface ImageLoaderOptions {
   onError?: () => void;
 }
 
+// Global cache to store loaded image statuses
+// This prevents redundant loading of the same images
+const imageCache: Record<string, { status: 'loading' | 'loaded' | 'error', url: string }> = {};
+
 /**
- * Custom hook to handle image loading with fallback support
+ * Custom hook to handle image loading with fallback support and caching
  */
 export const useImageLoader = (
   src: string,
@@ -21,56 +25,94 @@ export const useImageLoader = (
   const fallbackAttemptedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    // Reset states when src changes
-    setIsLoading(true);
-    setIsError(false);
-    setImageSrc(src);
-    fallbackAttemptedRef.current = false;
-
-    // Create new image to check loading
-    const img = new Image();
+    let isMounted = true;
     
-    img.onload = () => {
-      setIsLoading(false);
-      setIsError(false);
-      onLoad?.();
-    };
-    
-    img.onerror = () => {
-      // If we have a fallback and haven't tried it yet
-      if (fallbackSrc && !fallbackAttemptedRef.current) {
-        fallbackAttemptedRef.current = true;
+    const loadImage = async (imageUrl: string, isFallback = false): Promise<boolean> => {
+      // Check cache first
+      if (imageCache[imageUrl]) {
+        if (imageCache[imageUrl].status === 'loaded') {
+          if (isMounted) {
+            setImageSrc(imageUrl);
+            setIsLoading(false);
+            setIsError(false);
+            onLoad?.();
+          }
+          return true;
+        } else if (imageCache[imageUrl].status === 'error') {
+          return false;
+        }
+        // If status is 'loading', continue with load attempt
+      }
+      
+      // Set as loading in the cache
+      imageCache[imageUrl] = { status: 'loading', url: imageUrl };
+      
+      return new Promise<boolean>((resolve) => {
+        const img = new Image();
         
-        // Try the fallback
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => {
-          setImageSrc(fallbackSrc);
-          setIsLoading(false);
-          setIsError(false);
-          onLoad?.();
+        img.onload = () => {
+          // Update cache
+          imageCache[imageUrl] = { status: 'loaded', url: imageUrl };
+          
+          if (isMounted) {
+            if (!isFallback) {
+              setImageSrc(imageUrl);
+            } else {
+              setImageSrc(imageUrl);
+            }
+            setIsLoading(false);
+            setIsError(false);
+            onLoad?.();
+          }
+          resolve(true);
         };
         
-        fallbackImg.onerror = () => {
+        img.onerror = () => {
+          // Update cache
+          imageCache[imageUrl] = { status: 'error', url: imageUrl };
+          resolve(false);
+        };
+        
+        img.src = imageUrl;
+      });
+    };
+    
+    const attemptLoad = async () => {
+      // Reset states when src changes
+      if (isMounted) {
+        setIsLoading(true);
+        setIsError(false);
+        setImageSrc(src);
+        fallbackAttemptedRef.current = false;
+      }
+      
+      // Try to load the main image
+      const mainSuccess = await loadImage(src);
+      
+      // If main image failed and we have a fallback
+      if (!mainSuccess && fallbackSrc && !fallbackAttemptedRef.current && isMounted) {
+        fallbackAttemptedRef.current = true;
+        const fallbackSuccess = await loadImage(fallbackSrc, true);
+        
+        // If fallback also failed
+        if (!fallbackSuccess && isMounted) {
           setIsLoading(false);
           setIsError(true);
           onError?.();
-        };
-        
-        fallbackImg.src = fallbackSrc;
-      } else {
-        // No fallback or fallback also failed
+        }
+      } else if (!mainSuccess && isMounted) {
+        // No fallback or fallback already attempted
         setIsLoading(false);
         setIsError(true);
         onError?.();
       }
     };
     
-    img.src = src;
+    attemptLoad();
     
     // Clean up
     return () => {
-      img.onload = null;
-      img.onerror = null;
+      isMounted = false;
     };
   }, [src, fallbackSrc, onLoad, onError]);
 
