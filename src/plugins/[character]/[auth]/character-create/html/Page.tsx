@@ -123,12 +123,12 @@ function CharacterCreationContent() {
       </div>
 
       {/* Camera controls panel */}
-      <div className="w-[200px] h-full max-h-full overflow-hidden flex flex-col gap-2">
+      <div className="w-[220px] h-full max-h-full overflow-hidden flex flex-col gap-2">
         <div className="glass-brand-dark p-2 border-t border-brand-700 mb-auto rounded-b-lg">
           <CameraControls />
         </div>
         {activeTab === 'clothing' && (
-          <div className="h-[300px] w-full max-h-full overflow-y-auto max-w-full">
+          <div className="h-full w-full max-h-[calc(100vh-300px)] overflow-y-auto overflow-x-hidden">
             <ClothingVariationsSection />
           </div>
         )}

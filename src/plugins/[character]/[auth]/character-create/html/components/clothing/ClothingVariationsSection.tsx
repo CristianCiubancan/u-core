@@ -22,20 +22,22 @@ const TextureVariationItem: React.FC<TextureVariationItemProps> = ({
 }) => {
   return (
     <div
-      className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
+      className={`relative w-full aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
         isSelected
           ? 'ring-2 ring-brand-500 scale-105'
           : 'hover:scale-105 hover:ring-1 hover:ring-brand-300'
       }`}
       onClick={onClick}
     >
-      <ClothingImage
-        model={model}
-        componentId={componentId}
-        drawableId={drawableId}
-        textureId={textureId}
-        quality="tiny"
-      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <ClothingImage
+          model={model}
+          componentId={componentId}
+          drawableId={drawableId}
+          textureId={textureId}
+          quality="tiny"
+        />
+      </div>
     </div>
   );
 };
@@ -54,7 +56,7 @@ export const ClothingVariationsSection: React.FC = () => {
     selectedClothingItem.verifiedTextures.length <= 1
   ) {
     return (
-      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex items-center justify-center">
+      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex items-center justify-center overflow-hidden">
         <p className="text-sm text-gray-400">
           {!selectedClothingItem
             ? 'Select a clothing item to view variations'
@@ -67,7 +69,7 @@ export const ClothingVariationsSection: React.FC = () => {
   // If we're still verifying textures, show a loading indicator
   if (isVerifyingTextures) {
     return (
-      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex flex-col items-center justify-center">
+      <div className="glass-brand-dark p-4 rounded-lg text-center h-full flex flex-col items-center justify-center overflow-hidden">
         <LoadingIndicator size="medium" />
         <p className="text-sm text-gray-400 mt-2">Loading variations...</p>
       </div>
@@ -81,24 +83,24 @@ export const ClothingVariationsSection: React.FC = () => {
 
   return (
     <div className="glass-brand-dark p-4 rounded-lg h-full flex flex-col">
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-3 flex-shrink-0">
         <h3 className="text-on-dark font-semibold text-xs">Variations</h3>
         <span className="text-xs text-gray-400">
           {verifiedTextures.length} available
         </span>
       </div>
-
-      <div className="grid grid-cols-2 gap-2 overflow-y-auto scrollbar-brand-dark">
+      <div className="grid grid-cols-1 gap-2 overflow-y-auto overflow-x-hidden scrollbar-brand-dark w-full max-w-full">
         {verifiedTextures.map((textureId) => (
-          <TextureVariationItem
-            key={textureId}
-            model={model}
-            componentId={componentId}
-            drawableId={drawableId}
-            textureId={textureId}
-            isSelected={textureId === selectedTexture}
-            onClick={() => handleSelectTexture(textureId)}
-          />
+          <div className="w-full aspect-square" key={textureId}>
+            <TextureVariationItem
+              model={model}
+              componentId={componentId}
+              drawableId={drawableId}
+              textureId={textureId}
+              isSelected={textureId === selectedTexture}
+              onClick={() => handleSelectTexture(textureId)}
+            />
+          </div>
         ))}
       </div>
     </div>
