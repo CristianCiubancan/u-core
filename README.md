@@ -1,217 +1,196 @@
 # U-Core: FiveM Plugin Framework
 
-U-Core is a modern, TypeScript-based framework for developing and managing FiveM server resources. It provides a structured approach to building plugins with a powerful build system that handles TypeScript compilation, React UI components, and automatic resource reloading.
+U-Core is a TypeScript build framework for FiveM server resources. You author each resource as a "plugin" — a folder with a `plugin.json` and any combination of `client/`, `server/`, `shared/`, and `html/` (React) code — and the build pipeline emits a fully-formed FiveM resource (with auto-generated `fxmanifest.lua`) directly into your server's resource tree, with optional hot-reload while you develop.
 
 ![FiveM](https://img.shields.io/badge/FiveM-Compatible-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)
 ![React](https://img.shields.io/badge/React-19.0+-61DAFB)
 
-## 🌟 Features
+## Features
 
-- **Plugin-Based Architecture**: Organize your server resources as modular plugins
-- **TypeScript Support**: Full TypeScript support for client, server, and shared code
-- **React UI Framework**: Build modern UIs with React for your FiveM resources
-- **Hot Reloading**: Automatic resource reloading during development
-- **Bundling**: Efficient bundling of JavaScript/TypeScript files with esbuild
-- **Docker Support**: Easy deployment with Docker and Docker Compose
-- **Database Integration**: Built-in MariaDB database support
-- **Resource Management**: API for managing and reloading resources
+- **Plugin-based architecture** — each plugin is a self-contained resource folder.
+- **First-class TypeScript** — separate tsconfig projects for build scripts, plugin client/server code, and the React webview.
+- **React UI bundling** — drop a `Page.tsx` in a plugin's `html/` directory and the build system bundles it into a FiveM-compatible NUI page.
+- **Watch + hot reload** — `pnpm dev` rebuilds the affected plugin and tells the running FiveM server to `ensure` it again over a local HTTP endpoint.
+- **`fxmanifest.lua` generation** — `plugin.json` is the source of truth; the Lua manifest is generated.
+- **Docker or native** — run FiveM via `docker-compose` (Linux container + MariaDB) or directly on Windows against a local `FXServer.exe`.
 
-## 📋 Prerequisites
+## Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- [pnpm](https://pnpm.io/) (v10.8.0 or newer)
-- [FiveM Server](https://docs.fivem.net/docs/server-manual/setting-up-a-server/) (for running the resources)
-- [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) (optional, for containerized deployment)
+- [Node.js](https://nodejs.org/) v18 or newer
+- [pnpm](https://pnpm.io/) v10.8.0 (the `packageManager` field pins this)
+- A FiveM server, either:
+  - [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/), **or**
+  - A local FXServer extracted to `fivem-binaries/FXServer.exe` (Windows only)
 
-## 🚀 Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/u-core.git
-   cd u-core
-   ```
-
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-
-3. Create a `.env` file based on the example:
-   ```bash
-   cp .env.example .env
-   ```
-
-4. Edit the `.env` file with your configuration settings.
-
-## 🔧 Development
-
-### Building Resources
-
-To build all resources:
+## Installation
 
 ```bash
-pnpm build
+pnpm install
+cp .env.example .env       # then edit .env with your settings
 ```
 
-### Development Mode
+### Required environment variables
 
-To start development mode with hot reloading:
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `SERVER_NAME` | build, `start:windows` | Selects which `txData/<SERVER_NAME>/` profile to build into and run. |
+| `RELOADER_API_KEY` | `pnpm dev` watcher | Auth for the in-game reload endpoint. |
+| `BINARIES_ARCHIVE_URL` | Docker build | URL to the FXServer Linux artifact tarball. |
+| `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` | `docker-compose` | MariaDB container config. |
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `pnpm build` | Build all plugins once. |
+| `pnpm dev` | Build all plugins, then watch `src/plugins/**` and rebuild + reload on change. |
+| `pnpm start:docker` | `docker-compose down && up -d --build` — FiveM + MariaDB. |
+| `pnpm start:windows` | Launch local `fivem-binaries/FXServer.exe` against `txData/${SERVER_NAME}/server.cfg`. |
+| `pnpm start:assets` | Start the separate asset optimization/serving server (see `asset-server/README.md`). |
+
+The build CLI (`src/scripts/build.ts`) also accepts flags directly:
 
 ```bash
-pnpm dev
+npx tsx src/scripts/build.ts --watch --log-level=verbose --no-clean
 ```
 
-This will:
-1. Build all plugins
-2. Watch for changes in source files
-3. Automatically rebuild affected resources when files change
-4. Trigger resource reloading in the FiveM server
+`--watch`, `--no-clean`, `--stop-on-error`, `--log-level={verbose,info,warn,error}`, `--plugins-dir=<dir>`, `--dist-dir=<dir>`.
 
-## 📁 Project Structure
+## Build output
+
+Plugins are emitted to:
+
+```
+txData/${SERVER_NAME}/resources/[GENERATED]/<bracket-path>/<plugin-name>/
+```
+
+so FXServer picks them up directly — there is no separate copy step. To run a generated plugin, add `ensure <plugin-name>` to your `server.cfg` once.
+
+The watcher (`pnpm dev`) re-bundles only the changed plugin and posts to `http://localhost:3414` (authed by `RELOADER_API_KEY`) to trigger an in-game reload. The reload requires a companion FiveM resource that exposes that endpoint; if the connection fails at startup the watcher still rebuilds, it just won't auto-reload.
+
+## Project layout
 
 ```
 u-core/
-├── dist/                  # Build output directory
 ├── src/
-│   ├── core/              # Core framework code
-│   ├── plugins/           # Plugin resources
-│   │   ├── [default]/     # Default plugins
-│   │   │   └── core/      # Core plugin
-│   │   ├── [misc]/        # Miscellaneous plugins
-│   │   └── example2/      # Example plugin
-│   ├── scripts/           # Build system scripts
-│   │   ├── cli/           # Command-line interface
-│   │   ├── managers/      # Build managers
-│   │   └── types/         # TypeScript types
-│   ├── utils/             # Utility functions
-│   └── webview/           # Webview UI components
-├── .env                   # Environment configuration
-├── docker-compose.yml     # Docker Compose configuration
-├── Dockerfile             # Docker configuration
-└── package.json           # Project dependencies
+│   ├── scripts/              # Build tooling (run via tsx)
+│   │   ├── build.ts          # Entry point — parses flags, drives BuildManager
+│   │   ├── managers/         # FileManager, BuildManager, PluginReloadManager, …
+│   │   └── types/
+│   ├── plugins/              # Your resources live here
+│   │   ├── [default]/
+│   │   │   └── core/
+│   │   └── [character]/
+│   │       ├── character-edit/
+│   │       └── [auth]/
+│   │           ├── character-create/
+│   │           └── character-select/
+│   ├── webview/              # Shared React/Vite infra used by every plugin's html/Page.tsx
+│   ├── utils/
+│   └── index.html            # Vite entry (Vite root is src/)
+├── asset-server/             # Separate sub-package (uses npm) — image optimizer + server
+├── scripts/
+│   └── start-windows.js      # Launcher for native FXServer.exe
+├── txData/                   # Server data; build output lands under [GENERATED]/
+├── docker-compose.yml
+├── Dockerfile                # FiveM binaries container (Ubuntu 20.04)
+└── tsconfig.{plugins,scripts,webview}.json
 ```
 
-## 🔌 Plugin Structure
+### Bracket folders
 
-Each plugin follows this structure:
+Folder names wrapped in brackets — `[default]`, `[character]`, `[auth]`, etc. — are FiveM's [resource grouping convention](https://docs.fivem.net/docs/scripting-manual/runtimes/lua/#resource-folders). They are not plugins themselves; the build preserves the full bracket path in the output. Use them to group related resources.
+
+## Plugin structure
 
 ```
 plugin-name/
-├── client/               # Client-side scripts
-├── server/               # Server-side scripts
-├── shared/               # Shared scripts
-├── html/                 # UI files
-│   └── Page.tsx          # React component for UI
-├── translations/         # Localization files
-└── plugin.json           # Plugin manifest
+├── client/                # Bundled with platform=browser, IIFE, target ES2017
+├── server/                # Bundled with platform=node, Node built-ins externalized
+├── shared/                # Available to either side
+├── html/
+│   └── Page.tsx           # Optional React entry — built into html/index.html via Vite
+├── translations/          # i18next JSON (loaded by react-i18next)
+└── plugin.json            # Manifest — fxmanifest.lua is generated from this
 ```
 
-### Plugin Manifest (plugin.json)
+**Server vs. client detection is path-based.** A `.ts`/`.js` file is bundled as server code if and only if its absolute path contains `/server/` (or `\server\`). Files in `client/` and `shared/` are bundled for the browser. There is no override — if you put server-only code outside a `server/` folder, it will silently be bundled with the wrong platform.
+
+### `plugin.json`
+
+This is the source of truth. The build generates `fxmanifest.lua` from it; do not hand-author the Lua file.
 
 ```json
 {
-  "name": "example",
-  "version": "1.0.0",
+  "name": "character-edit",
+  "version": "0.1.0",
   "fx_version": "cerulean",
   "author": "Your Name",
-  "description": "Example plugin",
+  "description": "Character editor UI",
   "games": ["gta5", "rdr3"],
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
-  "shared_scripts": ["shared/*.js"],
-  "files": ["translations/*.json", "html/**/*"],
+  "files": ["html/**/*", "translations/*.json"],
   "ui_page": "html/index.html"
 }
 ```
 
-## 🐳 Docker Deployment
+Standard manifest fields (`fx_version`, `games`, `author`, `description`, `version`, `client_scripts`, `server_scripts`, `shared_scripts`, `ui_page`, `files`, `data_files`, `dependencies`, `provide`, `constraints`, `exports`, `server_exports`, `is_map`, `server_only`, `loadscreen`) get dedicated emit logic; anything else is emitted verbatim as `key 'value'`.
 
-To deploy using Docker:
+## Webview UI
 
-1. Configure your `.env` file with appropriate settings
-2. Build and start the containers:
-   ```bash
-   docker-compose up -d
-   ```
+Each plugin can have its own React UI by creating `html/Page.tsx`. The build:
 
-This will start:
-- A FiveM server container
-- A MariaDB database container
+1. Generates a temporary `src/webview/App.tsx` that re-exports `Page` from your plugin.
+2. Runs `npx vite build --outDir=<plugin-dist>/html`.
+3. Restores the original `App.tsx`.
 
-## 🔄 Resource Reloading
+Because the swap is global, plugin webview builds run sequentially. Don't rely on `src/webview/App.tsx` having stable contents — it's overwritten and restored on every webview build.
 
-The framework includes a resource reloading system that automatically detects changes and reloads affected resources. This is controlled through environment variables:
-
-```
-RELOADER_API_KEY=***SCRUBBED***
-RELOADER_HOST=localhost
-RELOADER_PORT=3414
-```
-
-## 🌐 Webview UI Development
-
-The framework supports React-based UIs for your plugins:
-
-1. Create a `Page.tsx` file in your plugin's `html` directory
-2. The build system will automatically:
-   - Bundle the React component
-   - Generate the necessary HTML files
-   - Include the UI in the plugin's manifest
-
-Example Page.tsx:
 ```tsx
+// src/plugins/[character]/character-edit/html/Page.tsx
 import React from 'react';
 
-export const Page: React.FC = () => {
+export default function Page() {
   return (
     <div className="container">
-      <h1>My Plugin UI</h1>
-      <p>This is a React-based UI for my FiveM plugin</p>
+      <h1>Character Edit</h1>
     </div>
   );
-};
+}
 ```
 
-## 📚 API Documentation
+The shared `src/webview/` folder provides Tailwind config, theme, i18n setup, dev tools, and the entry HTML used by Vite — your `Page.tsx` plugs into that infra.
 
-### FileManager
+## Docker deployment
 
-The `FileManager` class provides utilities for working with the file system:
-
-```typescript
-import { FileManager } from './managers/FileManager';
-
-const fileManager = new FileManager('src/plugins');
-const plugins = await fileManager.findPlugins();
+```bash
+docker-compose up -d --build
 ```
 
-### PluginManager
+This brings up a FiveM container that downloads FXServer from `BINARIES_ARCHIVE_URL` at image build time and a MariaDB 10.5 sidecar. `txData/` is bind-mounted into the FiveM container at `/root/binaries/txData`, so `pnpm build` on the host writes directly into the running server's resource tree.
 
-The `PluginManager` class handles plugin building and deployment:
+Exposed ports: `30120/tcp+udp` (FiveM), `40120/tcp` (txAdmin), `3414/tcp` (reload endpoint), `3306/tcp` (MariaDB).
 
-```typescript
-import { PluginManager } from './managers/PluginManager';
+## Asset server
 
-const pluginManager = new PluginManager(fileManager, 'dist');
-await pluginManager.buildPlugin(plugin);
-```
+`asset-server/` is a separate sub-package (uses `npm`, has its own `package.json`) that optimizes images at multiple quality levels and serves them with caching/compression. See `asset-server/README.md` for its commands and URL scheme. It runs independently of the FiveM build pipeline.
 
-### BuildManager
+## TypeScript projects
 
-The `BuildManager` class orchestrates the build process:
+`tsconfig.json` is a solution file referencing three projects:
 
-```typescript
-import { BuildManager } from './managers/BuildManager';
+- `tsconfig.scripts.json` — Node tooling under `src/scripts/**` (NodeNext modules).
+- `tsconfig.plugins.json` — plugin client/server/shared code (ES2022, **excludes `**/html/**`**).
+- `tsconfig.webview.json` — `src/webview/**` plus every plugin's `html/**` and `shared/**` (DOM lib, `react-jsx`, `noEmit`).
 
-const buildManager = new BuildManager(fileManager, 'dist');
-await buildManager.buildAll();
-```
+Files placed in the wrong tree won't typecheck. In particular, DOM-only code belongs in `html/` (webview project), not in `client/` (plugins project).
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Issues and pull requests welcome.
 
-## 📄 License
+## License
 
-This project is licensed under the ISC License - see the LICENSE file for details.
+ISC — see the LICENSE file.
