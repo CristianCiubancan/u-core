@@ -401,7 +401,11 @@ class BuildManager {
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             minify: false,
-            sourcemap: 'inline',
+            // Inline sourcemaps only for server-side bundles. Client bundles
+            // are downloaded by every connecting FiveM player; shipping
+            // base64-encoded `sourcesContent` would leak the full TypeScript
+            // source of every client file to anyone who joins the server.
+            sourcemap: isServerScript ? 'inline' : false,
             loader,
             logLevel: 'info',
             external: externalPackages.concat(isServerScript ? ['canvas'] : []), // Add canvas as external for server scripts
@@ -522,7 +526,7 @@ class BuildManager {
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             minify: false,
-            sourcemap: 'inline',
+            sourcemap: isServerScript ? 'inline' : false,
             external: externalPackages,
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',

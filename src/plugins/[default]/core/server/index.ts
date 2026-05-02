@@ -1,24 +1,29 @@
 /// <reference types="@citizenfx/server" />
-import 'dotenv/config';
 import * as http from 'http';
 import * as url from 'url';
 import * as crypto from 'crypto';
 
+// Read the API key from FXServer's convar mechanism (set via
+// `setr reloader_api_key "<value>"` in server.cfg). Avoids shipping the
+// `dotenv` package into the in-game bundle and the path-relative sourcemap
+// that leaks dev-machine pnpm layout.
+//
 // Refuse to start without an explicitly-configured key. The previous fallback
 // to a literal `***SCRUBBED***` placeholder meant any operator who skipped
-// env config exposed an unauthenticated remote-resource-control endpoint.
+// config exposed an unauthenticated remote-resource-control endpoint.
 const PLACEHOLDER_API_KEYS = new Set(['<replace-me>', '***SCRUBBED***']);
-const RAW_API_KEY = process.env.RELOADER_API_KEY ?? '';
+const RAW_API_KEY = GetConvar('reloader_api_key', '');
 if (!RAW_API_KEY || PLACEHOLDER_API_KEYS.has(RAW_API_KEY)) {
   const reason = !RAW_API_KEY
     ? 'unset or empty'
     : `equal to placeholder "${RAW_API_KEY}"`;
   console.error(
-    `[resource-manager] RELOADER_API_KEY is ${reason}. Refusing to start. ` +
-      `Set RELOADER_API_KEY in .env to a CSPRNG-generated value (e.g. ` +
+    `[resource-manager] reloader_api_key convar is ${reason}. Refusing to ` +
+      `start. Add \`setr reloader_api_key "<value>"\` to your server.cfg ` +
+      `with a CSPRNG-generated value (e.g. ` +
       `\`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"\`).`
   );
-  throw new Error('RELOADER_API_KEY is unset or set to placeholder');
+  throw new Error('reloader_api_key convar is unset or set to placeholder');
 }
 const API_KEY = RAW_API_KEY;
 const API_KEY_BUFFER = Buffer.from(API_KEY, 'utf8');
