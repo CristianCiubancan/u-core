@@ -26,7 +26,7 @@
       "title": "Lock down secrets & endpoints (ports, API key, CORS, compose)",
       "phase": "A",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "Credentials (`***SCRUBBED***` and the placeholder API key) are present in git history and are NOT rotated by this PR. Run `git filter-repo` separately and force-push, then have all clones re-clone.",
@@ -73,9 +73,9 @@
       ],
       "branch_name": "audit/pr-01-lockdown-secrets",
       "commit_message": "chore(security): bind reload+db ports to localhost, refuse placeholder API key",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
+      "started_at": "2026-05-02T00:00:00Z",
+      "completed_at": "2026-05-02T00:30:00Z",
+      "commit_shas": ["316b19cbc9aae8f391fa8ad3de4189c90bd7d25d"],
       "notes": []
     },
     {
