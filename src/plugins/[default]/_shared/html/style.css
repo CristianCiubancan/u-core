@@ -1,0 +1,51 @@
+/* Shared Tailwind + theme stylesheet. The Tailwind config at
+ * src/webview/theme/tailwind.config.ts already globs the entire src tree,
+ * so this single stylesheet contains every utility class any plugin's
+ * webview references and purging is global, not per-plugin. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(30, 30, 46, 0.4);
+    border-radius: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(100, 100, 150, 0.5);
+    border-radius: 8px;
+    border: 2px solid rgba(50, 50, 70, 0.3);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(120, 120, 170, 0.6);
+  }
+}
+
+@layer base {
+  body {
+    @apply text-base;
+  }
+}
+
+body {
+  font-family: 'Libre Baskerville', serif;
+  font-weight: 400;
+  font-style: normal;
+}

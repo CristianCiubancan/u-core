@@ -1,0 +1,9 @@
+{
+  "name": "_shared",
+  "version": "0.1.0",
+  "fx_version": "cerulean",
+  "games": ["gta5", "rdr3"],
+  "author": "u-core",
+  "description": "Shared vendor bundle (React, ReactDOM, i18n) and Tailwind CSS hosted at https://cfx-nui-_shared/ for all u-core plugin webviews",
+  "files": ["html/_shared.js", "html/style.css"]
+}

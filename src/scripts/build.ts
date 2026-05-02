@@ -132,10 +132,25 @@ class PluginBuilder {
       // Get all plugins
       const plugins = this.fileManager.getAllPlugins();
 
-      // Report how many plugins we'll build
+      // Split into the shared vendor resource (built first, serialized) and
+      // the consumer plugins (built in parallel after `_shared` lands).
+      // Consumer index.html files reference `https://cfx-nui-_shared/...`,
+      // so building _shared first ensures the URL targets exist before
+      // FXServer is told to start anything.
+      const shared = plugins.find((p) =>
+        this.buildManager.isSharedVendorPlugin(p)
+      );
+      const consumers = plugins.filter(
+        (p) => !this.buildManager.isSharedVendorPlugin(p)
+      );
+
       this.log(
         'info',
-        chalk.bold(`Building ${plugins.length} plugins in parallel`)
+        chalk.bold(
+          shared
+            ? `Building ${plugins.length} plugins (1 shared vendor + ${consumers.length} consumers)`
+            : `Building ${plugins.length} plugins in parallel`
+        )
       );
 
       // Clean dist directory if requested; otherwise sweep orphaned outputs
@@ -150,10 +165,28 @@ class PluginBuilder {
         await this.buildManager.sweepOrphans();
       }
 
-      // Build plugins in parallel. PR-09 eliminated the src/webview/App.tsx
-      // swap, so cross-plugin webview builds no longer race for the same
-      // shared file and can run concurrently.
-      await Promise.all(plugins.map((plugin) => this.buildSinglePlugin(plugin)));
+      if (shared) {
+        // Hard-fail before any consumer build if the workspace has more
+        // than one React copy. The externalized consumer bundles all
+        // resolve their imports to whichever copy esbuild/Vite picks for
+        // the lib build, while window.React comes from _shared. A skew
+        // produces silent runtime errors that look like unrelated bugs
+        // (hooks-out-of-order, dispatcher mismatches).
+        const reactVersion = await this.buildManager.assertSingleReactVersion();
+        this.log(
+          'info',
+          chalk.green('✓') +
+            chalk.gray(` Single React@${reactVersion} resolved across the workspace`)
+        );
+
+        // Build _shared serially before consumers — its dist files are
+        // referenced by every consumer's generated index.html. PR-09
+        // eliminated the App.tsx swap, so the consumers themselves can
+        // still run in parallel.
+        await this.buildSinglePlugin(shared);
+      }
+
+      await Promise.all(consumers.map((plugin) => this.buildSinglePlugin(plugin)));
 
       // Log completion
       const totalTime = ((performance.now() - this.startTime) / 1000).toFixed(
