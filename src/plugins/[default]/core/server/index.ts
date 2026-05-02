@@ -1,12 +1,14 @@
 /// <reference types="@citizenfx/server" />
-import 'dotenv/config';
 import * as http from 'http';
 import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Simple authentication - you should use a more secure method in production
-const API_KEY = process.env.RELOADER_API_KEY || '***SCRUBBED***';
+// Read the API key from FXServer's convar mechanism (set via
+// `setr reloader_api_key "<value>"` in server.cfg). Avoids shipping the
+// `dotenv` package into the in-game bundle and the path-relative sourcemap
+// that leaks dev-machine pnpm layout.
+const API_KEY = GetConvar('reloader_api_key', '') || '***SCRUBBED***';
 console.log(
   `[resource-manager] API_KEY is ${
     API_KEY ? 'configured' : 'using default value'
