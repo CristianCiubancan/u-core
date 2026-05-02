@@ -298,6 +298,94 @@ export interface SaveCharacterData {
 }
 
 /**
- * Utility type for NUI callbacks
+ * Discriminated response shape returned to NUI callbacks. The wire format
+ * is whatever the handler passes to `cb(...)`; today every call site emits
+ * `{ status: 'ok' }` on success. The union covers the rejection paths
+ * server validation will need (PR-05) without committing to a specific
+ * error envelope yet.
  */
-export type NuiCallback<T> = (data: T, cb: (response: any) => void) => void;
+export type NuiResponse =
+  | { status: 'ok' }
+  | { status: 'success'; message?: string }
+  | { status: 'invalid'; reason?: string }
+  | { status: 'error'; message: string };
+
+/**
+ * Compile-time mapping of NUI action strings to their request and response
+ * payload types. Adding a new NUI callback action means adding an entry
+ * here; both `fetchNui` (NUI → client) and `registerNuiCallback` (client
+ * handler) infer their types from this map, so payload typos are a
+ * compile error at every layer.
+ */
+export interface NuiCallbackMap {
+  'character-create:toggle-ui': {
+    request: SaveCharacterData;
+    response: NuiResponse;
+  };
+  'character-create:update-model': {
+    request: ModelUpdateData;
+    response: NuiResponse;
+  };
+  'character-create:update-face': {
+    request: FaceUpdateData;
+    response: NuiResponse;
+  };
+  'character-create:update-hair': {
+    request: HairUpdateData;
+    response: NuiResponse;
+  };
+  'character-create:update-appearance': {
+    request: AppearanceUpdateData;
+    response: NuiResponse;
+  };
+  'character-create:update-clothing': {
+    request: ClothingUpdateData;
+    response: NuiResponse;
+  };
+  'character-create:rotate-camera': {
+    request: CameraRotationData;
+    response: NuiResponse;
+  };
+  'character-create:zoom-camera': {
+    request: CameraZoomData;
+    response: NuiResponse;
+  };
+  'character-create:focus-camera': {
+    request: CameraFocusData;
+    response: NuiResponse;
+  };
+  'character-create:rotate-player': {
+    request: PlayerRotationData;
+    response: NuiResponse;
+  };
+  'character-create:drag-camera': {
+    request: CameraDragData;
+    response: NuiResponse;
+  };
+  'character-create:drag-end': {
+    request: Record<string, never>;
+    response: NuiResponse;
+  };
+}
+
+export type NuiAction = keyof NuiCallbackMap;
+
+/**
+ * Compile-time mapping of NetEvent names to their wire payloads. `client`
+ * means the event flows server → client (consumed by `onNet` on the
+ * client); `server` means the inverse (emitted by `emitNet` on the client,
+ * consumed by `onNet` on the server). Direction lives next to the type so
+ * typos and direction mistakes both fail at compile time.
+ */
+export interface NetEventMap {
+  'character-create:save': {
+    direction: 'server';
+    payload: CharacterData;
+  };
+  'character-create:save-result': {
+    direction: 'client';
+    payload: { success: boolean; error?: string };
+  };
+}
+
+export type NetEventName = keyof NetEventMap;
