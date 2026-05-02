@@ -1,31 +1,78 @@
-FROM ubuntu:20.04
+# syntax=docker/dockerfile:1.6
+#
+# Multi-stage build for the FXServer container.
+#
+# Stage 1 (`fetch`) downloads, verifies, and extracts the FXServer tarball.
+# It carries `curl`, `tar`, and `xz-utils` — none of which appear in the
+# final image. The committed `fxserver.sha256` checksum gates extraction so
+# a tampered or stale upstream artifact halts the build.
+#
+# Stage 2 (`runtime`) is a minimal image with only the libs FXServer needs
+# at runtime, runs as a non-root `fivem` user, and exposes a HEALTHCHECK
+# against the txAdmin web UI on :40120.
+#
+# When you bump BINARIES_ARCHIVE_URL, you MUST also refresh fxserver.sha256
+# in the same commit. To compute the new value:
+#   curl -L "$BINARIES_ARCHIVE_URL" -o /tmp/fx.tar.xz
+#   sha256sum /tmp/fx.tar.xz | awk '{print $1"  fx.tar.xz"}' > fxserver.sha256
 
-# Install required packages
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    tar \
-    xz-utils && \
+# ---------- Stage 1: fetch + verify + extract ----------
+FROM ubuntu:24.04 AS fetch
+
+ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/13890-ad6c90072e62cdb7ee0dcc943d7ded8a5107d542/fx.tar.xz
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        tar \
+        xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
-# Build arguments for URLs (these can be overridden at build time)
-ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/14482-1eed77dd20d49bab1a41f89427adafea7781a3fd/fx.tar.xz
-ARG SERVER_DATA_REPO_URL=https://github.com/citizenfx/cfx-server-data
+WORKDIR /work
+COPY fxserver.sha256 ./fxserver.sha256
 
-# Optionally, set environment variables (if your start.sh or runtime logic requires them)
-ENV BINARIES_ARCHIVE_URL=${BINARIES_ARCHIVE_URL} \
-    SERVER_DATA_REPO_URL=${SERVER_DATA_REPO_URL}
+# Download with strict TLS settings:
+#   --proto '=https'      refuse any non-HTTPS redirect
+#   --tlsv1.2             floor the TLS version
+#   --fail-with-body      non-zero exit (and body) on HTTP >= 400
+#   -L                    follow redirects (FiveM's CDN issues them)
+RUN curl --proto '=https' --tlsv1.2 --fail-with-body -L \
+        "$BINARIES_ARCHIVE_URL" -o fx.tar.xz && \
+    sha256sum -c fxserver.sha256 && \
+    mkdir -p /opt/fivem && \
+    tar -xf fx.tar.xz -C /opt/fivem && \
+    rm fx.tar.xz
 
-# Download and extract binaries into /root/binaries
-RUN mkdir -p /root/binaries && \
-    curl -L "$BINARIES_ARCHIVE_URL" -o /tmp/fx.tar.xz && \
-    tar -xf /tmp/fx.tar.xz -C /root/binaries && \
-    rm /tmp/fx.tar.xz
+# ---------- Stage 2: runtime ----------
+FROM ubuntu:24.04 AS runtime
 
+# Runtime libs only. ca-certificates for outbound TLS, tini as PID 1 to reap
+# the children FXServer spawns.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        tini && \
+    rm -rf /var/lib/apt/lists/*
 
+# Non-root runtime user. UID/GID 10001 are arbitrary but high enough to avoid
+# collisions with host-side service accounts when txData is bind-mounted.
+RUN groupadd --system --gid 10001 fivem && \
+    useradd --system --uid 10001 --gid fivem --home-dir /home/fivem \
+        --shell /sbin/nologin --create-home fivem
 
-# Set executable permissions for the startup script and the binary runner script
-RUN chmod +x /root/binaries/run.sh
+# Re-base extracted binaries under /home/fivem so the runtime user owns them.
+# /home/fivem/binaries mirrors the legacy /root/binaries layout so existing
+# txData volume mounts and run.sh stay valid.
+COPY --from=fetch --chown=fivem:fivem /opt/fivem /home/fivem/binaries
 
-# Define the container's startup command
-CMD ["/root/binaries/run.sh"]
+USER fivem
+WORKDIR /home/fivem/binaries
+
+# txAdmin web UI listens on 40120; HEALTHCHECK exits non-zero when it's
+# unreachable, so docker (and `depends_on: condition: service_healthy` on
+# downstream services) can react. `bash -c '</dev/tcp/...'` avoids needing
+# curl in the final image.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD bash -c '</dev/tcp/127.0.0.1/40120' || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/home/fivem/binaries/run.sh"]
