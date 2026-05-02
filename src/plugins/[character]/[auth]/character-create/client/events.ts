@@ -1,18 +1,7 @@
 /// <reference types="@citizenfx/client" />
 
 import {
-  ModelUpdateData,
-  FaceUpdateData,
-  HairUpdateData,
-  AppearanceUpdateData,
-  ClothingUpdateData,
-  CameraRotationData,
-  CameraZoomData,
-  CameraFocusData,
-  PlayerRotationData,
-  CameraDragData,
-  SaveCharacterData,
-  NuiCallback,
+  NuiCallbackMap,
   NUI_EVENT,
 } from '../shared/types';
 import { isUiVisible } from '../shared/store';
@@ -36,6 +25,29 @@ import {
 const COMMAND_NAME = 'character-create:toggle_ui';
 
 /**
+ * Typed bridge for `RegisterNuiCallback`. Action strings are constrained to
+ * keys of `NuiCallbackMap`; the request and response payloads are inferred
+ * from that map. Replaces the previous handler-cast pattern, which was
+ * additive — it told the type checker about the data type but left `cb`
+ * typed as an unconstrained callback, so a wrong status shape silently
+ * type-checked.
+ */
+function registerNuiCallback<K extends keyof NuiCallbackMap>(
+  action: K,
+  handler: (
+    data: NuiCallbackMap[K]['request'],
+    cb: (response: NuiCallbackMap[K]['response']) => void
+  ) => void | Promise<void>
+): void {
+  // RegisterNuiCallback is a CitizenFX native; the wrapper enforces typing
+  // at the call site, while the runtime payload still arrives as plain JSON.
+  RegisterNuiCallback(
+    action,
+    handler as (data: unknown, cb: (response: unknown) => void) => void
+  );
+}
+
+/**
  * =======================================================
  * NUI CALLBACKS & EVENT HANDLERS
  * =======================================================
@@ -54,10 +66,7 @@ export function registerEvents(): void {
   );
 
   // Handle NUI callback when UI is closed from the interface
-  RegisterNuiCallback(NUI_EVENT, ((
-    data: SaveCharacterData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback(NUI_EVENT, (data, cb) => {
     console.log(
       '[Character Create] Received NUI event with data:',
       JSON.stringify(data)
@@ -80,130 +89,100 @@ export function registerEvents(): void {
 
     // Send response back to NUI
     cb({ status: 'ok' });
-  }) as NuiCallback<SaveCharacterData>);
+  });
 
   // Handle model update
-  RegisterNuiCallback('character-create:update-model', (async (
-    data: ModelUpdateData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:update-model', async (data, cb) => {
     console.log(
       '[Character Create] Update model request:',
       JSON.stringify(data)
     );
     await updateModel(data.model);
     cb({ status: 'ok' });
-  }) as NuiCallback<ModelUpdateData>);
+  });
 
   // Handle face update
-  RegisterNuiCallback('character-create:update-face', ((
-    data: FaceUpdateData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:update-face', (data, cb) => {
     console.log(
       '[Character Create] Update face request:',
       JSON.stringify(data)
     );
     updateFace(data.key, data.value);
     cb({ status: 'ok' });
-  }) as NuiCallback<FaceUpdateData>);
+  });
 
   // Handle hair update
-  RegisterNuiCallback('character-create:update-hair', ((
-    data: HairUpdateData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:update-hair', (data, cb) => {
     console.log(
       '[Character Create] Update hair request:',
       JSON.stringify(data)
     );
     updateHair(data.key, data.value);
     cb({ status: 'ok' });
-  }) as NuiCallback<HairUpdateData>);
+  });
 
   // Handle appearance update
-  RegisterNuiCallback('character-create:update-appearance', ((
-    data: AppearanceUpdateData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:update-appearance', (data, cb) => {
     console.log(
       '[Character Create] Update appearance request:',
       JSON.stringify(data)
     );
     updateAppearance(data.category, data.key, data.value);
     cb({ status: 'ok' });
-  }) as NuiCallback<AppearanceUpdateData>);
+  });
 
   // Handle clothing update
-  RegisterNuiCallback('character-create:update-clothing', ((
-    data: ClothingUpdateData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:update-clothing', (data, cb) => {
     console.log(
       '[Character Create] Update clothing request:',
       JSON.stringify(data)
     );
     updateClothing(data.key, data.value);
     cb({ status: 'ok' });
-  }) as NuiCallback<ClothingUpdateData>);
+  });
 
   // Handle camera rotation
-  RegisterNuiCallback('character-create:rotate-camera', ((
-    data: CameraRotationData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:rotate-camera', (data, cb) => {
     console.log(
       '[Character Create] Camera rotation request:',
       JSON.stringify(data)
     );
     rotateCamera(data.direction);
     cb({ status: 'ok' });
-  }) as NuiCallback<CameraRotationData>);
+  });
 
   // Handle camera zoom
-  RegisterNuiCallback('character-create:zoom-camera', ((
-    data: CameraZoomData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:zoom-camera', (data, cb) => {
     console.log(
       '[Character Create] Camera zoom request:',
       JSON.stringify(data)
     );
     zoomCamera(data.direction);
     cb({ status: 'ok' });
-  }) as NuiCallback<CameraZoomData>);
+  });
 
   // Handle camera focus
-  RegisterNuiCallback('character-create:focus-camera', ((
-    data: CameraFocusData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:focus-camera', (data, cb) => {
     console.log(
       '[Character Create] Camera focus request:',
       JSON.stringify(data)
     );
     focusCamera(data.focus);
     cb({ status: 'ok' });
-  }) as NuiCallback<CameraFocusData>);
+  });
 
   // Handle player rotation
-  RegisterNuiCallback('character-create:rotate-player', ((
-    data: PlayerRotationData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:rotate-player', (data, cb) => {
     console.log(
       '[Character Create] Player rotation request:',
       JSON.stringify(data)
     );
     rotatePlayer(data.direction);
     cb({ status: 'ok' });
-  }) as NuiCallback<PlayerRotationData>);
+  });
 
   // Handle camera drag (for rotation and zoom)
-  RegisterNuiCallback('character-create:drag-camera', ((
-    data: CameraDragData,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:drag-camera', (data, cb) => {
     console.log(
       '[Character Create] Camera drag request:',
       JSON.stringify(data)
@@ -229,17 +208,14 @@ export function registerEvents(): void {
     }
 
     cb({ status: 'ok' });
-  }) as NuiCallback<CameraDragData>);
+  });
 
   // Handle drag end
-  RegisterNuiCallback('character-create:drag-end', ((
-    data: any,
-    cb: (data: any) => void
-  ) => {
+  registerNuiCallback('character-create:drag-end', (_data, cb) => {
     console.log('[Character Create] Drag end request');
     // Nothing to do here for now, but we could stop any ongoing animations
     cb({ status: 'ok' });
-  }) as NuiCallback<any>);
+  });
 
   /**
    * =======================================================

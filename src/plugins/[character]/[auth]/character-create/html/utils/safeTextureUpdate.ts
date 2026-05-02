@@ -1,5 +1,18 @@
 import { fetchNui } from '../../../../../../webview/utils/fetchNui';
+import type { ClothingData } from '../../shared/types';
 import { verifyTextures } from './textureVerification';
+
+// Subset of ClothingData keys whose drawable values map 1:1 onto a CitizenFX
+// component slot. The `${BaseClothingKey}Texture` suffix is also a valid
+// ClothingData key — that mapping lets us narrow `${baseKey}Texture` template
+// literals into `keyof ClothingData` at the type level without runtime casts.
+type BaseClothingKey =
+  | 'tops'
+  | 'undershirt'
+  | 'legs'
+  | 'shoes'
+  | 'accessories'
+  | 'torso';
 
 /**
  * Cache to store verification results for quick access
@@ -31,7 +44,7 @@ const getCacheKey = (
 /**
  * Helper function to map component IDs to their respective clothing keys
  */
-const getClothingKeyFromComponentId = (componentId: number): string => {
+const getClothingKeyFromComponentId = (componentId: number): BaseClothingKey => {
   switch (componentId) {
     case 11:
       return 'tops';
@@ -99,8 +112,9 @@ export const safelyUpdateTexture = async (
     // Check if the requested texture is verified
     if (verifiedTextures.includes(textureId)) {
       // It's verified, send the update
+      const textureKey = `${clothingKey}Texture` as const;
       await fetchNui('character-create:update-clothing', {
-        key: `${clothingKey}Texture`,
+        key: textureKey,
         value: textureId,
       });
       return true;
@@ -116,8 +130,9 @@ export const safelyUpdateTexture = async (
         console.log(
           `[Safe Texture Update] Using fallback texture ${fallbackTexture}`
         );
+        const fallbackKey = `${clothingKey}Texture` as const;
         await fetchNui('character-create:update-clothing', {
-          key: `${clothingKey}Texture`,
+          key: fallbackKey,
           value: fallbackTexture,
         });
         return true;
@@ -162,10 +177,11 @@ export const safeClothingUpdate = async (
     // Safely update the texture
     return safelyUpdateTexture(model, compId, drawableId, value);
   } else {
-    // This is a drawable update, not a texture update
-    // Send it directly
+    // This is a drawable update, not a texture update. Caller is expected
+    // to pass a valid clothing key; we narrow at the boundary instead of
+    // proliferating the type up through every caller.
     await fetchNui('character-create:update-clothing', {
-      key,
+      key: key as keyof ClothingData,
       value,
     });
     return true;

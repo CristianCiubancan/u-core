@@ -4,52 +4,57 @@ declare global {
   }
 }
 
-/**
- * Simple wrapper around fetch API tailored for CEF/NUI use. This abstraction
- * can be extended to include AbortController if needed or if the response isn't
- * JSON. Tailor it to your needs.
- *
- * @param eventName - The endpoint eventname to target
- * @param data - Data you wish to send in the NUI Callback
- *
- * @return returnData - A promise for the data sent back by the NuiCallbacks CB argument
- */
 import { isEnvBrowser } from './misc';
+import type {
+  NuiAction,
+  NuiCallbackMap,
+} from '../../plugins/[character]/[auth]/character-create/shared/types';
 
-// Mock responses for browser development environment
-const mockResponses: Record<string, unknown> = {
-  uiOpened: { status: 'success', message: 'UI opened successfully' },
-  testEvent: { status: 'success', message: 'Test event received' },
-  saveCharacter: { status: 'success', message: 'Character saved successfully' },
-  saveSettings: { status: 'success', message: 'Settings saved successfully' },
-  cancelPurchase: { status: 'success', message: 'Purchase cancelled' },
-  confirmPurchase: { status: 'success', message: 'Purchase confirmed', success: true },
-  // Add more mock responses as needed
+// Mock responses for browser development environment. Keyed by NUI action
+// string; loosely typed because the dev-mode mock doesn't have to match
+// the real wire format perfectly — only enough for the UI to behave.
+const mockResponses: Partial<Record<NuiAction | string, unknown>> = {
+  'character-create:toggle-ui': { status: 'ok' },
+  'character-create:update-model': { status: 'ok' },
+  'character-create:update-face': { status: 'ok' },
+  'character-create:update-hair': { status: 'ok' },
+  'character-create:update-appearance': { status: 'ok' },
+  'character-create:update-clothing': { status: 'ok' },
+  'character-create:rotate-camera': { status: 'ok' },
+  'character-create:zoom-camera': { status: 'ok' },
+  'character-create:focus-camera': { status: 'ok' },
+  'character-create:rotate-player': { status: 'ok' },
+  'character-create:drag-camera': { status: 'ok' },
+  'character-create:drag-end': { status: 'ok' },
 };
 
-export async function fetchNui<T>(
-  eventName: string,
-  data?: unknown
-): Promise<T> {
-  // If we're in a browser environment, return a mock response after a slight delay
+/**
+ * Typed wrapper around the CEF/NUI `fetch` bridge. The action string must
+ * be a known key of `NuiCallbackMap`; the request and response types are
+ * inferred from that map at the call site. In browser dev mode the call
+ * is intercepted and a mock response is returned after a short delay; in
+ * the FiveM runtime the request is POSTed to `https://${resource}/${action}`.
+ */
+export async function fetchNui<K extends NuiAction>(
+  eventName: K,
+  data?: NuiCallbackMap[K]['request']
+): Promise<NuiCallbackMap[K]['response']> {
   if (isEnvBrowser()) {
-    // Use collapsed console groups for cleaner output
     console.groupCollapsed(`📡 NUI Call: ${eventName}`);
     console.log('Request Data:', data);
-    
-    // Return a promise that resolves with mock data after a small delay
+
     return new Promise((resolve) => {
       setTimeout(() => {
-        const response = mockResponses[eventName] || { status: 'success', message: 'Operation completed' };
+        const response =
+          mockResponses[eventName] ?? ({ status: 'ok' } as const);
         console.log('Response:', response);
         console.groupEnd();
-        resolve(response as T);
-      }, 500); // Simulate network delay
+        resolve(response as NuiCallbackMap[K]['response']);
+      }, 500);
     });
   }
-  
-  // In FiveM environment, perform the actual fetch
-  const actualData = data || {};
+
+  const actualData = data ?? {};
   const options = {
     method: 'post',
     headers: {
@@ -64,7 +69,7 @@ export async function fetchNui<T>(
 
   try {
     const resp = await fetch(`https://${resourceName}/${eventName}`, options);
-    return await resp.json();
+    return (await resp.json()) as NuiCallbackMap[K]['response'];
   } catch (error) {
     console.error(`Error in fetchNui for event ${eventName}:`, error);
     throw error;
