@@ -833,7 +833,7 @@
       "title": "Tests + CI",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [],
@@ -865,10 +865,49 @@
       ],
       "branch_name": "audit/pr-17-tests-ci",
       "commit_message": "feat(ci): add vitest with regression suite; GitHub Actions tsc/build/test pipeline",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T19:16:13Z",
+      "completed_at": "2026-05-02T19:19:20Z",
+      "commit_shas": ["9d8a4791"],
+      "notes": [
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "implementation",
+          "issue": "Tests for `watcher debounce` and `App.tsx restoration` use behavioral reproductions rather than direct imports of the production logic, because both flows are currently inlined inside build.ts (startWatching) and BuildManager.buildPluginPageTsx without seams. They lock the semantics rather than the call shape. Once PR-13 extracts the debounce timer and PR-09 removes the App.tsx swap, both tests should be revisited — debounce.test.ts to import the helper directly, apptsx-restore.test.ts to assert the swap simply does not happen."
+        },
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "implementation",
+          "issue": "Manifest snapshot and routing tests reach into private methods (generateFxManifest, isServerScript) via typed casts. This is acceptable for regression locks but couples the tests to the private surface; if those methods are renamed they break. Worth promoting to a public-only API once a stable export shape is decided."
+        },
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "verify",
+          "command": "pnpm install --frozen-lockfile",
+          "exit": 0,
+          "tail": "Lockfile is up to date; vitest installed successfully"
+        },
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "verify",
+          "command": "pnpm exec tsc -b",
+          "exit": 0,
+          "tail": "no errors"
+        },
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "verify",
+          "command": "SERVER_NAME=ci-stub pnpm build",
+          "exit": 0,
+          "tail": "4 plugins built; total 10.17s"
+        },
+        {
+          "ts": "2026-05-02T19:19:20Z",
+          "phase": "verify",
+          "command": "pnpm test",
+          "exit": 0,
+          "tail": "Test Files 5 passed (5); Tests 10 passed (10); 637ms"
+        }
+      ]
     },
     {
       "id": "PR-18",
