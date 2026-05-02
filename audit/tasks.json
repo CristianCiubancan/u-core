@@ -630,7 +630,7 @@
       "title": "Typed NUI + NetEvent registry; remove `as NuiCallback<...>` casts",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": ["PR-14"],
@@ -665,10 +665,53 @@
       ],
       "branch_name": "audit/pr-15-typed-nui-registry",
       "commit_message": "refactor(types): typed NUI/NetEvent registry; remove NuiCallback casts",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T19:00:00Z",
+      "completed_at": "2026-05-02T19:07:36Z",
+      "commit_shas": ["2fd85197"],
+      "notes": [
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "discovery",
+          "issue": "Picked up after PR-14 unblocked PR-15 mid-run; PR-15 was not in the runner's original queue. The autonomous loop spec resolves this correctly via 'first task in array order satisfying eligibility' — PR-15 is array-position-earlier than PR-16, so it runs first."
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "implementation",
+          "issue": "Added a registerNuiCallback wrapper inline in client/events.ts rather than introducing a new helper module. Keeps the callsite-to-helper distance short and avoids a new file in client/. The wrapper is generic over keyof NuiCallbackMap and casts once internally to bridge the untyped CitizenFX RegisterNuiCallback native; everything outside the wrapper stays type-safe."
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "implementation",
+          "issue": "Touched src/plugins/[character]/[auth]/character-create/html/utils/safeTextureUpdate.ts (NOT in affected_files). Reason: tightening 'character-create:update-clothing' to ClothingUpdateData surfaced 3 pre-existing key:string usages that the previous fetchNui<T>() generic had silently accepted. Narrowed getClothingKeyFromComponentId to a BaseClothingKey union and added one boundary cast for the catch-all 'drawable update' path."
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "incident",
+          "issue": "Initial commit landed on master instead of audit/pr-15-typed-nui-registry — I forgot the `git checkout -b` step. Recovered by creating the branch at the bad-commit SHA, then `git reset --hard 213bc82a` on master to return it to the baseline. The PR-15 commit SHA (2fd85197) is unchanged. No work lost; master is clean.",
+          "suggested_task": "Future runs: tighten the per-task workflow so the branch is created before the first source edit, not after."
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "verify",
+          "command": "pnpm exec tsc -b --force",
+          "exit": 0,
+          "tail": "no errors"
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "verify",
+          "command": "SERVER_NAME=ci-stub pnpm build",
+          "exit": 0,
+          "tail": "4 plugins built successfully"
+        },
+        {
+          "ts": "2026-05-02T19:07:36Z",
+          "phase": "verify",
+          "command": "! grep -RE 'as NuiCallback<' src/plugins/[character]/[auth]/character-create  &&  ! grep -RE 'cb:\\s*\\(data:\\s*any\\)' ...  &&  grep -E 'NuiCallbackMap|NetEventMap' shared/types.ts",
+          "exit": 0,
+          "tail": "all three predicates pass"
+        }
+      ]
     },
     {
       "id": "PR-16",
