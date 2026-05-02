@@ -322,7 +322,7 @@ RegisterCommand(
 
       // Log details of any failed restarts
       Object.entries(result.results)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         .filter(([_, success]) => !success)
         .forEach(([resource]) => {
           console.log(`Failed to restart resource: ${resource}`);

@@ -111,7 +111,7 @@ async function processImage(filePath) {
   
   try {
     // Load the image
-    let image = sharp(filePath);
+    const image = sharp(filePath);
     
     // Process for each optimization level
     for (const level of config.optimizationLevels) {

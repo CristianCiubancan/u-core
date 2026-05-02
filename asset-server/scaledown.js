@@ -131,7 +131,7 @@ async function processImage(filePath, sourceDir) {
 
     // Get the output format based on the input format
     const ext = path.extname(filePath).toLowerCase();
-    let outputOptions = { quality: config.thumbnail.quality };
+    const outputOptions = { quality: config.thumbnail.quality };
 
     // Resize the image while preserving aspect ratio
     const resizedImage = image.resize({

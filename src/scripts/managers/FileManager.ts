@@ -114,7 +114,7 @@ class FileManager {
    */
   private escapeGlobPattern(pathStr: string): string {
     // First, normalize using forward slashes for glob patterns
-    let normalized = pathStr.replace(/\\/g, '/');
+    const normalized = pathStr.replace(/\\/g, '/');
 
     // Use a more thorough escaping approach - replace each square bracket individually
     // to handle cases with nested square brackets

@@ -10,7 +10,7 @@ type HandlersMap = Map<string, Set<HandlerType>>;
 
 // Singleton for managing NUI event listeners
 const NuiEventManager = (() => {
-  let handlers: HandlersMap = new Map();
+  const handlers: HandlersMap = new Map();
   let initialized = false;
 
   // The single event listener for all NUI events

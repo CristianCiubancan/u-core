@@ -56,10 +56,8 @@ export default [
       // pending PR-05 / PR-06; downgrade to warn so the introductory config
       // surfaces them without blocking CI on day one.
       '@typescript-eslint/no-explicit-any': 'warn',
-      // `prefer-const` is real but pre-existing in several files audited
-      // for refactor by upcoming PRs. Warn now, ratchet to error after
-      // those PRs land.
-      'prefer-const': 'warn',
+      // No remaining violations after the validation PRs landed.
+      'prefer-const': 'error',
       // `require()` calls live in legacy JS scripts (start-windows.js,
       // asset-server). Migrating them to ESM is out of PR-18's scope.
       '@typescript-eslint/no-require-imports': 'warn',
@@ -82,11 +80,9 @@ export default [
       'react/react-in-jsx-scope': 'off',
       // Default props can be expressed via TypeScript defaults.
       'react/prop-types': 'off',
-      // Pre-existing conditional-hook violation in webview/components/forms/
-      // ColorPicker.tsx:53 (React.useId inside a callback). Real bug;
-      // downgraded to warn here so this PR doesn't pretend to have fixed
-      // it. Track as a separate task.
-      'react-hooks/rules-of-hooks': 'warn',
+      // The known offender (ColorPicker.tsx) is fixed; ratchet to error so
+      // a re-introduction blocks CI.
+      'react-hooks/rules-of-hooks': 'error',
     },
   },
 ];
