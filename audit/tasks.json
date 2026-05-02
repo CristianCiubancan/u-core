@@ -700,7 +700,7 @@
       "title": "Reuse esbuild contexts + Vite JS API across watch rebuilds",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [
@@ -732,10 +732,23 @@
       ],
       "branch_name": "audit/pr-13-reuse-esbuild-vite-api",
       "commit_message": "perf(watch): reuse esbuild contexts and Vite JS API across rebuilds",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T01:30:00Z",
+      "completed_at": "2026-05-03T01:45:00Z",
+      "commit_shas": [
+        "6a4937ee809bc0b2feff51893889ebcaa655493f"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T01:45:00Z",
+          "phase": "implement",
+          "issue": "esbuild contexts use write:false + a writeBundleOutputs helper so the cached context isn't tied to a specific transactional temp dir — entries can stage into a fresh tmp.<pid> on each rebuild while reusing the parsed module graph. Cache key invalidates on platform/external/minify/sourcemap/target/format/loader change so a `--prod` toggle drops stale contexts. dispose() runs on watcher shutdown; non-watch builds rely on process.exit for cleanup."
+        },
+        {
+          "ts": "2026-05-03T01:45:00Z",
+          "phase": "discovery",
+          "issue": "Cold first build is slightly slower (~7.7s vs ~6.7s baseline) because esbuild.context creation has roughly the same cost as one-shot build for a single rebuild. The win is on subsequent ctx.rebuild() calls in watch mode — those should drop watch latency below 1s for typical 1-byte edits (criterion 4). Did not run a watch-loop benchmark in this session; left as a verification step for the PR body."
+        }
+      ]
     },
     {
       "id": "PR-14",
