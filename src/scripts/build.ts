@@ -8,6 +8,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { performance } from 'perf_hooks';
 import * as chokidar from 'chokidar';
+import { createDebouncer } from './util/debounce.js';
 
 interface BuildOptions {
   /**
@@ -263,7 +264,10 @@ class PluginBuilder {
     const rebuildQueue = new Map<string, RebuildIntent>();
     let pluginsRefreshNeeded = false;
     let isBuilding = false;
-    let debounceTimer: NodeJS.Timeout | null = null;
+    const rebuildDebouncer = createDebouncer(
+      () => void processRebuildQueue(),
+      300
+    );
 
     const processRebuildQueue = async () => {
       if (isBuilding || (rebuildQueue.size === 0 && !pluginsRefreshNeeded))
@@ -427,11 +431,7 @@ class PluginBuilder {
         existing.manifestReload || classification.isManifest;
       rebuildQueue.set(plugin.fullPath, existing);
 
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        processRebuildQueue();
-        debounceTimer = null;
-      }, 300);
+      rebuildDebouncer.schedule();
     };
 
     const handleFileChange = (filePath: string, eventType: string) => {
@@ -457,11 +457,7 @@ class PluginBuilder {
           viteRebuild: true,
           manifestReload: true,
         });
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          processRebuildQueue();
-          debounceTimer = null;
-        }, 300);
+        rebuildDebouncer.schedule();
         return;
       }
 

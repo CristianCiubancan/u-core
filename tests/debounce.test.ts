@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createDebouncer } from '../src/scripts/util/debounce.ts';
 
 /**
  * Watcher-debounce semantics. The build watcher (src/scripts/build.ts:
  * startWatching) coalesces rapid file-change events into a single rebuild
- * via a 300ms timeout. The debounce timer is currently inline so this test
- * exercises an isolated reproduction of the same algorithm — when that
- * inline code is extracted into a helper (PR-13's planned refactor) this
- * test should switch to importing it directly.
+ * by routing every queue mutation through `createDebouncer`. This test
+ * exercises that exact helper rather than a hand-rolled reproduction.
  */
-describe('watcher debounce', () => {
+describe('createDebouncer', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -16,17 +15,13 @@ describe('watcher debounce', () => {
   it('coalesces multiple rapid triggers into a single action', () => {
     vi.useFakeTimers();
     let calls = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const trigger = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        calls += 1;
-      }, 300);
-    };
+    const debouncer = createDebouncer(() => {
+      calls += 1;
+    }, 300);
 
-    trigger();
-    trigger();
-    trigger();
+    debouncer.schedule();
+    debouncer.schedule();
+    debouncer.schedule();
     vi.advanceTimersByTime(100);
     expect(calls).toBe(0);
     vi.advanceTimersByTime(400);
@@ -36,19 +31,28 @@ describe('watcher debounce', () => {
   it('fires twice when triggers are spaced beyond the debounce window', () => {
     vi.useFakeTimers();
     let calls = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const trigger = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        calls += 1;
-      }, 300);
-    };
+    const debouncer = createDebouncer(() => {
+      calls += 1;
+    }, 300);
 
-    trigger();
+    debouncer.schedule();
     vi.advanceTimersByTime(400);
     expect(calls).toBe(1);
-    trigger();
+    debouncer.schedule();
     vi.advanceTimersByTime(400);
     expect(calls).toBe(2);
+  });
+
+  it('cancels a pending action', () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const debouncer = createDebouncer(() => {
+      calls += 1;
+    }, 300);
+
+    debouncer.schedule();
+    debouncer.cancel();
+    vi.advanceTimersByTime(1000);
+    expect(calls).toBe(0);
   });
 });
