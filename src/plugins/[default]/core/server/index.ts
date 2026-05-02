@@ -52,8 +52,11 @@ function getAllResources(): string[] {
   return resources;
 }
 
-// Function to restart a specific resource
-function restartResource(resourceName: string): boolean {
+// Function to restart a specific resource. Returns once `StartResource` has
+// either succeeded or thrown — never before. The 500ms settle window
+// between Stop and Start is wrapped in a Promise so the HTTP handler can
+// `await` the full lifecycle and surface the actual start outcome.
+async function restartResource(resourceName: string): Promise<boolean> {
   console.log(
     `[resource-manager] Attempting to restart resource: ${resourceName}`
   );
@@ -64,55 +67,8 @@ function restartResource(resourceName: string): boolean {
     return false;
   }
 
-  // Handle special case for core resource
-  if (resourceName === 'core' || resourceName.endsWith('/core')) {
-    // Extract the clean resource name if it's a path
-    const cleanName = resourceName.includes('/')
-      ? resourceName.split('/').pop()
-      : resourceName;
-    console.log(`[resource-manager] Restarting core resource: ${cleanName}`);
-
-    // Check if resource exists
-    const state = GetResourceState(cleanName);
-    if (state === 'missing') {
-      console.error(
-        `[resource-manager] Core resource '${cleanName}' not found!`
-      );
-      return false;
-    }
-    try {
-      console.log(`[resource-manager] Stopping core resource: ${cleanName}`);
-      StopResource(cleanName);
-
-      // Add a small delay to ensure the resource is fully stopped
-      setTimeout(() => {
-        try {
-          console.log(
-            `[resource-manager] Starting core resource: ${cleanName}`
-          );
-          StartResource(cleanName);
-          console.log(
-            `[resource-manager] Successfully restarted core resource: ${cleanName}`
-          );
-        } catch (startError) {
-          console.error(
-            `[resource-manager] Failed to start core resource ${cleanName}:`,
-            startError
-          );
-        }
-      }, 500);
-
-      return true;
-    } catch (error) {
-      console.error(
-        `[resource-manager] Failed to stop core resource ${cleanName}:`,
-        error
-      );
-      return false;
-    }
-  }
-
-  // Handle resource names with folder paths
+  // Handle resource names with folder paths (also covers special-case 'core'
+  // — the previous code special-cased it but the logic was identical).
   const cleanResourceName = resourceName.includes('/')
     ? resourceName.split('/').pop()
     : resourceName;
@@ -137,26 +93,6 @@ function restartResource(resourceName: string): boolean {
   try {
     console.log(`[resource-manager] Stopping resource: ${cleanResourceName}`);
     StopResource(cleanResourceName);
-
-    // Add a small delay to ensure the resource is fully stopped
-    setTimeout(() => {
-      try {
-        console.log(
-          `[resource-manager] Starting resource: ${cleanResourceName}`
-        );
-        StartResource(cleanResourceName);
-        console.log(
-          `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
-        );
-      } catch (startError) {
-        console.error(
-          `[resource-manager] Failed to start resource ${cleanResourceName}:`,
-          startError
-        );
-      }
-    }, 500);
-
-    return true;
   } catch (error) {
     console.error(
       `[resource-manager] Failed to stop resource ${cleanResourceName}:`,
@@ -164,13 +100,27 @@ function restartResource(resourceName: string): boolean {
     );
     return false;
   }
+
+  // Settle window between Stop and Start, wrapped in a Promise that the
+  // handler awaits before responding. Previously this was a fire-and-
+  // forget `setTimeout(..., 500)`, so the HTTP response went out before
+  // StartResource ran and the watcher always saw "OK" even on a failure.
+  // Now `restartResource` only resolves after the Start outcome is known.
+  const startSucceeded = await new Promise<boolean>((resolve) => setTimeout(() => { try { console.log(`[resource-manager] Starting resource: ${cleanResourceName}`); StartResource(cleanResourceName); resolve(true); } catch (startError) { console.error(`[resource-manager] Failed to start resource ${cleanResourceName}:`, startError); resolve(false); } }, 500));
+
+  if (startSucceeded) {
+    console.log(
+      `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
+    );
+  }
+  return startSucceeded;
 }
 
 // Function to restart all resources
-function restartAllResources(): {
+async function restartAllResources(): Promise<{
   success: boolean;
   results: Record<string, boolean>;
-} {
+}> {
   console.log(`[resource-manager] Restarting all resources...`);
   const resources = getAllResources();
   const results: Record<string, boolean> = {};
@@ -182,7 +132,7 @@ function restartAllResources(): {
       continue;
     }
 
-    results[resource] = restartResource(resource);
+    results[resource] = await restartResource(resource);
   }
 
   return {
@@ -193,98 +143,124 @@ function restartAllResources(): {
 
 // Create HTTP server. Bound to localhost only; the reload endpoint is a
 // developer feature, not a public API, so no CORS headers are emitted.
+//
+// The handler is async so it can `await` the resource lifecycle and
+// surface real success/failure to the watcher. Any unhandled rejection
+// inside it would otherwise crash the resource — the outer try/catch
+// converts those into a 500 response so the watcher learns about it.
 const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url || '', true);
-  const path = parsedUrl.pathname;
-  const query = parsedUrl.query;
+  void (async () => {
+    try {
+      const parsedUrl = url.parse(req.url || '', true);
+      const path = parsedUrl.pathname;
+      const query = parsedUrl.query;
 
-  // Log incoming requests
-  console.log(`[resource-manager] Received ${req.method} request to ${path}`);
-
-  // Authenticate all requests
-  const authHeader = req.headers.authorization || '';
-  const providedKey = authHeader.replace('Bearer ', '');
-
-  if (!constantTimeKeyEqual(providedKey)) {
-    console.error(
-      `[resource-manager] Authentication failed - invalid API key provided`
-    );
-    res.statusCode = 401;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(
-      JSON.stringify({
-        success: false,
-        error: 'Unauthorized: Invalid API key',
-      })
-    );
-    return;
-  }
-
-  // Route handling
-  if (path === '/') {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain');
-    res.end('Resource Management API\n');
-  } else if (path === '/resources') {
-    const resources = getAllResources();
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(
-      JSON.stringify({
-        success: true,
-        resources,
-        count: resources.length,
-      })
-    );
-  } else if (path === '/restart' && req.method === 'POST') {
-    // Restart a specific resource
-    if (query.resource) {
-      const resourceName = query.resource as string;
+      // Log incoming requests
       console.log(
-        `[resource-manager] Processing restart request for resource: ${resourceName}`
+        `[resource-manager] Received ${req.method} request to ${path}`
       );
-      const success = restartResource(resourceName);
 
-      res.statusCode = success ? 200 : 404;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(
-        JSON.stringify({
-          success,
-          resource: resourceName,
-          message: success
-            ? `Resource '${resourceName}' restarted successfully`
-            : `Resource '${resourceName}' not found or failed to restart`,
-        })
-      );
-    }
-    // Restart all resources
-    else {
-      console.log(
-        `[resource-manager] Processing restart request for all resources`
-      );
-      const result = restartAllResources();
+      // Authenticate all requests
+      const authHeader = req.headers.authorization || '';
+      const providedKey = authHeader.replace('Bearer ', '');
 
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(
-        JSON.stringify({
-          success: result.success,
-          message: 'Resources restart operation completed',
-          results: result.results,
-        })
-      );
+      if (!constantTimeKeyEqual(providedKey)) {
+        console.error(
+          `[resource-manager] Authentication failed - invalid API key provided`
+        );
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Unauthorized: Invalid API key',
+          })
+        );
+        return;
+      }
+
+      // Route handling
+      if (path === '/') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('Resource Management API\n');
+      } else if (path === '/resources') {
+        const resources = getAllResources();
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: true,
+            resources,
+            count: resources.length,
+          })
+        );
+      } else if (path === '/restart' && req.method === 'POST') {
+        // Restart a specific resource
+        if (query.resource) {
+          const resourceName = query.resource as string;
+          console.log(
+            `[resource-manager] Processing restart request for resource: ${resourceName}`
+          );
+          const success = await restartResource(resourceName);
+
+          res.statusCode = success ? 200 : 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success,
+              resource: resourceName,
+              message: success
+                ? `Resource '${resourceName}' restarted successfully`
+                : `Resource '${resourceName}' failed to start (or was missing)`,
+            })
+          );
+        }
+        // Restart all resources
+        else {
+          console.log(
+            `[resource-manager] Processing restart request for all resources`
+          );
+          const result = await restartAllResources();
+
+          res.statusCode = result.success ? 200 : 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: result.success,
+              message: 'Resources restart operation completed',
+              results: result.results,
+            })
+          );
+        }
+      } else {
+        console.error(`[resource-manager] Invalid endpoint requested: ${path}`);
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Endpoint not found',
+          })
+        );
+      }
+    } catch (error) {
+      console.error('[resource-manager] Unhandled error in request:', error);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: false,
+            error:
+              error instanceof Error ? error.message : 'Internal server error',
+          })
+        );
+      } else {
+        res.end();
+      }
     }
-  } else {
-    console.error(`[resource-manager] Invalid endpoint requested: ${path}`);
-    res.statusCode = 404;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(
-      JSON.stringify({
-        success: false,
-        error: 'Endpoint not found',
-      })
-    );
-  }
+  })();
 });
 
 // Start the server on port 3414, bound to localhost only. The Docker compose
@@ -317,12 +293,13 @@ RegisterCommand(
       return;
     }
 
-    const success = restartResource(resourceName);
-    console.log(
-      success
-        ? `Resource '${resourceName}' restarted successfully`
-        : `Resource '${resourceName}' not found or failed to restart`
-    );
+    void restartResource(resourceName).then((success) => {
+      console.log(
+        success
+          ? `Resource '${resourceName}' restarted successfully`
+          : `Resource '${resourceName}' not found or failed to restart`
+      );
+    });
   },
   true
 );
@@ -336,20 +313,21 @@ RegisterCommand(
       return;
     }
 
-    const result = restartAllResources();
-    console.log(
-      result.success
-        ? 'All resources restarted successfully'
-        : 'Some resources failed to restart'
-    );
+    void restartAllResources().then((result) => {
+      console.log(
+        result.success
+          ? 'All resources restarted successfully'
+          : 'Some resources failed to restart'
+      );
 
-    // Log details of any failed restarts
-    Object.entries(result.results)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      .filter(([_, success]) => !success)
-      .forEach(([resource]) => {
-        console.log(`Failed to restart resource: ${resource}`);
-      });
+      // Log details of any failed restarts
+      Object.entries(result.results)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .filter(([_, success]) => !success)
+        .forEach(([resource]) => {
+          console.log(`Failed to restart resource: ${resource}`);
+        });
+    });
   },
   true
 );
