@@ -88,3 +88,8 @@ crawled.txt
 
 fivem-binaries
 **/.claude/settings.local.json
+
+# Removed by PR-09 — used to be a build artifact mutated per plugin during
+# webview builds. Per-plugin Vite entries now flow through the
+# `virtual:plugin-page` module (vite.config.ts), so this file no longer exists.
+src/webview/App.tsx

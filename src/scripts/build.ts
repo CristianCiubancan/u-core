@@ -120,7 +120,7 @@ class PluginBuilder {
       // Report how many plugins we'll build
       this.log(
         'info',
-        chalk.bold(`Building ${plugins.length} plugins sequentially`)
+        chalk.bold(`Building ${plugins.length} plugins in parallel`)
       );
 
       // Clean dist directory if requested; otherwise sweep orphaned outputs
@@ -135,10 +135,10 @@ class PluginBuilder {
         await this.buildManager.sweepOrphans();
       }
 
-      // Build plugins sequentially
-      for (const plugin of plugins) {
-        await this.buildSinglePlugin(plugin);
-      }
+      // Build plugins in parallel. PR-09 eliminated the src/webview/App.tsx
+      // swap, so cross-plugin webview builds no longer race for the same
+      // shared file and can run concurrently.
+      await Promise.all(plugins.map((plugin) => this.buildSinglePlugin(plugin)));
 
       // Log completion
       const totalTime = ((performance.now() - this.startTime) / 1000).toFixed(

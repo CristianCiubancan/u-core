@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './theme/index.css';
-import App from './App.tsx';
+import Page from 'virtual:plugin-page';
 import { isEnvBrowser } from './utils/misc';
 import { setupDevTools, simulateNuiEvent } from './utils/devtools';
 import './i18n';
@@ -10,7 +10,7 @@ import './i18n';
 const initApp = () => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <Page />
     </StrictMode>
   );
 
