@@ -119,8 +119,20 @@ class BuildManager {
   }
 
   /**
-   * Builds a plugin by copying all files to the dist directory
+   * Builds a plugin transactionally: stages all output into
+   * `<destDir>.tmp.<pid>`, then atomically swaps it into `<destDir>` only
+   * after every step succeeds. On any failure the temp dir is removed and the
+   * existing `<destDir>` is left untouched, so partially-built outputs never
+   * become visible to FXServer.
+   *
+   * Note (Windows): `fs.rm` of the existing `<destDir>` can fail with
+   * EBUSY/EPERM if FXServer holds an open handle. In that case the temp dir
+   * remains on disk and can be recovered by `sweepOrphans()` on the next
+   * build with `--no-clean` (or by a fresh `--clean` rebuild). Coordinating
+   * with FXServer's resource scan is out of scope for this PR.
+   *
    * @param pluginNameOrPath The name or path of the plugin to build
+   * @param reload Whether to trigger a hot reload after the build
    */
   async buildPlugin(
     pluginNameOrPath: string,
@@ -128,31 +140,41 @@ class BuildManager {
   ): Promise<void> {
     this.ensureInitialized();
 
-    try {
-      // Get the plugin
-      const plugin = this.getPluginFromNameOrPath(pluginNameOrPath);
+    let tmpDir: string | undefined;
 
+    try {
+      const plugin = this.getPluginFromNameOrPath(pluginNameOrPath);
       if (!plugin) {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
       console.log(`Building plugin: ${plugin.pluginName}`);
 
-      // Create the destination directory
       const destDir = this.getPluginDestDir(plugin);
-      await fs.mkdir(destDir, { recursive: true });
+      tmpDir = `${destDir}.tmp.${process.pid}`;
 
-      await this.buildPluginPageTsx(plugin);
+      if (fsSync.existsSync(tmpDir)) {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+      await fs.mkdir(path.dirname(destDir), { recursive: true });
+      await fs.mkdir(tmpDir, { recursive: true });
 
-      // Build all file types
+      await this.buildPluginPageTsx(plugin, tmpDir);
+
       await Promise.all([
-        this.buildPluginLua(plugin),
-        this.buildPluginJson(plugin),
-        this.buildPluginTs(plugin),
-        this.buildPluginJs(plugin),
-        this.buildPluginManifest(plugin),
-        this.buildPluginOtherFiles(plugin),
+        this.buildPluginLua(plugin, tmpDir),
+        this.buildPluginJson(plugin, tmpDir),
+        this.buildPluginTs(plugin, tmpDir),
+        this.buildPluginJs(plugin, tmpDir),
+        this.buildPluginManifest(plugin, tmpDir),
+        this.buildPluginOtherFiles(plugin, tmpDir),
       ]);
+
+      if (fsSync.existsSync(destDir)) {
+        await fs.rm(destDir, { recursive: true, force: true });
+      }
+      await fs.rename(tmpDir, destDir);
+      tmpDir = undefined;
 
       console.log(
         `✓ Plugin ${
@@ -163,6 +185,15 @@ class BuildManager {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(`Error building plugin ${pluginNameOrPath}:`, error);
+      if (tmpDir) {
+        try {
+          await fs.rm(tmpDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.warn(
+            `⚠ Failed to clean up temp build dir ${tmpDir}: ${cleanupError}`
+          );
+        }
+      }
       throw new Error(
         `Failed to build plugin ${pluginNameOrPath}: ${errorMessage}`
       );
@@ -183,8 +214,12 @@ class BuildManager {
   /**
    * Builds Lua files for a plugin
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginLua(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginLua(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -207,7 +242,7 @@ class BuildManager {
         return;
       }
 
-      await this.copyFilesToDist(plugin, luaFiles);
+      await this.copyFilesToDist(plugin, luaFiles, outputDir);
       console.log(
         `✓ Built ${luaFiles.length} Lua file(s) for plugin ${plugin.pluginName}`
       );
@@ -237,8 +272,12 @@ class BuildManager {
   /**
    * Builds JSON files for a plugin
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginJson(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginJson(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -262,7 +301,7 @@ class BuildManager {
         return;
       }
 
-      await this.copyFilesToDist(plugin, jsonFiles);
+      await this.copyFilesToDist(plugin, jsonFiles, outputDir);
       console.log(
         `✓ Built ${jsonFiles.length} JSON file(s) for plugin ${plugin.pluginName}`
       );
@@ -292,8 +331,12 @@ class BuildManager {
   /**
    * Builds TypeScript files for a plugin
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginTs(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginTs(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -317,7 +360,7 @@ class BuildManager {
         return;
       }
 
-      const destDir = this.getPluginDestDir(plugin);
+      const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
       // Process each TypeScript file
       for (const file of tsFiles) {
@@ -413,8 +456,12 @@ class BuildManager {
   /**
    * Builds JavaScript files for a plugin
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginJs(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginJs(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -438,7 +485,7 @@ class BuildManager {
         return;
       }
 
-      const destDir = this.getPluginDestDir(plugin);
+      const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
       // Process each JavaScript file
       for (const file of jsFiles) {
@@ -523,8 +570,12 @@ class BuildManager {
   /**
    * Builds TSX (TypeScript JSX) page files for a plugin
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginPageTsx(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginPageTsx(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -558,7 +609,7 @@ class BuildManager {
       // Set up paths
       const webviewDir = path.resolve('src/webview');
       const srcDir = webviewDir;
-      const pluginDistDir = this.getPluginDestDir(plugin);
+      const pluginDistDir = outputDir ?? this.getPluginDestDir(plugin);
       const htmlOutputDir = path.join(pluginDistDir, 'html');
 
       // Ensure directories exist
@@ -728,10 +779,15 @@ export default App;
    * Copies files to the dist directory
    * @param plugin The plugin object
    * @param files The files to copy
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    * @private
    */
-  private async copyFilesToDist(plugin: Plugin, files: File[]): Promise<void> {
-    const destDir = this.getPluginDestDir(plugin);
+  private async copyFilesToDist(
+    plugin: Plugin,
+    files: File[],
+    outputDir?: string
+  ): Promise<void> {
+    const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
     // Ensure the destination directory exists
     await fs.mkdir(destDir, { recursive: true });
@@ -862,6 +918,98 @@ export default App;
   }
 
   /**
+   * Sweeps orphaned outputs from the dist tree.
+   *
+   * Removes:
+   * - Any directory that contains an `fxmanifest.lua` but is no longer the
+   *   destination of an active plugin (renamed/deleted/moved source plugin).
+   * - Any directory whose name matches `<basename>.tmp.<digits>` — these are
+   *   leftover staging dirs from a build process that crashed or is still
+   *   running. We delete them indiscriminately because they only exist as
+   *   transient build state; an in-flight build that races with the sweep
+   *   will simply rebuild its own tmp dir.
+   * - Empty wrapper directories left behind after either of the above.
+   *
+   * Intended to run when `--no-clean` is set, since that path otherwise lets
+   * stale outputs accumulate forever (R-34). With `--clean` the entire dist
+   * is wiped first, so this sweep is unnecessary.
+   */
+  async sweepOrphans(): Promise<void> {
+    this.ensureInitialized();
+
+    if (!fsSync.existsSync(this.distPath)) {
+      return;
+    }
+
+    const activePlugins = this.fileManager.getAllPlugins();
+    const expectedDirs = new Set<string>(
+      activePlugins.map((plugin) =>
+        path.normalize(this.getPluginDestDir(plugin))
+      )
+    );
+
+    let orphansRemoved = 0;
+    let tmpDirsRemoved = 0;
+
+    const sweep = async (dir: string): Promise<void> => {
+      let entries: fsSync.Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch (error) {
+        // Dir disappeared mid-sweep — nothing to do.
+        return;
+      }
+
+      const baseName = path.basename(dir);
+      const isTmpDir = /\.tmp\.\d+$/.test(baseName);
+      if (isTmpDir) {
+        await fs.rm(dir, { recursive: true, force: true });
+        tmpDirsRemoved++;
+        return;
+      }
+
+      const containsManifest = entries.some(
+        (e) => e.isFile() && e.name === 'fxmanifest.lua'
+      );
+      if (containsManifest && !expectedDirs.has(path.normalize(dir))) {
+        await fs.rm(dir, { recursive: true, force: true });
+        orphansRemoved++;
+        return;
+      }
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          await sweep(path.join(dir, entry.name));
+        }
+      }
+
+      // Prune empty wrapper directories (e.g. `[character]/[auth]/` after the
+      // last plugin under it was removed). Never prune the dist root itself.
+      if (dir !== this.distPath) {
+        try {
+          const remaining = await fs.readdir(dir);
+          if (remaining.length === 0) {
+            await fs.rmdir(dir);
+          }
+        } catch {
+          // Race with another process; ignore.
+        }
+      }
+    };
+
+    await sweep(this.distPath);
+
+    if (orphansRemoved > 0 || tmpDirsRemoved > 0) {
+      console.log(
+        `✓ Orphan sweep: removed ${orphansRemoved} stale plugin output(s)` +
+          (tmpDirsRemoved > 0
+            ? ` and ${tmpDirsRemoved} leftover temp dir(s)`
+            : '')
+      );
+    }
+  }
+
+  /**
    * Cleans the dist directory
    */
   async clean(): Promise<void> {
@@ -945,8 +1093,12 @@ export default App;
   /**
    * Builds an fxmanifest.lua file from a plugin.json file
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
-  async buildPluginManifest(pluginNameOrPath: string | Plugin): Promise<void> {
+  async buildPluginManifest(
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
+  ): Promise<void> {
     this.ensureInitialized();
 
     try {
@@ -971,7 +1123,7 @@ export default App;
       const manifestContent = this.generateFxManifest(plugin);
 
       // Get the destination directory for the plugin
-      const destDir = this.getPluginDestDir(plugin);
+      const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
       // Ensure the destination directory exists
       await fs.mkdir(destDir, { recursive: true });
@@ -1339,9 +1491,11 @@ export default App;
   /**
    * Builds other files for a plugin by copying untreated extensions to the output folder
    * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
+   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    */
   async buildPluginOtherFiles(
-    pluginNameOrPath: string | Plugin
+    pluginNameOrPath: string | Plugin,
+    outputDir?: string
   ): Promise<void> {
     this.ensureInitialized();
 
@@ -1387,7 +1541,7 @@ export default App;
         `Copying other files for plugin ${plugin.pluginName}: ${extensionSummary}`
       );
 
-      await this.copyFilesToDist(plugin, otherFiles);
+      await this.copyFilesToDist(plugin, otherFiles, outputDir);
       console.log(
         `✓ Built ${otherFiles.length} other file(s) for plugin ${plugin.pluginName}`
       );
