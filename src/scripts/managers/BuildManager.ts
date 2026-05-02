@@ -66,16 +66,19 @@ class BuildManager {
    * @param options Configuration options for the reload manager
    */
   async initializeReloadManager(options: ReloadOptions = {}): Promise<void> {
-    try {
-      this.reloadManager = new PluginReloadManager(options);
-      await this.reloadManager.initialize();
+    // Construct the manager unconditionally and let it own the probe-retry
+    // policy. Previous behavior nulled `reloadManager` on first-call failure,
+    // which permanently disabled hot reload for the rest of the session even
+    // if FXServer started later. The manager itself now retries on every
+    // reload attempt via `ensureInitialized` (PR-06).
+    this.reloadManager = new PluginReloadManager(options);
+    const ok = await this.reloadManager.initialize();
+    if (ok) {
       this.logger.info('✓ Reload manager initialized successfully');
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.warn(`⚠ Failed to initialize reload manager: ${errorMessage}`);
-      this.logger.warn('Plugins will be built but not automatically reloaded');
-      this.reloadManager = null;
+    } else {
+      this.logger.warn(
+        '⚠ Reload manager probe failed; will retry on each reload attempt'
+      );
     }
   }
 

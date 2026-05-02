@@ -317,7 +317,7 @@
       "title": "Reload protocol correctness — timeouts, await StartResource, retry probe",
       "phase": "A",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [
@@ -354,10 +354,18 @@
       ],
       "branch_name": "audit/pr-06-reload-protocol-correctness",
       "commit_message": "fix(reload): add request timeouts, await StartResource, retry probe on failure",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T00:15:00Z",
+      "completed_at": "2026-05-03T00:25:00Z",
+      "commit_shas": [
+        "dfb425d43f707bf0f83d767db913c4a4245ba44e"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T00:25:00Z",
+          "phase": "implement",
+          "issue": "Used ajv (matching PR-04/PR-05) for makeRequest response narrowing in PluginReloadManager. The 5000ms request-timeout literal is intentional at the call site (under a const) to keep grep-based verification stable."
+        }
+      ]
     },
     {
       "id": "PR-07",
