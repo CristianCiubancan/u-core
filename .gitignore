@@ -1,42 +1,34 @@
-*/binaries/*
-*/tools/*
+# ───────── Environment & secrets ─────────
 .env
-crawl_py_files.py
-server.txt
-*cache*
-.replxx_history
+.env.local
+*.local
 
-asset-server/public/*
-asset-server/original/*
-*-bkp
-# node_modules
-node_modules
-package-lock.json
+# ───────── Build output ─────────
+dist/
+dist-ssr/
+.vite/
+.turbo/
+*.tsbuildinfo
+
+# ───────── Caches ─────────
+.cache/
+.eslintcache
+.parcel-cache/
+
+# ───────── Dependencies ─────────
+node_modules/
+
+# This repo is pnpm at the root; the asset-server sub-package uses npm
+# (see CLAUDE.md). Ignore foreign root lockfiles plus the npm sentinel
+# some tools drop. asset-server/package-lock.json is intentionally ignored
+# under the same pattern — re-add a `!asset-server/package-lock.json`
+# negation if you decide to track it for reproducible asset-server builds.
 yarn.lock
-npm-debug.log
-# IDE files
-*.iml
-.idea/
-# OS files
-.DS_Store
-Thumbs.db
-# Logs
-logs
-*.log
-*/logs/*
+package-lock.json
+.yarn.installed
 
-fivem/
-
-db/
-# Ignore everything in txData/ EXCEPT the example server.cfg. Pattern uses
-# `txData/*` (not `txData/`) so the negation below can re-include a path
-# inside the directory — git can't undo a directory-level ignore.
-txData/*
-!txData/server.cfg.example
-fivem.zip
-
-# Logs
-logs
+# ───────── Logs ─────────
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -44,52 +36,47 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependencies
-node_modules/
-# Build output
-dist/
-dist-ssr/
-.vite/
+# ───────── OS files ─────────
+.DS_Store
+Thumbs.db
 
-# Environment files
-.env
-.env.local
-*.local
-
-# Editor directories and files
+# ───────── Editors / IDEs ─────────
+.idea/
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*~
 
-# Testing
+# ───────── Testing ─────────
 coverage/
 *.lcov
 
-# Lua specific
-client/backup.lua
-client/messed.lua
-
-# Temporary files
-*~
+# ───────── Temporary files ─────────
 *.tmp
 
-# Lockfiles - keep one consistent package manager
-yarn.lock
-.yarn.installed
+# ───────── FXServer artifacts ─────────
+# Local extraction dir (Windows host) and the source archives the Docker
+# build downloads. Keep both forms — the upstream URL has shipped as
+# .zip historically and as .tar.xz currently.
+fivem-binaries/
+fivem.zip
+fx.tar.xz
 
-crawl.py
-crawled.txt
+# ───────── txData (FXServer runtime state) ─────────
+# Pattern uses `txData/*` (not `txData/`) so the negation below can
+# re-include a single tracked path — git can't undo a directory-level
+# ignore.
+txData/*
+!txData/server.cfg.example
 
-fivem-binaries
+# ───────── asset-server ─────────
+# Bulk image trees; only source files are tracked.
+asset-server/public/*
+asset-server/original/*
+
+# ───────── Project-local agent settings ─────────
 **/.claude/settings.local.json
-
-# Removed by PR-09 — used to be a build artifact mutated per plugin during
-# webview builds. Per-plugin Vite entries now flow through the
-# `virtual:plugin-page` module (vite.config.ts), so this file no longer exists.
-src/webview/App.tsx

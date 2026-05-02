@@ -1,0 +1,10 @@
+# Shell scripts must use LF — they run inside the FXServer Linux
+# container, where a `#!/usr/bin/env bash\r` shebang is fatal. Pin
+# regardless of the developer's core.autocrlf setting on Windows.
+*.sh text eol=lf
+
+# Same reasoning for Dockerfiles and the entrypoint discovered via
+# COPY: Docker parses these line by line and CRLF in a RUN block can
+# corrupt heredocs and shell continuations.
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
