@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { colorPalettes, grayPalettes } from '../../theme/colors';
 import Button from '../ui/Button'; // Assuming a Button component exists
 
@@ -50,7 +50,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
   defaultValue = '#ffffff', // Default to white
   ...props
 }) => {
-  const inputId = id || `color-picker-${React.useId()}`;
+  const generatedId = useId();
+  const inputId = id || `color-picker-${generatedId}`;
   const nativeColorInputRef = useRef<HTMLInputElement>(null);
 
   // Internal state to manage uncontrolled component behavior or sync with controlled value

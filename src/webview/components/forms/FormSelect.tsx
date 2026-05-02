@@ -33,7 +33,7 @@ const FormSelect = ({
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listboxId = `${id}-listbox`; // ID for the listbox
   const getOptionId = (index: number) => `${id}-option-${index}`; // Function to generate option IDs
 

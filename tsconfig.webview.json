@@ -20,9 +20,8 @@
 
     /* Type whitelist — without this, every package under typeRoots loads
        globally (notably @types/node, which leaks process/Buffer/setImmediate
-       into NUI/browser code). Vite's `define` for ASSET_SERVER_URL is the
-       only thing that keeps the current process.env access working at
-       runtime; an explicit whitelist makes that contract enforceable. */
+       into NUI/browser code). NUI runs in CEF/Chromium, not Node, so we
+       expose only `vite/client` (for `import.meta.env`) and React. */
     "types": ["vite/client", "react", "react-dom"],
 
     /* Linting */

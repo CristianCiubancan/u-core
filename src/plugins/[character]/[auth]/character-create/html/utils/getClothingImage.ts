@@ -35,9 +35,8 @@ export const getClothingImage = (
   // 10: Decals
   // 11: Tops
 
-  // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000'; // Corrected protocol to http
+    import.meta.env.VITE_ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
   const isProp = [0, 1, 2].includes(componentId);
@@ -69,9 +68,8 @@ export const getClothingImageFallback = (
   // Determine if male or female
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
 
-  // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000'; // Corrected protocol to http
+    import.meta.env.VITE_ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
   const isProp = [0, 1, 2].includes(componentId);
@@ -102,9 +100,8 @@ export const getClothingThumbnail = (
   // Determine if male or female
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
 
-  // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+    import.meta.env.VITE_ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
   const isProp = [0, 1, 2].includes(componentId);
@@ -136,9 +133,8 @@ export const getClothingThumbnailFallback = (
   // Determine if male or female
   const gender = model === 'mp_m_freemode_01' ? 'male' : 'female';
 
-  // Get the asset server URL from environment variables
   const assetServerUrl =
-    process.env.ASSET_SERVER_URL || 'http://localhost:3000';
+    import.meta.env.VITE_ASSET_SERVER_URL || 'https://localhost:3000';
 
   // Determine if this is a prop (componentIds 0, 1, 2, 6, 7 are props)
   const isProp = [0, 1, 2].includes(componentId);

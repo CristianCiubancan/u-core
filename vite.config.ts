@@ -36,22 +36,6 @@ export default defineConfig({
   root: 'src/',
   base: './',
   plugins: [pluginPageEntry(), react()],
-  environments: {
-    production: {
-      define: {
-        'process.env': {
-          ASSET_SERVER_URL: 'https://localhost:3000',
-        },
-      },
-    },
-    development: {
-      define: {
-        'process.env': {
-          ASSET_SERVER_URL: 'https://localhost:3000',
-        },
-      },
-    },
-  },
   build: {
     emptyOutDir: true,
     outDir: '../dist/webview',
