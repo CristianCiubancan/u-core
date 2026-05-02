@@ -1,6 +1,10 @@
 /// <reference types="@citizenfx/server" />
 import 'dotenv/config';
 import { CharacterData } from '../shared/types';
+import {
+  validateCharacterData,
+  formatValidationErrors,
+} from '../shared/validators';
 
 /**
  * Character Creation Server
@@ -27,12 +31,29 @@ class CharacterServer {
   }
 
   /**
-   * Handle saving character data
-   * @param {CharacterData} characterData - The character data to save
+   * Handle saving character data. The payload arrives over the network as
+   * arbitrary JSON; treat it as `unknown` and validate before any side
+   * effect. Invalid payloads are dropped with an audit log keyed by source
+   * — net IDs are the only attribution available here.
    */
-  private handleSaveCharacter(characterData: CharacterData): void {
+  private handleSaveCharacter(payload: unknown): void {
     const source = global.source;
     const playerId = source.toString();
+
+    if (!validateCharacterData(payload)) {
+      console.warn(
+        `[Character Create] [audit] dropped 'character-create:save' from net=${playerId}: ${formatValidationErrors(validateCharacterData.errors)}`
+      );
+      // Surface the rejection back to the client so the UI can react;
+      // do not echo the payload contents.
+      emitNet('character-create:save-result', source, {
+        success: false,
+        error: 'invalid character payload',
+      });
+      return;
+    }
+
+    const characterData: CharacterData = payload;
 
     console.log(
       `[Character Create] Saving character data for player ${playerId}`
