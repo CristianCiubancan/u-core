@@ -1,75 +1,55 @@
-// .\types\PluginManifest.ts
+// Mirror of src/utils/schema.json. Keep in sync — FileManager validates every
+// plugin.json against the JSON schema at startup. The type surface stays
+// strict (no catch-all index signature); custom properties are still tolerated
+// at runtime by getCustomProperties in BuildManager, which validates each key
+// against the identifier regex before emission.
 
-/**
- * Represents a plugin manifest file (plugin.json)
- * Based on the fxmanifest.lua schema
- */
-export interface PluginManifest {
-  // Core metadata
-  name: string;
-  description?: string;
-  author?: string;
-  version?: string;
+export type FxVersion = 'cerulean' | 'bodacious' | 'adamant';
+export type Game = 'gta5' | 'rdr3';
 
-  // Framework version identifiers
-  fx_version?: string;
+export type ScriptList = string | string[];
 
-  // Supported games/platforms
-  games?: string[];
-
-  // Scripts
-  client_scripts?: string | string[];
-  server_scripts?: string | string[];
-  shared_scripts?: string | string[];
-
-  // UI related properties
-  ui_page?: string;
-
-  // Dependencies
-  dependencies?: string[];
-  provide?: string | string[];
-
-  // Runtime constraints (similar to dependencies in fxmanifest)
-  constraints?: {
-    server?: string;
-    policy?: string[];
-    onesync?: boolean;
-    gameBuild?: string;
-    natives?: string[];
-  };
-
-  // File definitions
-  files?: string[];
-  data_files?: Array<{
-    type: string;
-    files: string | string[];
-  }>;
-
-  // Map related
-  is_map?: boolean;
-
-  // Server related
-  server_only?: boolean;
-
-  // Loading screen related
-  loadscreen?: string;
-  loadscreen_manual_shutdown?: boolean;
-
-  // Exports
-  exports?: string[];
-  server_exports?: string[];
-
-  // Additional configuration options
-  config?: Record<string, any>;
-
-  // Any other custom metadata (allows for plugin-specific extensions)
-  [key: string]: any;
+export interface DataFile {
+  type: string;
+  files: string | string[];
 }
 
-/**
- * Type representing a simplified plugin.json for initial loading
- * Contains only the essential fields needed for plugin identification/registration
- */
+export interface PluginConstraints {
+  server?: string;
+  policy?: string[];
+  onesync?: boolean;
+  gameBuild?: string;
+  natives?: string[];
+}
+
+export type ConfigValue = string | number | boolean;
+
+export interface PluginManifest {
+  name: string;
+  version: string;
+  fx_version: FxVersion;
+  games?: Game[];
+  author?: string;
+  description?: string;
+  client_scripts?: ScriptList;
+  server_scripts?: ScriptList;
+  shared_scripts?: ScriptList;
+  exports?: string[];
+  server_exports?: string[];
+  ui_page?: string;
+  data_files?: DataFile[];
+  is_map?: boolean;
+  server_only?: boolean;
+  loadscreen?: string;
+  loadscreen_manual_shutdown?: boolean;
+  files?: string[];
+  dependencies?: string[];
+  lua54?: boolean;
+  provide?: string | string[];
+  constraints?: PluginConstraints;
+  config?: Record<string, ConfigValue>;
+}
+
 export interface BasicPluginManifest {
   name: string;
   version?: string;
