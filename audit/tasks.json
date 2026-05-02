@@ -630,7 +630,7 @@
       "title": "Watcher correctness — deletes/renames/plugin.json reload + file-kind routing",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [
@@ -668,10 +668,23 @@
       ],
       "branch_name": "audit/pr-11-watcher-correctness",
       "commit_message": "fix(watch): handle delete/rename/manifest-reload; route rebuilds by file kind",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T00:50:00Z",
+      "completed_at": "2026-05-03T01:05:00Z",
+      "commit_shas": [
+        "7344455e6c9c9fdcf8a1077a95ad71269d510f99"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T01:05:00Z",
+          "phase": "implement",
+          "issue": "FileManager.ts (in affected_files) was not modified. The criteria all map to existing FileManager methods (`reloadPlugin`, `refresh`); the watcher in build.ts now calls them at the right moments. Vite-skip in BuildManager.buildPlugin copies the previous dist html/ forward — falls back to a full Vite build if the previous output is missing (first build, or a prior failure)."
+        },
+        {
+          "ts": "2026-05-03T01:05:00Z",
+          "phase": "discovery",
+          "issue": "DEBOUNCE_TIME/RESOURCE_DEBOUNCE_TIME/WEBVIEW_DEBOUNCE_TIME were never present in .env.example, so criterion 6 is vacuously satisfied; the 300ms debounce stays hardcoded."
+        }
+      ]
     },
     {
       "id": "PR-12",

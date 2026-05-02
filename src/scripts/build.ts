@@ -202,7 +202,20 @@ class PluginBuilder {
   }
 
   /**
-   * Start watching for file changes
+   * Start watching for file changes. The watcher handles:
+   *
+   *   - File-kind routing — TS/JS-only edits skip the Vite cold-start and
+   *     trigger a partial rebuild; only changes to `Page.tsx` or anything
+   *     under `html/` re-run Vite.
+   *   - Manifest reload — a `plugin.json` change runs
+   *     `fileManager.reloadPlugin(...)` before rebuilding so the manifest
+   *     globs (and consequently the entry set) are fresh.
+   *   - New plugin detection — adding a `plugin.json` that doesn't match
+   *     a registered plugin triggers `fileManager.refresh()` and an
+   *     in-process build, no watcher restart required.
+   *   - Deletion / rename — `unlink` and `unlinkDir` re-scan the plugin's
+   *     file tree (via `reloadPlugin`) and the next transactional build
+   *     swap removes the stale dist output for the deleted source.
    */
   private startWatching(): void {
     this.log('info', chalk.bold('\nStarting watch mode...'));
@@ -224,46 +237,98 @@ class PluginBuilder {
       },
     });
 
-    // Track which plugin was last changed to avoid multiple rebuilds for the same plugin
-    let rebuildQueue = new Set<string>();
+    // Per-plugin queued intent — what kinds of work the next rebuild must
+    // do. `viteRebuild` is the file-kind routing flag; `manifestReload` is
+    // set when `plugin.json` changes; `pluginsRefresh` is a sentinel for
+    // "this was a brand-new plugin, the entire registry needs to refresh".
+    interface RebuildIntent {
+      pluginPath: string;
+      viteRebuild: boolean;
+      manifestReload: boolean;
+    }
+    const rebuildQueue = new Map<string, RebuildIntent>();
+    let pluginsRefreshNeeded = false;
     let isBuilding = false;
     let debounceTimer: NodeJS.Timeout | null = null;
 
     const processRebuildQueue = async () => {
-      if (isBuilding || rebuildQueue.size === 0) return;
+      if (isBuilding || (rebuildQueue.size === 0 && !pluginsRefreshNeeded))
+        return;
 
       isBuilding = true;
-      const pluginsToRebuild = Array.from(rebuildQueue);
-      rebuildQueue.clear();
 
       try {
+        // If a brand-new plugin.json appeared, re-scan the whole registry
+        // before figuring out what to build. The `add` handler queues the
+        // plugin path optimistically; the refresh either confirms it (the
+        // path is now a registered plugin) or drops it (the user deleted
+        // the file before the debounce window closed).
+        if (pluginsRefreshNeeded) {
+          this.log('info', chalk.cyan('New plugin.json detected — refreshing plugin registry'));
+          await this.fileManager.refresh();
+          pluginsRefreshNeeded = false;
+        }
+
+        const intents = Array.from(rebuildQueue.values());
+        rebuildQueue.clear();
+
         this.log(
           'info',
-          chalk.bold(
-            `Rebuilding ${pluginsToRebuild.length} changed plugin(s)...`
-          )
+          chalk.bold(`Rebuilding ${intents.length} changed plugin(s)...`)
         );
 
-        // Reset results for new build
         this.pluginResults.clear();
         this.startTime = performance.now();
 
-        // Find the plugin objects for all changes
         const plugins: Plugin[] = [];
-        for (const pluginPath of pluginsToRebuild) {
-          const plugin = this.fileManager.getPluginByPath(pluginPath);
-          if (plugin) {
-            plugins.push(plugin);
+        const intentByPlugin = new Map<string, RebuildIntent>();
+        for (const intent of intents) {
+          // After `refresh()`, the prior `Plugin` object is stale; look up
+          // the current one from the path registry.
+          const plugin = this.fileManager.getPluginByPath(intent.pluginPath);
+          if (!plugin) {
+            this.log(
+              'warn',
+              chalk.yellow(
+                `Skipping rebuild: no plugin registered at ${intent.pluginPath}`
+              )
+            );
+            continue;
+          }
+          plugins.push(plugin);
+          intentByPlugin.set(plugin.pluginName, intent);
+
+          // Manifest changes: reload the plugin's manifest + file tree
+          // before any build step reads them. Without this the rebuild
+          // would emit an `fxmanifest.lua` derived from the previous
+          // (cached) `plugin.json`.
+          if (intent.manifestReload) {
+            try {
+              await this.fileManager.reloadPlugin(plugin.fullPath);
+              this.log(
+                'verbose',
+                `Reloaded manifest for ${plugin.pluginName} before rebuild`
+              );
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              this.log(
+                'warn',
+                chalk.yellow(
+                  `Manifest reload failed for ${plugin.pluginName}: ${msg}`
+                )
+              );
+            }
           }
         }
 
         if (plugins.length > 0) {
-          // Build the changed plugins sequentially
           for (const plugin of plugins) {
-            await this.buildSinglePlugin(plugin);
+            const intent = intentByPlugin.get(plugin.pluginName);
+            await this.buildSinglePlugin(plugin, {
+              skipVite: !(intent?.viteRebuild ?? true),
+            });
           }
 
-          // Log completion
           const totalTime = (
             (performance.now() - this.startTime) /
             1000
@@ -308,22 +373,83 @@ class PluginBuilder {
         this.log('error', chalk.red(`Error during rebuild: ${errorMessage}`));
       } finally {
         isBuilding = false;
-        // Check if more items were added to the queue while we were building
-        if (rebuildQueue.size > 0) {
+        if (rebuildQueue.size > 0 || pluginsRefreshNeeded) {
           process.nextTick(processRebuildQueue);
         }
       }
     };
 
-    // File change handler
+    /**
+     * Classify a changed file path into a rebuild kind. The Vite step is
+     * the slowest part of a rebuild, so a TS/JS-only edit gets a fast
+     * path that copies the previous Vite output forward instead of
+     * re-running the bundler.
+     */
+    const classify = (
+      pluginRoot: string,
+      absolutePath: string
+    ): { isManifest: boolean; needsVite: boolean } => {
+      const rel = path
+        .relative(pluginRoot, absolutePath)
+        .replace(/\\/g, '/');
+      if (rel === 'plugin.json') return { isManifest: true, needsVite: true };
+      // Anything under html/ (Page.tsx, html assets, fonts, images, css)
+      // can affect the webview bundle, so re-run Vite.
+      if (rel.startsWith('html/')) return { isManifest: false, needsVite: true };
+      return { isManifest: false, needsVite: false };
+    };
+
+    const queueRebuild = (
+      plugin: Plugin,
+      classification: { isManifest: boolean; needsVite: boolean }
+    ) => {
+      const existing = rebuildQueue.get(plugin.fullPath) ?? {
+        pluginPath: plugin.fullPath,
+        viteRebuild: false,
+        manifestReload: false,
+      };
+      existing.viteRebuild = existing.viteRebuild || classification.needsVite;
+      existing.manifestReload =
+        existing.manifestReload || classification.isManifest;
+      rebuildQueue.set(plugin.fullPath, existing);
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        processRebuildQueue();
+        debounceTimer = null;
+      }, 300);
+    };
+
     const handleFileChange = (filePath: string, eventType: string) => {
-      // Convert to absolute path if it's not already
       const absolutePath = path.isAbsolute(filePath)
         ? filePath
         : path.resolve(process.cwd(), filePath);
 
-      // Find which plugin this file belongs to
       const plugin = this.findPluginForPath(absolutePath);
+
+      // New `plugin.json` at a path that no registered plugin owns:
+      // schedule a registry refresh and queue the prospective plugin
+      // path. After the refresh the path lookup will resolve.
+      if (!plugin && path.basename(absolutePath) === 'plugin.json') {
+        this.log(
+          'info',
+          chalk.blue(`Plugin manifest ${eventType}: `) +
+            chalk.cyan(path.relative(process.cwd(), absolutePath))
+        );
+        pluginsRefreshNeeded = true;
+        const prospectivePluginRoot = path.dirname(absolutePath);
+        rebuildQueue.set(prospectivePluginRoot, {
+          pluginPath: prospectivePluginRoot,
+          viteRebuild: true,
+          manifestReload: true,
+        });
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          processRebuildQueue();
+          debounceTimer = null;
+        }, 300);
+        return;
+      }
 
       if (plugin) {
         this.log(
@@ -331,27 +457,21 @@ class PluginBuilder {
           chalk.blue(`File ${eventType}: `) +
             chalk.cyan(path.relative(process.cwd(), absolutePath))
         );
-
-        // Add the plugin to the rebuild queue
-        rebuildQueue.add(plugin.fullPath);
-
-        // Debounce rebuilds to avoid rapid consecutive builds
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-
-        debounceTimer = setTimeout(() => {
-          processRebuildQueue();
-          debounceTimer = null;
-        }, 300);
+        const classification = classify(plugin.fullPath, absolutePath);
+        queueRebuild(plugin, classification);
       }
     };
 
-    // Set up event handlers
+    // Set up event handlers. `unlink` (file delete) and `unlinkDir`
+    // (folder delete) both flow through the same handler — the next
+    // build's `reloadPlugin` re-scans the plugin tree and the
+    // transactional swap removes any dist artifact whose source no
+    // longer exists.
     this.watcher
       .on('add', (filePath) => handleFileChange(filePath, 'added'))
       .on('change', (filePath) => handleFileChange(filePath, 'changed'))
-      .on('unlink', (filePath) => handleFileChange(filePath, 'deleted'));
+      .on('unlink', (filePath) => handleFileChange(filePath, 'deleted'))
+      .on('unlinkDir', (filePath) => handleFileChange(filePath, 'deleted'));
   }
 
   /**
@@ -405,7 +525,10 @@ class PluginBuilder {
   /**
    * Build a single plugin
    */
-  private async buildSinglePlugin(plugin: Plugin): Promise<void> {
+  private async buildSinglePlugin(
+    plugin: Plugin,
+    options: { skipVite?: boolean } = {}
+  ): Promise<void> {
     const pluginStartTime = performance.now();
 
     try {
@@ -413,7 +536,7 @@ class PluginBuilder {
       this.log('info', chalk.cyan(`🔨 Building plugin: ${plugin.pluginName}`));
 
       // Build the plugin
-      await this.buildManager.buildPlugin(plugin.pluginName);
+      await this.buildManager.buildPlugin(plugin.pluginName, false, options);
 
       // Record success
       const buildTime = (performance.now() - pluginStartTime) / 1000;
