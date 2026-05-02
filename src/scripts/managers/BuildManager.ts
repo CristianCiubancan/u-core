@@ -598,9 +598,10 @@ class BuildManager {
   }
 
   /**
-   * Builds TSX (TypeScript JSX) page files for a plugin
-   * @param pluginNameOrPath The name or path of the plugin, or the Plugin object
-   * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
+   * Builds the per-plugin webview by handing the plugin's Page.tsx to Vite via
+   * the `virtual:plugin-page` module (resolved in vite.config.ts from
+   * `U_CORE_PLUGIN_PAGE`). No mutation of `src/webview/App.tsx` — that file is
+   * gone; cross-plugin builds are now safe to run in parallel.
    */
   async buildPluginPageTsx(
     pluginNameOrPath: string | Plugin,
@@ -609,7 +610,6 @@ class BuildManager {
     this.ensureInitialized();
 
     try {
-      // Get the plugin object
       const plugin =
         typeof pluginNameOrPath === 'string'
           ? this.getPluginFromNameOrPath(pluginNameOrPath)
@@ -619,7 +619,6 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      // Find the Page.tsx file in the html directory
       const pageTsxFile = plugin.files.find(
         (file) =>
           file.fileName === 'Page.tsx' &&
@@ -636,58 +635,22 @@ class BuildManager {
         `Building webview for plugin ${plugin.pluginName} from ${pageTsxFile.displayPath}`
       );
 
-      // Set up paths
-      const webviewDir = path.resolve('src/webview');
-      const srcDir = webviewDir;
       const pluginDistDir = outputDir ?? this.getPluginDestDir(plugin);
       const htmlOutputDir = path.join(pluginDistDir, 'html');
-
-      // Ensure directories exist
-      await fs.mkdir(srcDir, { recursive: true });
       await fs.mkdir(htmlOutputDir, { recursive: true });
 
-      // Backup original App.tsx if it exists
-      const appFilePath = path.join(srcDir, 'App.tsx');
-      let originalAppContent = '';
-      if (fsSync.existsSync(appFilePath)) {
-        originalAppContent = await fs.readFile(appFilePath, 'utf-8');
+      await this.runViteBuild(htmlOutputDir, pageTsxFile.fullPath);
+
+      const indexHtmlPath = path.join(htmlOutputDir, 'index.html');
+      if (!fsSync.existsSync(indexHtmlPath)) {
+        throw new Error(
+          `Failed to generate index.html for plugin ${plugin.pluginName}`
+        );
       }
 
-      try {
-        // Generate and write temporary App.tsx
-        const appContent = this.generateAppTsxContent(srcDir, pageTsxFile);
-        await fs.writeFile(appFilePath, appContent, 'utf-8');
-        this.logger.info(
-          `Generated temporary App.tsx for plugin ${plugin.pluginName}`
-        );
-
-        // Ensure other necessary files exist
-        await this.ensureWebviewFiles(srcDir);
-
-        // Run Vite build
-        this.logger.info(`Running Vite build for plugin ${plugin.pluginName}...`);
-        await this.runViteBuild(htmlOutputDir);
-
-        // Verify the build output
-        const indexHtmlPath = path.join(htmlOutputDir, 'index.html');
-        if (!fsSync.existsSync(indexHtmlPath)) {
-          throw new Error(
-            `Failed to generate index.html for plugin ${plugin.pluginName}`
-          );
-        }
-
-        this.logger.info(
-          `✓ Built webview for plugin ${
-            plugin.pluginName
-          } to ${this.pathToDisplay(htmlOutputDir)}`
-        );
-      } finally {
-        // Restore the original App.tsx
-        if (originalAppContent) {
-          await fs.writeFile(appFilePath, originalAppContent, 'utf-8');
-          this.logger.info(`Restored original App.tsx`);
-        }
-      }
+      this.logger.info(
+        `✓ Built webview for plugin ${plugin.pluginName} to ${this.pathToDisplay(htmlOutputDir)}`
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -704,22 +667,27 @@ class BuildManager {
   }
 
   /**
-   * Runs the Vite build process
-   * @param outputDir The directory to output the build to
-   * @private
+   * Runs `vite build` against the per-plugin Page.tsx. The page path is passed
+   * via `U_CORE_PLUGIN_PAGE`; vite.config.ts's `virtual:plugin-page` plugin
+   * resolves the import in src/webview/main.tsx to that file.
    */
-  private async runViteBuild(outputDir: string): Promise<void> {
+  private async runViteBuild(
+    outputDir: string,
+    pluginPagePath: string
+  ): Promise<void> {
     const buildCommand = `npx vite build --outDir=${outputDir}`;
-    this.logger.info(`Executing: ${buildCommand}`);
+    this.logger.info(`Executing: ${buildCommand} (page=${pluginPagePath})`);
 
-    // Use spawn to run the build command
     const child = spawn(buildCommand, {
       cwd: process.cwd(),
       shell: true,
       stdio: 'inherit',
+      env: {
+        ...process.env,
+        U_CORE_PLUGIN_PAGE: pluginPagePath,
+      },
     });
 
-    // Wait for the build to complete
     await new Promise<void>((resolve, reject) => {
       child.on('close', (code) => {
         if (code === 0) {
@@ -729,80 +697,6 @@ class BuildManager {
         }
       });
     });
-  }
-
-  /**
-   * Generates App.tsx content for a plugin's Page.tsx
-   * @param srcDir Source directory where App.tsx will be created
-   * @param pageTsxFile The Page.tsx file
-   * @returns Generated App.tsx content
-   * @private
-   */
-  private generateAppTsxContent(srcDir: string, pageTsxFile: File): string {
-    // Calculate relative path from src directory to the Page.tsx file
-    const importPath = path
-      .relative(srcDir, pageTsxFile.fullPath)
-      .replace(/\\/g, '/');
-    const formattedImportPath = importPath.startsWith('.')
-      ? importPath
-      : `../../${importPath}`;
-
-    // Create the App.tsx content
-    return `// Auto-generated by BuildManager
-// Generated on: ${new Date().toISOString()}
-
-import Page from '${formattedImportPath}';
-
-function App() {
-  return <Page />;
-}
-
-export default App;
-`;
-  }
-
-  /**
-   * Ensures all necessary files exist for the webview build
-   * @param srcDir Source directory
-   * @private
-   */
-  private async ensureWebviewFiles(srcDir: string): Promise<void> {
-    const webviewSrcDir = path.resolve('src/webview');
-
-    // Check if the webview src directory exists
-    if (!fsSync.existsSync(webviewSrcDir)) {
-      throw new Error(`Webview src directory not found: ${webviewSrcDir}`);
-    }
-
-    // Copy main.tsx if it doesn't exist in the target directory
-    const mainTsxPath = path.join(srcDir, 'main.tsx');
-    if (!fsSync.existsSync(mainTsxPath)) {
-      const sourcePath = path.join(webviewSrcDir, 'main.tsx');
-      if (fsSync.existsSync(sourcePath)) {
-        await fs.copyFile(sourcePath, mainTsxPath);
-        this.logger.info(`Copied main.tsx from ${sourcePath}`);
-      }
-    }
-
-    // Copy index.html if it doesn't exist in the target directory
-    const indexHtmlPath = path.join(srcDir, 'index.html');
-    if (!fsSync.existsSync(indexHtmlPath)) {
-      const sourcePath = path.join(webviewSrcDir, 'index.html');
-      if (fsSync.existsSync(sourcePath)) {
-        await fs.copyFile(sourcePath, indexHtmlPath);
-        this.logger.info(`Copied index.html from ${sourcePath}`);
-      }
-    }
-
-    // Copy index.css if it doesn't exist in the target directory
-    const indexCssPath = path.join(srcDir, 'index.css');
-    if (!fsSync.existsSync(indexCssPath)) {
-      const sourcePath = path.join(webviewSrcDir, 'index.css');
-      if (fsSync.existsSync(sourcePath)) {
-        await fs.copyFile(sourcePath, indexCssPath);
-        this.logger.info(`Copied index.css from ${sourcePath}`);
-      }
-    }
   }
 
   /**
@@ -905,9 +799,12 @@ export default App;
 
       this.logger.info(`Building all ${plugins.length} plugins...`);
 
-      for (const plugin of plugins) {
-        await this.buildPlugin(plugin.fullPath);
-      }
+      // Per-plugin Vite entries (PR-09) make cross-plugin webview builds
+      // independent — App.tsx is no longer mutated, so parallel `vite build`
+      // invocations cannot clobber each other.
+      await Promise.all(
+        plugins.map((plugin) => this.buildPlugin(plugin.fullPath))
+      );
 
       this.logger.info(`✓ All ${plugins.length} plugins built successfully`);
     } catch (error) {

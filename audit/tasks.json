@@ -486,7 +486,7 @@
       "title": "Eliminate App.tsx swap (per-plugin Vite entry) + parallelize webview builds",
       "phase": "A",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "`src/webview/App.tsx` is currently a committed build artifact — this PR deletes it and adds it to `.gitignore`. Confirm no developer has uncommitted edits to that file before merge."
@@ -531,10 +531,23 @@
       ],
       "branch_name": "audit/pr-09-eliminate-apptsx-swap",
       "commit_message": "refactor(build): per-plugin Vite entries; remove src/webview/App.tsx mutation",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T20:39:21.467Z",
+      "completed_at": "2026-05-02T20:43:05.064Z",
+      "commit_shas": [
+        "bccfebfedbb21f895b1ce02a5bef003659202646"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-02T20:43:05.064Z",
+          "phase": "implement",
+          "issue": "Touched src/scripts/build.ts (outside affected_files): parallelized the per-plugin build loop with Promise.all so the cold pnpm build actually realizes the win — BuildManager.buildAllPlugins is not on the pnpm build path. Cold build observed: 13.66s (PR-04 baseline) -> 6.85s."
+        },
+        {
+          "ts": "2026-05-02T20:43:05.064Z",
+          "phase": "implement",
+          "issue": "Touched src/webview/env.d.ts (outside affected_files) to add an ambient module declaration for the virtual:plugin-page module that main.tsx now imports."
+        }
+      ]
     },
     {
       "id": "PR-10",
