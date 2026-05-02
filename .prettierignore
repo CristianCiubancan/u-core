@@ -1,0 +1,11 @@
+node_modules
+pnpm-lock.yaml
+txData
+fivem-binaries
+asset-server/node_modules
+asset-server/public
+asset-server/original
+dist
+**/dist
+**/.tmp.*
+audit

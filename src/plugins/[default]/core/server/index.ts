@@ -2,8 +2,6 @@
 import 'dotenv/config';
 import * as http from 'http';
 import * as url from 'url';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Simple authentication - you should use a more secure method in production
 const API_KEY = process.env.RELOADER_API_KEY || '***SCRUBBED***';
@@ -12,11 +10,6 @@ console.log(
     API_KEY ? 'configured' : 'using default value'
   }`
 );
-
-// File watcher for auto-reload on rebuilds
-const WATCH_PATHS = ['dist'];
-const WATCH_INTERVAL = 2000; // Check every 2 seconds
-const lastModifiedTimes = new Map<string, number>();
 
 // Function to get all resource names
 function getAllResources(): string[] {
@@ -286,140 +279,11 @@ server.listen(PORT, () => {
   console.log(
     `[resource-manager] Resource management server running on port ${PORT}`
   );
-
-  // Initialize file monitoring
-  initializeFileWatcher();
 });
 
 server.on('error', (err) => {
   console.error('[resource-manager] Server error:', err);
 });
-
-// Function to recursively get all files in a directory
-function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
-  if (!fs.existsSync(dirPath)) return arrayOfFiles;
-
-  const files = fs.readdirSync(dirPath);
-
-  files.forEach((file) => {
-    const fullPath = path.join(dirPath, file);
-    if (fs.statSync(fullPath).isDirectory()) {
-      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
-    } else {
-      arrayOfFiles.push(fullPath);
-    }
-  });
-
-  return arrayOfFiles;
-}
-
-// Initialize file watcher to detect rebuilt resources
-function initializeFileWatcher(): void {
-  console.log(
-    `[auto-reload] Initializing file watcher for resource auto-reload`
-  );
-
-  // First pass - record initial file timestamps
-  WATCH_PATHS.forEach((watchPath) => {
-    try {
-      const files = getAllFiles(watchPath);
-      files.forEach((file) => {
-        const stats = fs.statSync(file);
-        lastModifiedTimes.set(file, stats.mtimeMs);
-      });
-    } catch (error) {
-      console.error(`[auto-reload] Error scanning ${watchPath}:`, error);
-    }
-  });
-
-  // Start watching for changes
-  setInterval(() => checkForChanges(), WATCH_INTERVAL);
-  console.log(
-    `[auto-reload] File watcher started with interval: ${WATCH_INTERVAL}ms`
-  );
-}
-
-// Check for file changes
-function checkForChanges(): void {
-  const changedResources = new Set<string>();
-
-  WATCH_PATHS.forEach((watchPath) => {
-    try {
-      const files = getAllFiles(watchPath);
-
-      // Check for new or modified files
-      files.forEach((file) => {
-        try {
-          const stats = fs.statSync(file);
-          const lastModified = lastModifiedTimes.get(file) || 0;
-
-          if (stats.mtimeMs > lastModified) {
-            // File was modified
-            lastModifiedTimes.set(file, stats.mtimeMs);
-
-            // Determine resource name from path
-            const relativePath = path.relative(watchPath, file);
-            const resourceDir = relativePath.split(path.sep)[0];
-
-            if (resourceDir && resourceDir !== 'scripts') {
-              changedResources.add(resourceDir);
-              console.log(
-                `[auto-reload] Detected change in resource: ${resourceDir}`
-              );
-            }
-          }
-        } catch (error) {
-          console.error(`[auto-reload] Error checking file ${file}:`, error);
-          // File might have been deleted or is inaccessible
-        }
-      });
-
-      // Handle deleted files (they won't be in the new list)
-      for (const [existingFile] of lastModifiedTimes) {
-        if (
-          !files.includes(existingFile) &&
-          fs.existsSync(path.dirname(existingFile))
-        ) {
-          // File was deleted
-          const relativePath = path.relative(watchPath, existingFile);
-          const resourceDir = relativePath.split(path.sep)[0];
-
-          if (resourceDir && resourceDir !== 'scripts') {
-            changedResources.add(resourceDir);
-            console.log(
-              `[auto-reload] Detected deleted file in resource: ${resourceDir}`
-            );
-          }
-
-          lastModifiedTimes.delete(existingFile);
-        }
-      }
-    } catch (error) {
-      console.error(
-        `[auto-reload] Error checking ${watchPath} for changes:`,
-        error
-      );
-    }
-  });
-
-  // Restart changed resources
-  if (changedResources.size > 0) {
-    console.log(
-      `[auto-reload] Restarting ${changedResources.size} changed resources...`
-    );
-
-    for (const resource of changedResources) {
-      if (resource === GetCurrentResourceName()) continue;
-
-      const success = restartResource(resource);
-      console.log(
-        `[auto-reload] Resource '${resource}' restart ${
-          success ? 'successful' : 'failed'
-        }`
-      );
-    }
-  }
-}
 
 // Register command to restart resources from the server console
 RegisterCommand(

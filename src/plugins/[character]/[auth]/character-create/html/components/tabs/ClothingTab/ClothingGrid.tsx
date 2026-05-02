@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ClothingCategory } from '../../../utils/getClothingImage';
 import { ClothingItem } from '../../clothing/ClothingItem';
 import { useInfiniteScroll } from '../../../hooks';
@@ -20,8 +20,14 @@ export const ClothingGrid: React.FC<ClothingGridProps> = ({
   selectedTexture = 0,
   onSelectDrawable,
 }) => {
-  // Generate a range of drawable IDs for the grid
-  const drawableIds = Array.from({ length: category.maxItems }, (_, i) => i);
+  // Generate a range of drawable IDs for the grid. Memoized on
+  // `category.maxItems` so the array identity is stable across renders that
+  // don't change the category — useInfiniteScroll's effects key off this
+  // identity.
+  const drawableIds = useMemo(
+    () => Array.from({ length: category.maxItems }, (_, i) => i),
+    [category.maxItems]
+  );
 
   // Initialize infinite scroll with a reasonable number of initial items
   const {

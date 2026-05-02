@@ -28,7 +28,11 @@ logs
 fivem/
 
 db/
-txData/
+# Ignore everything in txData/ EXCEPT the example server.cfg. Pattern uses
+# `txData/*` (not `txData/`) so the negation below can re-include a path
+# inside the directory — git can't undo a directory-level ignore.
+txData/*
+!txData/server.cfg.example
 fivem.zip
 
 # Logs
