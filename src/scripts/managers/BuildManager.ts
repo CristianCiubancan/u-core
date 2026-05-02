@@ -3,7 +3,7 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import { builtinModules } from 'module';
 import * as esbuild from 'esbuild';
-import { spawn } from 'child_process';
+import { build as viteBuild, type InlineConfig } from 'vite';
 import { minimatch } from 'minimatch';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
@@ -50,6 +50,18 @@ const NODE_BUILTIN_EXTERNALS: string[] = [
 ];
 
 /**
+ * Cached esbuild rebuild context. Keyed by source file + platform +
+ * sourcemap mode so a context is only reused when its build options
+ * actually match. Each context owns an esbuild incremental session: the
+ * first call runs a full build, subsequent calls run only the work
+ * required to produce a fresh bundle.
+ */
+interface CachedEsbuildContext {
+  ctx: esbuild.BuildContext;
+  optionsKey: string;
+}
+
+/**
  * Build manager
  * This class provides functionality to build plugins by copying files to a dist directory
  */
@@ -59,6 +71,16 @@ class BuildManager {
   private initialized: boolean = false;
   private logger: Logger;
   private production: boolean;
+
+  /**
+   * Cached esbuild build contexts keyed by source file path. A context
+   * holds the parsed entrypoint graph and any plugin state in memory, so
+   * `ctx.rebuild()` after a 1-byte source edit reuses the previous parse
+   * tree and only re-emits the changed module — typically <100 ms versus
+   * ~1 s for a fresh `esbuild.build()` cold start. Disposed via
+   * `BuildManager.dispose()` when the watcher shuts down.
+   */
+  private esbuildContexts: Map<string, CachedEsbuildContext> = new Map();
 
   /**
    * Creates a new BuildManager instance
@@ -79,6 +101,92 @@ class BuildManager {
     this.distPath = path.resolve(distPath);
     this.logger = logger;
     this.production = options.production ?? false;
+  }
+
+  /**
+   * Tear down cached state. The watcher calls this on `SIGINT` so the
+   * esbuild worker pool exits cleanly. Safe to call multiple times.
+   */
+  async dispose(): Promise<void> {
+    const contexts = Array.from(this.esbuildContexts.values());
+    this.esbuildContexts.clear();
+    await Promise.all(
+      contexts.map(async ({ ctx }) => {
+        try {
+          await ctx.dispose();
+        } catch (error) {
+          this.logger.warn('Failed to dispose esbuild context', error);
+        }
+      })
+    );
+  }
+
+  /**
+   * Run an esbuild build for `entryPath`, reusing a cached context when
+   * the option set matches. Returns the bundle output as in-memory files
+   * (`write: false`) so the caller can stage them into the transactional
+   * temp dir without baking the destination path into the context. The
+   * context survives across rebuilds in a watch session — that's where
+   * the watch-latency win comes from.
+   */
+  private async runEsbuildBundle(
+    entryPath: string,
+    options: esbuild.BuildOptions
+  ): Promise<esbuild.BuildResult & { outputFiles: esbuild.OutputFile[] }> {
+    // Cache key encodes every option that would change the produced
+    // bundle (platform, externals, minify, sourcemap mode, target,
+    // loader). Two builds that differ in any of these need separate
+    // contexts.
+    const optionsKey = JSON.stringify({
+      platform: options.platform,
+      external: options.external,
+      minify: options.minify,
+      sourcemap: options.sourcemap,
+      target: options.target,
+      format: options.format,
+      loader: options.loader,
+    });
+
+    const existing = this.esbuildContexts.get(entryPath);
+    if (existing && existing.optionsKey !== optionsKey) {
+      // Options changed for this entry (e.g. user toggled --prod between
+      // builds). Drop the stale context and build a fresh one.
+      try {
+        await existing.ctx.dispose();
+      } catch (error) {
+        this.logger.warn('Failed to dispose stale esbuild context', error);
+      }
+      this.esbuildContexts.delete(entryPath);
+    }
+
+    let cached = this.esbuildContexts.get(entryPath);
+    if (!cached) {
+      // esbuild needs *some* output target even with `write: false` —
+      // `sourcemap: 'external'` errors with "Cannot use an external source
+      // map without an output path" otherwise. The synthetic outfile here
+      // only names the in-memory output (and its .map sibling); the
+      // caller stages the bytes to the real transactional path via
+      // `writeBundleOutputs`.
+      const syntheticOutfile = entryPath.replace(/\.(ts|tsx|js|jsx)$/, '.js');
+      const ctx = await esbuild.context({
+        ...options,
+        entryPoints: [entryPath],
+        outfile: syntheticOutfile,
+        write: false,
+      });
+      cached = { ctx, optionsKey };
+      this.esbuildContexts.set(entryPath, cached);
+    }
+
+    const result = await cached.ctx.rebuild();
+    if (!result.outputFiles) {
+      throw new Error(
+        `esbuild rebuild produced no output files for ${entryPath}`
+      );
+    }
+    return result as esbuild.BuildResult & {
+      outputFiles: esbuild.OutputFile[];
+    };
   }
 
   /**
@@ -474,11 +582,12 @@ class BuildManager {
         this.logger.info(`Bundling TypeScript file: ${relativePath}`);
 
         try {
-          // Bundle the file
-          const result = await esbuild.build({
-            entryPoints: [file.fullPath],
+          // Bundle the file via a long-lived esbuild context (PR-13).
+          // `write: false` is enforced inside `runEsbuildBundle` so the
+          // context isn't tied to a specific transactional temp dir —
+          // we write the in-memory output ourselves below.
+          const result = await this.runEsbuildBundle(file.fullPath, {
             bundle: true,
-            outfile: outputPath,
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             // Production builds minify everything. Dev builds stay readable
@@ -517,6 +626,11 @@ class BuildManager {
               cause: result.errors[0],
             });
           }
+
+          // Stage the in-memory output to the transactional temp path.
+          // esbuild emits one file per entry plus optional `.map`; pick
+          // them apart by suffix so a sourcemap doesn't overwrite the .js.
+          await this.writeBundleOutputs(result.outputFiles, outputPath);
 
           // Verify the file was created
           if (!fsSync.existsSync(outputPath)) {
@@ -610,11 +724,9 @@ class BuildManager {
         this.logger.info(`Bundling JavaScript file: ${relativePath}`);
 
         try {
-          // Bundle the file
-          const result = await esbuild.build({
-            entryPoints: [file.fullPath],
+          // Bundle the file via a long-lived esbuild context (PR-13).
+          const result = await this.runEsbuildBundle(file.fullPath, {
             bundle: true,
-            outfile: outputPath,
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
             minify: this.production,
@@ -642,6 +754,8 @@ class BuildManager {
               cause: result.errors[0],
             });
           }
+
+          await this.writeBundleOutputs(result.outputFiles, outputPath);
 
           // Verify the file was created
           if (!fsSync.existsSync(outputPath)) {
@@ -775,41 +889,81 @@ class BuildManager {
   }
 
   /**
-   * Runs `vite build` against the per-plugin Page.tsx. The page path is passed
-   * via `U_CORE_PLUGIN_PAGE`; vite.config.ts's `virtual:plugin-page` plugin
-   * resolves the import in src/webview/main.tsx to that file.
+   * Build the per-plugin Page.tsx via Vite's programmatic JS API. Calling
+   * `build()` in-process (instead of spawning the `vite` CLI as a child
+   * process) keeps the dep-prebundle cache, plugin module graph, and
+   * Rollup state warm
+   * across plugins and across rebuilds within a single `pnpm dev`
+   * session — the watch-latency win that the subprocess fork-exec model
+   * could never deliver. The page path still flows through
+   * `U_CORE_PLUGIN_PAGE`; vite.config.ts's `virtual:plugin-page` plugin
+   * reads `process.env.U_CORE_PLUGIN_PAGE` at load time, so we set it on
+   * the current process rather than passing it via spawn env.
    */
   private async runViteBuild(
     outputDir: string,
     pluginPagePath: string
   ): Promise<void> {
-    // `vite build` defaults to production mode (always minifies), but
-    // pass `--mode` explicitly so .env.production loading + downstream
-    // plugins see the right `import.meta.env.MODE`.
     const mode = this.production ? 'production' : 'development';
-    const buildCommand = `npx vite build --mode=${mode} --outDir=${outputDir}`;
-    this.logger.info(`Executing: ${buildCommand} (page=${pluginPagePath})`);
+    this.logger.info(
+      `Running Vite build (JS API, mode=${mode}) → outDir=${outputDir}, page=${pluginPagePath}`
+    );
 
-    const child = spawn(buildCommand, {
-      cwd: process.cwd(),
-      shell: true,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        U_CORE_PLUGIN_PAGE: pluginPagePath,
-        NODE_ENV: this.production ? 'production' : 'development',
-      },
-    });
+    // Vite's `virtual:plugin-page` resolver in vite.config.ts reads
+    // `process.env.U_CORE_PLUGIN_PAGE` at module-load time, so we set
+    // the variable on the parent process for the duration of this
+    // build and restore the previous value afterwards. Same pattern
+    // for NODE_ENV, which Vite + downstream plugins inspect.
+    const previousPage = process.env.U_CORE_PLUGIN_PAGE;
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.U_CORE_PLUGIN_PAGE = pluginPagePath;
+    if (this.production) {
+      process.env.NODE_ENV = 'production';
+    }
+    try {
+      const config: InlineConfig = {
+        // configFile defaults to auto-discovery; vite.config.ts's React
+        // plugin and `virtual:plugin-page` resolver come along for free.
+        mode,
+        logLevel: 'warn',
+        build: {
+          outDir: outputDir,
+          emptyOutDir: true,
+        },
+      };
+      await viteBuild(config);
+    } finally {
+      if (previousPage === undefined) {
+        delete process.env.U_CORE_PLUGIN_PAGE;
+      } else {
+        process.env.U_CORE_PLUGIN_PAGE = previousPage;
+      }
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Vite build failed with exit code ${code}`));
-        }
-      });
-    });
+  /**
+   * Stage `outputFiles` from an in-memory esbuild build to disk. esbuild
+   * emits one bundle per entry plus an optional `.map` sibling; route
+   * them by suffix so a sourcemap can't overwrite the JS bundle when
+   * iterating in arbitrary order.
+   */
+  private async writeBundleOutputs(
+    outputFiles: esbuild.OutputFile[],
+    outputPath: string
+  ): Promise<void> {
+    const outputDir = path.dirname(outputPath);
+    await fs.mkdir(outputDir, { recursive: true });
+    for (const out of outputFiles) {
+      const target = out.path.endsWith('.map')
+        ? `${outputPath}.map`
+        : outputPath;
+      await fs.writeFile(target, out.contents);
+    }
   }
 
   /**

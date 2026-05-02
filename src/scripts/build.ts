@@ -512,7 +512,9 @@ class PluginBuilder {
   }
 
   /**
-   * Stop watching for file changes
+   * Stop watching for file changes. Disposes the BuildManager's cached
+   * esbuild contexts so the worker pool exits cleanly — without this,
+   * `pnpm dev` lingered after `SIGINT` until the worker timed out.
    */
   async stopWatching(): Promise<void> {
     if (this.watcher) {
@@ -521,6 +523,7 @@ class PluginBuilder {
       this.watcher = null;
       this.log('info', 'Watch mode stopped');
     }
+    await this.buildManager.dispose();
   }
 
   /**
