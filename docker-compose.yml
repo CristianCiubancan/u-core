@@ -11,15 +11,25 @@ services:
       - '40120:40120/tcp'
       - '3414:3414'
     volumes:
-      - ./txData:/root/binaries/txData
+      - ./txData:/home/fivem/binaries/txData
     restart: unless-stopped
     stdin_open: true
     tty: true
+    # Wait until MariaDB reports healthy before starting FXServer; otherwise
+    # the txAdmin first-run wizard / migrations race with mariadb-init.
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # Cap container log volume so long-running FXServer instances don't
+    # silently fill the host disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
 
   db:
-    image: mariadb:10.5
+    image: mariadb:11.4
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -30,6 +40,29 @@ services:
     restart: unless-stopped
     ports:
       - '3306:3306'
+    # `mariadb-admin ping` (mariadb's rename of mysqladmin) — use --silent so
+    # the ping output never floods container logs.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mariadb-admin',
+          'ping',
+          '--silent',
+          '-h',
+          '127.0.0.1',
+          '-uroot',
+          '-p${MYSQL_ROOT_PASSWORD}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
 
 volumes:
   db_data:
