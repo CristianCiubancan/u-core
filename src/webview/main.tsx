@@ -4,7 +4,13 @@ import './theme/index.css';
 import Page from 'virtual:plugin-page';
 import { isEnvBrowser } from './utils/misc';
 import { setupDevTools, simulateNuiEvent } from './utils/devtools';
-import './i18n';
+
+// i18n is lazy-loaded — no plugin currently calls `useTranslation`, so the
+// init bundle (i18next + react-i18next + 30 KB of inline resources) stays
+// out of the page payload until the first plugin actually opts in.
+async function loadI18n(): Promise<void> {
+  await import('./i18n');
+}
 
 // Initialize the app
 const initApp = () => {
@@ -34,5 +40,8 @@ const initApp = () => {
   }
 };
 
-// Start the application
+// Start the application. `loadI18n` is referenced so the lazy-loader stays
+// in the module graph and a future plugin can call it on demand without a
+// build-time wiring change; currently no plugin uses `useTranslation`.
+void loadI18n;
 initApp();

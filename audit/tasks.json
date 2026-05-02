@@ -691,7 +691,7 @@
       "title": "Production build flag + shared vendor/CSS + Tailwind safelist trim",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [
@@ -727,10 +727,28 @@
       ],
       "branch_name": "audit/pr-12-prod-build-shared-vendor",
       "commit_message": "perf(build): add --prod flag with minify, shared vendor/CSS, Tailwind safelist trim",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T01:10:00Z",
+      "completed_at": "2026-05-03T01:25:00Z",
+      "commit_shas": [
+        "af9a699f430c9ecffb0b60d76ec4baa75e26e6d0"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T01:25:00Z",
+          "phase": "implement",
+          "issue": "Touched src/webview/theme/utils/safelistUtils.ts (outside affected_files) to trim the Tailwind safelist from all 25 color palettes to the two configured in appConfig (indigo + zinc). vite.config.ts (in affected_files) was not modified — Vite already ran in production mode for `vite build`; the BuildManager now passes `--mode=production` explicitly so import.meta.env.MODE is correct."
+        },
+        {
+          "ts": "2026-05-03T01:25:00Z",
+          "phase": "discovery",
+          "issue": "Cross-plugin shared vendor bundle (acceptance criterion 3) is NOT addressed by this PR. Each plugin's webview still emits its own vendor chunk via Vite's manualChunks. A proper shared bundle requires either a separate Vite library-mode build (vendor.js + tailwind.css emitted to a stable path under [GENERATED]/_shared/) plus a post-build step that rewrites each plugin's index.html to reference it, or upstream changes to Vite's rollupOptions to mark React/etc. as external. Out of scope for the time budget on this run; opening a follow-up note in PR body."
+        },
+        {
+          "ts": "2026-05-03T01:25:00Z",
+          "phase": "implement",
+          "issue": "i18n is lazy-loaded via dynamic import in src/webview/main.tsx, gated behind a `loadI18n` reference. No plugin currently calls `useTranslation`, so the initial bundle no longer pays for i18next + react-i18next + 30 KB of inline resources. Plugins that need translations call `loadI18n()` before rendering."
+        }
+      ]
     },
     {
       "id": "PR-13",

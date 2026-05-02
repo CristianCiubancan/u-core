@@ -45,6 +45,15 @@ interface BuildOptions {
    * @default false
    */
   watch: boolean;
+
+  /**
+   * Whether to produce a production build: minify TS/JS bundles, switch
+   * sourcemaps to external `.map` siblings (server only — client bundles
+   * never get sourcemaps), and tell Vite to build in production mode.
+   * Auto-detected from `NODE_ENV=production` if the CLI flag isn't set.
+   * @default false
+   */
+  production: boolean;
 }
 
 class PluginBuilder {
@@ -71,6 +80,10 @@ class PluginBuilder {
       continueOnError:
         options.continueOnError !== undefined ? options.continueOnError : true,
       watch: options.watch !== undefined ? options.watch : false,
+      production:
+        options.production !== undefined
+          ? options.production
+          : process.env.NODE_ENV === 'production',
     };
 
     this.logger = createLogger({ level: this.options.logLevel });
@@ -81,7 +94,8 @@ class PluginBuilder {
     this.buildManager = new BuildManager(
       this.fileManager,
       this.options.distDir,
-      createLogger({ level: this.options.logLevel, prefix: 'BuildManager' })
+      createLogger({ level: this.options.logLevel, prefix: 'BuildManager' }),
+      { production: this.options.production }
     );
   }
 
@@ -665,6 +679,10 @@ function parseArgs(): Partial<BuildOptions> {
       case '-w':
         options.watch = true;
         break;
+      case '--prod':
+      case '--production':
+        options.production = true;
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -692,6 +710,7 @@ Options:
   --log-level, -l <level>  Log level: verbose, info, warn, error (default: info)
   --stop-on-error          Stop building if a plugin fails
   --watch, -w              Watch for changes and rebuild automatically
+  --prod, --production     Production build: minify TS/JS, external sourcemaps
   --help, -h               Show this help message
 `);
 }
