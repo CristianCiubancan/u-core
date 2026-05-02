@@ -116,11 +116,16 @@ class PluginBuilder {
         chalk.bold(`Building ${plugins.length} plugins sequentially`)
       );
 
-      // Clean dist directory if requested
+      // Clean dist directory if requested; otherwise sweep orphaned outputs
+      // left behind by renamed/deleted plugins or crashed prior builds. Without
+      // a sweep, `--no-clean` lets stale outputs accumulate forever (R-34).
       if (this.options.clean) {
         this.log('info', 'Cleaning distribution directory...');
         await this.buildManager.clean();
         this.log('info', chalk.green('✓') + ' Distribution directory cleaned');
+      } else {
+        this.log('info', 'Sweeping orphaned outputs (--no-clean mode)...');
+        await this.buildManager.sweepOrphans();
       }
 
       // Build plugins sequentially

@@ -292,7 +292,7 @@
       "title": "Transactional plugin builds (temp-dir + atomic rename) + orphan sweep",
       "phase": "A",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "Windows file-locks can cause `rename` to fail if FXServer holds a handle on the dist directory; document this behavior in the PR body. Coordination with FXServer's resource scan is out of scope."
@@ -321,10 +321,24 @@
       ],
       "branch_name": "audit/pr-07-transactional-builds",
       "commit_message": "refactor(build): write per-plugin output to temp dir; atomic rename; orphan sweep",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T18:39:46Z",
+      "completed_at": "2026-05-02T18:47:21Z",
+      "commit_shas": ["d58da3fb"],
+      "notes": [
+        {
+          "ts": "2026-05-02T18:47:21Z",
+          "phase": "discovery",
+          "issue": "tsconfig.plugins.json has composite:true but no noEmit/outDir, so `pnpm exec tsc -b` emits .d.ts/.js next to source files in src/plugins/**. This pollutes the working tree after every typecheck run and is unrelated to PR-07's transactional-build change.",
+          "suggested_task": "PR-14 (tsconfig hygiene) — add noEmit:true (or a dedicated outDir) to tsconfig.plugins.json so typechecking does not pollute the source tree."
+        },
+        {
+          "ts": "2026-05-02T18:47:21Z",
+          "phase": "verify",
+          "command": "SERVER_NAME=ci-stub pnpm build --no-clean (with synthesized orphan dir + .tmp.99999 leftover)",
+          "exit": 0,
+          "tail": "✓ Orphan sweep: removed 1 stale plugin output(s) and 1 leftover temp dir(s); 4 plugins built successfully"
+        }
+      ]
     },
     {
       "id": "PR-08",
