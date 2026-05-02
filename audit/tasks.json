@@ -675,7 +675,7 @@
       "title": "Unified Logger + error.cause + drop console.* in managers",
       "phase": "B",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [],
@@ -708,10 +708,42 @@
       ],
       "branch_name": "audit/pr-16-unified-logger",
       "commit_message": "refactor(scripts): unified Logger; preserve error.cause; drop console.* in managers",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T19:08:00Z",
+      "completed_at": "2026-05-02T19:15:00Z",
+      "commit_shas": ["daa8ed10"],
+      "notes": [
+        {
+          "ts": "2026-05-02T19:15:00Z",
+          "phase": "implementation",
+          "issue": "Touched src/scripts/build.ts (NOT in affected_files). Reason: build.ts is the only constructor caller for FileManager and BuildManager — wiring the Logger requires it to instantiate createLogger(level) and pass through. Without this, the Logger constructors fall back to defaults and --log-level is not honored end-to-end."
+        },
+        {
+          "ts": "2026-05-02T19:15:00Z",
+          "phase": "implementation",
+          "issue": "PluginReloadManager.error-cause wrapping is multi-line ({ \\n cause: error \\n }) per the existing throw-formatting style in that file. The verification grep '\\{\\s*cause:' is line-based and matches BuildManager+FileManager (both single-line); PluginReloadManager.cause: still appears in the file. The acceptance criterion's spirit (error.cause everywhere) is preserved; only the line-shape differs."
+        },
+        {
+          "ts": "2026-05-02T19:15:00Z",
+          "phase": "verify",
+          "command": "pnpm exec tsc -b --force",
+          "exit": 0,
+          "tail": "no errors"
+        },
+        {
+          "ts": "2026-05-02T19:15:00Z",
+          "phase": "verify",
+          "command": "SERVER_NAME=ci-stub pnpm build",
+          "exit": 0,
+          "tail": "4 plugins built; logger prefix '[BuildManager]' visible in output; total build 12.74s"
+        },
+        {
+          "ts": "2026-05-02T19:15:00Z",
+          "phase": "verify",
+          "command": "! grep -RE 'console\\.(log|warn|error|info)' BuildManager.ts FileManager.ts PluginReloadManager.ts",
+          "exit": 0,
+          "tail": "all three managers free of direct console usage"
+        }
+      ]
     },
     {
       "id": "PR-17",
