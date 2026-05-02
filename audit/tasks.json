@@ -587,7 +587,7 @@
       "title": "tsconfig hygiene — types whitelist, client/server split, scripts composite",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [],
@@ -620,10 +620,36 @@
       ],
       "branch_name": "audit/pr-14-tsconfig-hygiene",
       "commit_message": "chore(tsconfig): split plugin client/server, add types whitelists, fix scripts composite",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T18:54:51Z",
+      "completed_at": "2026-05-02T18:59:39Z",
+      "commit_shas": ["7e42f6e5"],
+      "notes": [
+        {
+          "ts": "2026-05-02T18:59:39Z",
+          "phase": "implementation",
+          "issue": "Introduced a 4th composite project (tsconfig.plugins.shared.json) instead of moving shared/ to a top-level src/shared/ directory or duplicating it across plugin projects. shared/ is now a single-owner composite project; client/server/webview reference it. This satisfies the no-duplication acceptance criterion without touching plugin source paths or imports."
+        },
+        {
+          "ts": "2026-05-02T18:59:39Z",
+          "phase": "implementation",
+          "issue": "Added src/webview/env.d.ts (NEW FILE outside listed affected_files). Reason: removing the @types/node leak from tsconfig.webview.json left process.env.ASSET_SERVER_URL (4 sites in getClothingImage.ts, build-time substituted by Vite define) and NodeJS.Timeout (2 useRef type references in FormSelect.tsx + MenuProvider.tsx) without compile-time types. The shim is intentionally minimal — it does not re-introduce the full Node ambient surface — and is documented inline as a temporary workaround.",
+          "suggested_task": "PR-18 polish — migrate process.env.ASSET_SERVER_URL to import.meta.env (Vite-native idiom) and timer refs to ReturnType<typeof setTimeout>, then delete src/webview/env.d.ts."
+        },
+        {
+          "ts": "2026-05-02T18:59:39Z",
+          "phase": "verify",
+          "command": "pnpm exec tsc -b --force",
+          "exit": 0,
+          "tail": "no errors after env.d.ts shim added; webview now reports types=['vite/client','react','react-dom']; scripts now composite"
+        },
+        {
+          "ts": "2026-05-02T18:59:39Z",
+          "phase": "verify",
+          "command": "SERVER_NAME=ci-stub pnpm build",
+          "exit": 0,
+          "tail": "4 plugins built successfully; total build time 10.44s; no source-tree pollution from tsc emit (closes the discovery note from PR-07)"
+        }
+      ]
     },
     {
       "id": "PR-15",
