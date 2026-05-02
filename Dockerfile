@@ -49,9 +49,11 @@ RUN curl --proto '=https' --tlsv1.2 --fail-with-body -L \
 FROM ubuntu:24.04 AS runtime
 
 # Runtime libs only. ca-certificates for outbound TLS, tini as PID 1 to reap
-# the children FXServer spawns.
+# the children FXServer spawns, gosu to drop privileges from the entrypoint
+# shim after it fixes bind-mount ownership.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
+        gosu \
         tini && \
     rm -rf /var/lib/apt/lists/*
 
@@ -66,7 +68,13 @@ RUN groupadd --system --gid 10001 fivem && \
 # txData volume mounts and run.sh stay valid.
 COPY --from=fetch --chown=fivem:fivem /opt/fivem /home/fivem/binaries
 
-USER fivem
+# Entrypoint shim runs as root just long enough to reconcile ownership of
+# the bind-mounted txData directory (Docker Desktop on Windows surfaces it
+# as root:root, which breaks the unprivileged fivem user), then execs
+# gosu to drop to fivem before launching FXServer. Net effect: FXServer
+# itself never runs with elevated privileges.
+COPY --chmod=0755 scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
 WORKDIR /home/fivem/binaries
 
 # txAdmin web UI listens on 40120; HEALTHCHECK exits non-zero when it's
@@ -76,5 +84,5 @@ WORKDIR /home/fivem/binaries
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD bash -c '</dev/tcp/127.0.0.1/40120' || exit 1
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/home/fivem/binaries/run.sh"]
