@@ -33,8 +33,19 @@
         "Operators must regenerate their local `.env` from the new `.env.example` placeholders before `pnpm start:docker` will succeed."
       ],
       "blocked_by": [],
-      "unblocks": ["PR-02", "PR-04"],
-      "risk_ids": ["R-01", "R-02", "R-23", "R-26", "R-41", "R-42", "R-45"],
+      "unblocks": [
+        "PR-02",
+        "PR-04"
+      ],
+      "risk_ids": [
+        "R-01",
+        "R-02",
+        "R-23",
+        "R-26",
+        "R-41",
+        "R-42",
+        "R-45"
+      ],
       "affected_files": [
         ".env.example",
         ".env",
@@ -75,7 +86,9 @@
       "commit_message": "chore(security): bind reload+db ports to localhost, refuse placeholder API key",
       "started_at": "2026-05-02T00:00:00Z",
       "completed_at": "2026-05-02T00:30:00Z",
-      "commit_shas": ["316b19cbc9aae8f391fa8ad3de4189c90bd7d25d"],
+      "commit_shas": [
+        "316b19cbc9aae8f391fa8ad3de4189c90bd7d25d"
+      ],
       "notes": []
     },
     {
@@ -88,9 +101,14 @@
       "pre_flight_warnings": [
         "Asset-server is a separate sub-package using npm; it has its own `package.json` and `node_modules`. Run `pnpm start:assets` (or `npm install && npm start` inside `asset-server/`) to verify after edits."
       ],
-      "blocked_by": ["PR-01"],
+      "blocked_by": [
+        "PR-01"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-03", "R-49"],
+      "risk_ids": [
+        "R-03",
+        "R-49"
+      ],
       "affected_files": [
         "asset-server/server.js"
       ],
@@ -130,8 +148,13 @@
         "Operators must add `setr reloader_api_key \"<value>\"` (or equivalent convar) to `server.cfg` after this lands; `.env`-based config is no longer read by the in-game core server."
       ],
       "blocked_by": [],
-      "unblocks": ["PR-09"],
-      "risk_ids": ["R-21", "R-22"],
+      "unblocks": [
+        "PR-09"
+      ],
+      "risk_ids": [
+        "R-21",
+        "R-22"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "src/plugins/[default]/core/server/index.ts"
@@ -157,9 +180,15 @@
       "commit_message": "fix(build,core): drop client inline sourcemaps; read API key via GetConvar",
       "started_at": "2026-05-02T00:31:00Z",
       "completed_at": "2026-05-02T00:50:00Z",
-      "commit_shas": ["86f41e81e2cb5435a62f9cff64fb00d6e97afbd2"],
+      "commit_shas": [
+        "86f41e81e2cb5435a62f9cff64fb00d6e97afbd2"
+      ],
       "notes": [
-        {"ts": "2026-05-02T00:50:00Z", "phase": "discovery", "issue": "PR-01 also touches src/plugins/[default]/core/server/index.ts (lines 1-14) — when both branches are merged, expect a conflict in the import block and API_KEY constant. Both changes are compatible (PR-01's placeholder rejection + timingSafeEqual + listen('127.0.0.1') wraps the same key value PR-03 now reads via GetConvar)."}
+        {
+          "ts": "2026-05-02T00:50:00Z",
+          "phase": "discovery",
+          "issue": "PR-01 also touches src/plugins/[default]/core/server/index.ts (lines 1-14) — when both branches are merged, expect a conflict in the import block and API_KEY constant. Both changes are compatible (PR-01's placeholder rejection + timingSafeEqual + listen('127.0.0.1') wraps the same key value PR-03 now reads via GetConvar)."
+        }
       ]
     },
     {
@@ -167,14 +196,23 @@
       "title": "Manifest validation via ajv + typed fxmanifest emit",
       "phase": "A",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "Existing plugin.json files may not currently conform to the schema. Audit each plugin's manifest before merging — non-conforming plugins will fail to build (record `success: false`)."
       ],
-      "blocked_by": ["PR-01"],
-      "unblocks": ["PR-05", "PR-06", "PR-11"],
-      "risk_ids": ["R-07", "R-08"],
+      "blocked_by": [
+        "PR-01"
+      ],
+      "unblocks": [
+        "PR-05",
+        "PR-06",
+        "PR-11"
+      ],
+      "risk_ids": [
+        "R-07",
+        "R-08"
+      ],
       "affected_files": [
         "src/scripts/managers/FileManager.ts",
         "src/scripts/managers/BuildManager.ts",
@@ -203,10 +241,18 @@
       ],
       "branch_name": "audit/pr-04-manifest-validation",
       "commit_message": "feat(build): validate plugin.json with ajv; fail fast on malformed manifests",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T20:31:01.179Z",
+      "completed_at": "2026-05-02T20:37:37.114Z",
+      "commit_shas": [
+        "09a7cd7a533c52f845b0fce23df1388c09adeac8"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-02T20:37:37.114Z",
+          "phase": "implement",
+          "issue": "Touched src/scripts/types/Plugin.ts (outside affected_files) to add an optional manifestError field; required so BuildManager can fail-fast on schema-validation failures recorded by FileManager."
+        }
+      ]
     },
     {
       "id": "PR-05",
@@ -218,9 +264,16 @@
       "pre_flight_warnings": [
         "If PR-04 chose ajv for manifests, prefer sharing the validator stack here over adding zod alongside; pick one and document the choice in the PR body."
       ],
-      "blocked_by": ["PR-04"],
-      "unblocks": ["PR-10"],
-      "risk_ids": ["R-27", "R-28"],
+      "blocked_by": [
+        "PR-04"
+      ],
+      "unblocks": [
+        "PR-10"
+      ],
+      "risk_ids": [
+        "R-27",
+        "R-28"
+      ],
       "affected_files": [
         "src/plugins/[character]/[auth]/character-create/server/index.ts",
         "src/plugins/[character]/[auth]/character-create/client/events.ts",
@@ -257,9 +310,16 @@
       "status": "pending",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-04"],
+      "blocked_by": [
+        "PR-04"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-14", "R-15", "R-16", "R-30"],
+      "risk_ids": [
+        "R-14",
+        "R-15",
+        "R-16",
+        "R-30"
+      ],
       "affected_files": [
         "src/plugins/[default]/core/server/index.ts",
         "src/scripts/managers/PluginReloadManager.ts",
@@ -300,8 +360,14 @@
         "Windows file-locks can cause `rename` to fail if FXServer holds a handle on the dist directory; document this behavior in the PR body. Coordination with FXServer's resource scan is out of scope."
       ],
       "blocked_by": [],
-      "unblocks": ["PR-08"],
-      "risk_ids": ["R-17", "R-34", "R-35"],
+      "unblocks": [
+        "PR-08"
+      ],
+      "risk_ids": [
+        "R-17",
+        "R-34",
+        "R-35"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts"
       ],
@@ -325,7 +391,9 @@
       "commit_message": "refactor(build): write per-plugin output to temp dir; atomic rename; orphan sweep",
       "started_at": "2026-05-02T18:39:46Z",
       "completed_at": "2026-05-02T18:47:21Z",
-      "commit_shas": ["d58da3fb"],
+      "commit_shas": [
+        "d58da3fb"
+      ],
       "notes": [
         {
           "ts": "2026-05-02T18:47:21Z",
@@ -352,9 +420,15 @@
       "pre_flight_warnings": [
         "When `BINARIES_ARCHIVE_URL` is bumped, the committed FXServer tarball SHA-256 checksum must be refreshed in the same commit. This step is manual."
       ],
-      "blocked_by": ["PR-07"],
+      "blocked_by": [
+        "PR-07"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-24", "R-25", "R-47"],
+      "risk_ids": [
+        "R-24",
+        "R-25",
+        "R-47"
+      ],
       "affected_files": [
         "Dockerfile",
         "docker-compose.yml"
@@ -389,10 +463,20 @@
       "commit_message": "chore(docker): multi-stage build, healthchecks, log rotation, non-root runtime",
       "started_at": "2026-05-02T00:51:00Z",
       "completed_at": "2026-05-02T01:15:00Z",
-      "commit_shas": ["ebf06944104c3986612dbe96f173a960f7bea366"],
+      "commit_shas": [
+        "ebf06944104c3986612dbe96f173a960f7bea366"
+      ],
       "notes": [
-        {"ts": "2026-05-02T01:15:00Z", "phase": "implement", "issue": "Pinned Dockerfile ARG to FXServer build 13890 (sha256 7ebdc1ac...) — the build I could verify by direct download. Master's pre-existing Dockerfile referenced build 14482 with no committed sha. Reconciliation between Dockerfile ARG default and .env.example URL is PR-01's scope; PR-08 only touches Dockerfile/compose. Operators bumping FXServer must refresh fxserver.sha256 in the same commit."},
-        {"ts": "2026-05-02T01:15:00Z", "phase": "implement", "issue": "Compose volume mount changed: ./txData:/root/binaries/txData → ./txData:/home/fivem/binaries/txData to match the non-root runtime path. Existing operators with running stacks need to `docker compose down` before pulling this change."}
+        {
+          "ts": "2026-05-02T01:15:00Z",
+          "phase": "implement",
+          "issue": "Pinned Dockerfile ARG to FXServer build 13890 (sha256 7ebdc1ac...) — the build I could verify by direct download. Master's pre-existing Dockerfile referenced build 14482 with no committed sha. Reconciliation between Dockerfile ARG default and .env.example URL is PR-01's scope; PR-08 only touches Dockerfile/compose. Operators bumping FXServer must refresh fxserver.sha256 in the same commit."
+        },
+        {
+          "ts": "2026-05-02T01:15:00Z",
+          "phase": "implement",
+          "issue": "Compose volume mount changed: ./txData:/root/binaries/txData → ./txData:/home/fivem/binaries/txData to match the non-root runtime path. Existing operators with running stacks need to `docker compose down` before pulling this change."
+        }
       ]
     },
     {
@@ -405,9 +489,17 @@
       "pre_flight_warnings": [
         "`src/webview/App.tsx` is currently a committed build artifact — this PR deletes it and adds it to `.gitignore`. Confirm no developer has uncommitted edits to that file before merge."
       ],
-      "blocked_by": ["PR-03"],
-      "unblocks": ["PR-10", "PR-12", "PR-13"],
-      "risk_ids": ["R-06"],
+      "blocked_by": [
+        "PR-03"
+      ],
+      "unblocks": [
+        "PR-10",
+        "PR-12",
+        "PR-13"
+      ],
+      "risk_ids": [
+        "R-06"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "src/webview/main.tsx",
@@ -450,9 +542,19 @@
       "status": "pending",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-05", "PR-09"],
-      "unblocks": ["PR-12"],
-      "risk_ids": ["R-04", "R-05", "R-12", "R-13"],
+      "blocked_by": [
+        "PR-05",
+        "PR-09"
+      ],
+      "unblocks": [
+        "PR-12"
+      ],
+      "risk_ids": [
+        "R-04",
+        "R-05",
+        "R-12",
+        "R-13"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "src/scripts/managers/FileManager.ts"
@@ -492,9 +594,17 @@
       "status": "pending",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-04"],
-      "unblocks": ["PR-13"],
-      "risk_ids": ["R-18", "R-19", "R-20"],
+      "blocked_by": [
+        "PR-04"
+      ],
+      "unblocks": [
+        "PR-13"
+      ],
+      "risk_ids": [
+        "R-18",
+        "R-19",
+        "R-20"
+      ],
       "affected_files": [
         "src/scripts/build.ts",
         "src/scripts/managers/FileManager.ts",
@@ -532,9 +642,15 @@
       "status": "pending",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-09", "PR-10"],
+      "blocked_by": [
+        "PR-09",
+        "PR-10"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-36", "R-38"],
+      "risk_ids": [
+        "R-36",
+        "R-38"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "vite.config.ts",
@@ -572,9 +688,14 @@
       "status": "pending",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-09", "PR-11"],
+      "blocked_by": [
+        "PR-09",
+        "PR-11"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-37"],
+      "risk_ids": [
+        "R-37"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "src/scripts/build.ts"
@@ -610,8 +731,14 @@
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [],
-      "unblocks": ["PR-15"],
-      "risk_ids": ["R-09", "R-10", "R-11"],
+      "unblocks": [
+        "PR-15"
+      ],
+      "risk_ids": [
+        "R-09",
+        "R-10",
+        "R-11"
+      ],
       "affected_files": [
         "tsconfig.json",
         "tsconfig.scripts.json",
@@ -641,7 +768,9 @@
       "commit_message": "chore(tsconfig): split plugin client/server, add types whitelists, fix scripts composite",
       "started_at": "2026-05-02T18:54:51Z",
       "completed_at": "2026-05-02T18:59:39Z",
-      "commit_shas": ["7e42f6e5"],
+      "commit_shas": [
+        "7e42f6e5"
+      ],
       "notes": [
         {
           "ts": "2026-05-02T18:59:39Z",
@@ -678,9 +807,13 @@
       "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
-      "blocked_by": ["PR-14"],
+      "blocked_by": [
+        "PR-14"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-29"],
+      "risk_ids": [
+        "R-29"
+      ],
       "affected_files": [
         "src/plugins/[character]/[auth]/character-create/shared/types.ts",
         "src/plugins/[character]/[auth]/character-create/client/events.ts",
@@ -712,7 +845,9 @@
       "commit_message": "refactor(types): typed NUI/NetEvent registry; remove NuiCallback casts",
       "started_at": "2026-05-02T19:00:00Z",
       "completed_at": "2026-05-02T19:07:36Z",
-      "commit_shas": ["2fd85197"],
+      "commit_shas": [
+        "2fd85197"
+      ],
       "notes": [
         {
           "ts": "2026-05-02T19:07:36Z",
@@ -768,7 +903,9 @@
       "pre_flight_warnings": [],
       "blocked_by": [],
       "unblocks": [],
-      "risk_ids": ["R-33"],
+      "risk_ids": [
+        "R-33"
+      ],
       "affected_files": [
         "src/scripts/managers/BuildManager.ts",
         "src/scripts/managers/FileManager.ts",
@@ -798,7 +935,9 @@
       "commit_message": "refactor(scripts): unified Logger; preserve error.cause; drop console.* in managers",
       "started_at": "2026-05-02T19:08:00Z",
       "completed_at": "2026-05-02T19:15:00Z",
-      "commit_shas": ["daa8ed10"],
+      "commit_shas": [
+        "daa8ed10"
+      ],
       "notes": [
         {
           "ts": "2026-05-02T19:15:00Z",
@@ -842,8 +981,12 @@
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [],
-      "unblocks": ["PR-18"],
-      "risk_ids": ["R-44"],
+      "unblocks": [
+        "PR-18"
+      ],
+      "risk_ids": [
+        "R-44"
+      ],
       "affected_files": [
         "tests/",
         "vitest.config.ts",
@@ -872,7 +1015,9 @@
       "commit_message": "feat(ci): add vitest with regression suite; GitHub Actions tsc/build/test pipeline",
       "started_at": "2026-05-02T19:16:13Z",
       "completed_at": "2026-05-02T19:19:20Z",
-      "commit_shas": ["9d8a4791"],
+      "commit_shas": [
+        "9d8a4791"
+      ],
       "notes": [
         {
           "ts": "2026-05-02T19:19:20Z",
@@ -924,9 +1069,19 @@
       "pre_flight_warnings": [
         "This PR is intentionally a basket; reviewer may request a split into separate PRs (deps / lint / README / dead code / React perf / env vars). Note this in the PR body."
       ],
-      "blocked_by": ["PR-17"],
+      "blocked_by": [
+        "PR-17"
+      ],
       "unblocks": [],
-      "risk_ids": ["R-43", "R-31", "R-32", "R-39", "R-40", "R-46", "R-48"],
+      "risk_ids": [
+        "R-43",
+        "R-31",
+        "R-32",
+        "R-39",
+        "R-40",
+        "R-46",
+        "R-48"
+      ],
       "affected_files": [
         "package.json",
         "pnpm-lock.yaml",
@@ -982,13 +1137,36 @@
       "commit_message": "chore: prune deps, add lint/format, delete dead code, React perf, README rewrite",
       "started_at": "2026-05-02T01:16:00Z",
       "completed_at": "2026-05-02T02:00:00Z",
-      "commit_shas": ["939262cd9bdb9ce68b994b630ab30c4d349cc548"],
+      "commit_shas": [
+        "939262cd9bdb9ce68b994b630ab30c4d349cc548"
+      ],
       "notes": [
-        {"ts": "2026-05-02T02:00:00Z", "phase": "implement", "issue": "ESLint config introduced with several rules downgraded from error to warn (no-explicit-any, prefer-const, no-require-imports, no-useless-escape, no-case-declarations, react-hooks/rules-of-hooks). 55 pre-existing warnings remain. Ratchet to error after PR-04, PR-05, PR-06 land."},
-        {"ts": "2026-05-02T02:00:00Z", "phase": "implement", "issue": "format:check intentionally NOT added to CI — running `prettier --write .` against the existing codebase would generate a several-hundred-file diff that belongs in a dedicated reformat PR."},
-        {"ts": "2026-05-02T02:00:00Z", "phase": "discovery", "issue": "ColorPicker.tsx:53 calls React.useId inside a callback — react-hooks/rules-of-hooks violation. Real bug; downgraded to warn so this PR doesn't claim to have fixed it.", "suggested_task": "Fix conditional useId in webview/components/forms/ColorPicker.tsx"},
-        {"ts": "2026-05-02T02:00:00Z", "phase": "implement", "issue": "PR-01 also touches src/plugins/[default]/core/server/index.ts, .env.example. PR-03 touches src/plugins/[default]/core/server/index.ts. Triple conflict expected when all three branches land — all three legitimately scope edits to the same files per their affected_files declarations."},
-        {"ts": "2026-05-02T02:00:00Z", "phase": "implement", "issue": "txData/ was directory-level gitignored — restructured to txData/* + !txData/server.cfg.example so the example is tracked but operator runtime data stays ignored."}
+        {
+          "ts": "2026-05-02T02:00:00Z",
+          "phase": "implement",
+          "issue": "ESLint config introduced with several rules downgraded from error to warn (no-explicit-any, prefer-const, no-require-imports, no-useless-escape, no-case-declarations, react-hooks/rules-of-hooks). 55 pre-existing warnings remain. Ratchet to error after PR-04, PR-05, PR-06 land."
+        },
+        {
+          "ts": "2026-05-02T02:00:00Z",
+          "phase": "implement",
+          "issue": "format:check intentionally NOT added to CI — running `prettier --write .` against the existing codebase would generate a several-hundred-file diff that belongs in a dedicated reformat PR."
+        },
+        {
+          "ts": "2026-05-02T02:00:00Z",
+          "phase": "discovery",
+          "issue": "ColorPicker.tsx:53 calls React.useId inside a callback — react-hooks/rules-of-hooks violation. Real bug; downgraded to warn so this PR doesn't claim to have fixed it.",
+          "suggested_task": "Fix conditional useId in webview/components/forms/ColorPicker.tsx"
+        },
+        {
+          "ts": "2026-05-02T02:00:00Z",
+          "phase": "implement",
+          "issue": "PR-01 also touches src/plugins/[default]/core/server/index.ts, .env.example. PR-03 touches src/plugins/[default]/core/server/index.ts. Triple conflict expected when all three branches land — all three legitimately scope edits to the same files per their affected_files declarations."
+        },
+        {
+          "ts": "2026-05-02T02:00:00Z",
+          "phase": "implement",
+          "issue": "txData/ was directory-level gitignored — restructured to txData/* + !txData/server.cfg.example so the example is tracked but operator runtime data stays ignored."
+        }
       ]
     }
   ]
