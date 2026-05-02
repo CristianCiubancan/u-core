@@ -261,7 +261,7 @@
       "title": "NUI + NetEvent input validation at boundaries",
       "phase": "A",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "If PR-04 chose ajv for manifests, prefer sharing the validator stack here over adding zod alongside; pick one and document the choice in the PR body."
@@ -299,10 +299,18 @@
       ],
       "branch_name": "audit/pr-05-nui-netevent-validation",
       "commit_message": "feat(security): validate NUI and NetEvent payloads at server/client boundaries",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T00:00:00Z",
+      "completed_at": "2026-05-03T00:10:00Z",
+      "commit_shas": [
+        "b2c68a5fc6f756bf0ba2173f1fa382ffbae5d2d0"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T00:10:00Z",
+          "phase": "implement",
+          "issue": "Used ajv (matching PR-04 choice) for validators in shared/validators.ts. Added one new file outside affected_files (validators.ts) to host shared schemas; this is the obvious split for sharing the validator stack across client + server."
+        }
+      ]
     },
     {
       "id": "PR-06",
