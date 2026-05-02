@@ -67,7 +67,9 @@ txData/${SERVER_NAME}/resources/[GENERATED]/<bracket-path>/<plugin-name>/
 
 so FXServer picks them up directly — there is no separate copy step. To run a generated plugin, add `ensure <plugin-name>` to your `server.cfg` once.
 
-The watcher (`pnpm dev`) re-bundles only the changed plugin and posts to `http://localhost:3414` (authed by `RELOADER_API_KEY`) to trigger an in-game reload. The reload requires a companion FiveM resource that exposes that endpoint; if the connection fails at startup the watcher still rebuilds, it just won't auto-reload.
+The watcher (`pnpm dev`) re-bundles only the changed plugin and posts to `http://localhost:3414` (authed by `RELOADER_API_KEY`) to trigger an in-game reload. The companion FiveM resource that exposes that endpoint is the bundled `[default]/core` plugin — your `server.cfg` must contain `ensure core` for hot-reload to work. See [`txData/server.cfg.example`](./txData/server.cfg.example) for a starter config. If the connection fails at startup the watcher still rebuilds, it just won't auto-reload.
+
+For first-time setup (clone → build → run), see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Project layout
 

@@ -1,0 +1,44 @@
+# =============================================================================
+# Sample server.cfg for an FXServer instance running u-core's generated
+# resources. Copy this to txData/${SERVER_NAME}/server.cfg and edit values
+# marked <replace-me>.
+# =============================================================================
+
+# ---- Identity / network -----------------------------------------------------
+sv_hostname     "u-core dev server"
+sv_projectName  "u-core"
+sv_projectDesc  "Local development instance"
+sv_maxclients   32
+
+# Endpoints. The 30120 default is fine for local dev.
+endpoint_add_tcp "0.0.0.0:30120"
+endpoint_add_udp "0.0.0.0:30120"
+
+# Steam web API key (optional, but txAdmin will nag without it).
+# sv_licenseKey  "<replace-me>"
+
+# ---- Convars consumed by u-core resources -----------------------------------
+# Required by the [default]/core resource. The pnpm dev watcher authenticates
+# its rebuild requests with this value; keep it in sync with the
+# RELOADER_API_KEY in your .env (or with whatever value you pass to the build
+# tool). Generate with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+setr reloader_api_key "<replace-me>"
+
+# Optional: override the port the in-game reload endpoint listens on.
+# Default is 3414 if unset.
+# setr resource_manager_port 3414
+
+# ---- Resources to start -----------------------------------------------------
+# `core` MUST be ensured for `pnpm dev` hot-reload to work — it owns the
+# in-game HTTP listener that the watcher posts to.
+ensure core
+
+# Add an `ensure` line per generated plugin you want loaded. Names match the
+# `name` field of each plugin.json.
+# ensure character-create
+# ensure character-edit
+# ensure character-select
+
+# ---- txAdmin (managed by FXServer itself; usually no extra config needed) ---
+# sv_endpointPrivacy true

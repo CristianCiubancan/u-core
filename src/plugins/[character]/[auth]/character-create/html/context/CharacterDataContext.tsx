@@ -3,6 +3,7 @@ import React, {
   useContext,
   useReducer,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import { fetchNui } from '../../../../../../webview/utils/fetchNui';
@@ -417,23 +418,43 @@ export const CharacterDataProvider: React.FC<CharacterDataProviderProps> = ({
     [state.selectedClothingItem, handleClothingChange]
   );
 
-  // Create the context value
-  const contextValue: CharacterDataContextType = {
-    ...state,
-    setActiveTab,
-    setActiveFocus,
-    handleModelChange,
-    handleFaceChange,
-    handleHairChange,
-    handleAppearanceChange,
-    handleClothingChange,
-    setSelectedClothingItem,
-    setVerifiedTextures,
-    handleSelectTexture,
-    setIsVerifyingTextures,
-    handleSaveCharacter,
-    handleCloseUi,
-  };
+  // Memoize the provider value so consumers don't re-render on every parent
+  // render. Without this, every render of CharacterDataProvider produces a
+  // fresh object literal, invalidating React.memo on every consumer.
+  const contextValue = useMemo<CharacterDataContextType>(
+    () => ({
+      ...state,
+      setActiveTab,
+      setActiveFocus,
+      handleModelChange,
+      handleFaceChange,
+      handleHairChange,
+      handleAppearanceChange,
+      handleClothingChange,
+      setSelectedClothingItem,
+      setVerifiedTextures,
+      handleSelectTexture,
+      setIsVerifyingTextures,
+      handleSaveCharacter,
+      handleCloseUi,
+    }),
+    [
+      state,
+      setActiveTab,
+      setActiveFocus,
+      handleModelChange,
+      handleFaceChange,
+      handleHairChange,
+      handleAppearanceChange,
+      handleClothingChange,
+      setSelectedClothingItem,
+      setVerifiedTextures,
+      handleSelectTexture,
+      setIsVerifyingTextures,
+      handleSaveCharacter,
+      handleCloseUi,
+    ]
+  );
 
   return (
     <CharacterDataContext.Provider value={contextValue}>

@@ -560,7 +560,7 @@ function printHelp(): void {
   console.log(`
 Plugin Builder - Build plugins sequentially
 
-Usage: ts-node build.ts [options]
+Usage: tsx build.ts [options]
 
 Options:
   --plugins-dir, -p <dir>  Path to plugins directory (default: src/plugins)

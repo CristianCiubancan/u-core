@@ -1,5 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 
+// `loadMore` is now synchronous (the previous setTimeout(50) gate produced a
+// visible flicker without preventing any UI freeze), so the hook never enters
+// an asynchronous loading state. We expose `isLoading: false` as a stable
+// constant so existing consumers' loading-spinner branches stay valid but
+// never render.
+const ALWAYS_FALSE = false;
+
 /**
  * Custom hook for implementing infinite scrolling functionality
  * 
@@ -17,44 +24,35 @@ export const useInfiniteScroll = <T>(
 ) => {
   // Store the number of items to display
   const [displayCount, setDisplayCount] = useState(initialItemsToLoad);
-  
-  // Store loading state
-  const [isLoading, setIsLoading] = useState(false);
-  
+
   // Reference to the scrollable container
   const containerRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Calculate if we've loaded everything
   const hasMore = displayCount < items.length;
 
-  // Function to load more items
+  // Function to load more items.
   const loadMore = useCallback(() => {
-    if (!hasMore || isLoading) return;
-    
-    setIsLoading(true);
-    
-    // Use setTimeout to simulate loading time and prevent UI freezes
-    setTimeout(() => {
-      setDisplayCount(prevCount => {
-        const newCount = prevCount + loadMoreCount;
-        return newCount > items.length ? items.length : newCount;
-      });
-      setIsLoading(false);
-    }, 50);
-  }, [hasMore, isLoading, items.length, loadMoreCount]);
+    if (!hasMore) return;
+
+    setDisplayCount((prevCount) => {
+      const newCount = prevCount + loadMoreCount;
+      return newCount > items.length ? items.length : newCount;
+    });
+  }, [hasMore, items.length, loadMoreCount]);
 
   // Handle scroll event
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     const scrollBottom = scrollHeight - scrollTop - clientHeight;
-    
+
     // When user scrolls close to the bottom, load more items
-    if (scrollBottom < threshold && hasMore && !isLoading) {
+    if (scrollBottom < threshold && hasMore) {
       loadMore();
     }
-  }, [hasMore, isLoading, loadMore, threshold]);
+  }, [hasMore, loadMore, threshold]);
 
   // Attach scroll event listener
   useEffect(() => {
@@ -76,9 +74,9 @@ export const useInfiniteScroll = <T>(
   return {
     containerRef,
     visibleItems,
-    isLoading,
+    isLoading: ALWAYS_FALSE,
     hasMore,
     loadMore,
-    displayCount
+    displayCount,
   };
 };
