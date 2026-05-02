@@ -574,10 +574,33 @@ Options:
 }
 
 /**
+ * Refuse to start when SERVER_NAME is missing or still set to the
+ * `<replace-me>` placeholder. The dist directory path embeds SERVER_NAME, so
+ * a missing value silently writes resources to `txData/undefined/...` and
+ * an unreplaced placeholder writes to `txData/<replace-me>/...` — neither
+ * is what the operator wanted.
+ */
+function assertServerName(): void {
+  const serverName = process.env.SERVER_NAME;
+  if (!serverName || serverName === '<replace-me>') {
+    const reason = !serverName
+      ? 'unset or empty'
+      : 'still set to the "<replace-me>" placeholder';
+    console.error(
+      `[build] SERVER_NAME is ${reason}. Set SERVER_NAME in .env to your ` +
+        `FXServer instance directory (e.g. CFXDefaultFiveM_xxxxxx.base).`
+    );
+    process.exit(1);
+  }
+}
+
+/**
  * Main function
  */
 async function main(): Promise<void> {
   try {
+    assertServerName();
+
     // Parse command line arguments
     const options = parseArgs();
 

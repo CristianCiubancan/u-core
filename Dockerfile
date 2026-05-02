@@ -19,7 +19,9 @@
 # ---------- Stage 1: fetch + verify + extract ----------
 FROM ubuntu:24.04 AS fetch
 
-ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/13890-ad6c90072e62cdb7ee0dcc943d7ded8a5107d542/fx.tar.xz
+# Default URL must stay in sync with .env.example's BINARIES_ARCHIVE_URL.
+# Bumping this requires refreshing fxserver.sha256 in the same commit.
+ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/25770-8ddccd4e4dfd6a760ce18651656463f961cc4761/fx.tar.xz
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
