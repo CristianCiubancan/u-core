@@ -23,6 +23,7 @@
   "packageManager": "pnpm@10.8.0",
   "dependencies": {
     "@tailwindcss/forms": "^0.5.10",
+    "ajv": "^8.20.0",
     "canvas": "^2.11.2",
     "chalk": "^5.4.1",
     "chokidar": "^4.0.3",

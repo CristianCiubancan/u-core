@@ -198,7 +198,7 @@
       "title": "Manifest validation via ajv + typed fxmanifest emit",
       "phase": "A",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "Existing plugin.json files may not currently conform to the schema. Audit each plugin's manifest before merging — non-conforming plugins will fail to build (record `success: false`)."
@@ -243,10 +243,18 @@
       ],
       "branch_name": "audit/pr-04-manifest-validation",
       "commit_message": "feat(build): validate plugin.json with ajv; fail fast on malformed manifests",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T20:31:01.179Z",
+      "completed_at": "2026-05-02T20:37:37.114Z",
+      "commit_shas": [
+        "09a7cd7a533c52f845b0fce23df1388c09adeac8"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-02T20:37:37.114Z",
+          "phase": "implement",
+          "issue": "Touched src/scripts/types/Plugin.ts (outside affected_files) to add an optional manifestError field; required so BuildManager can fail-fast on schema-validation failures recorded by FileManager."
+        }
+      ]
     },
     {
       "id": "PR-05",

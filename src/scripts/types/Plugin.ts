@@ -8,4 +8,5 @@ export interface Plugin {
   parents: string[]; // Array of parent directories with forward slashes
   files: File[];
   manifest?: PluginManifest;
+  manifestError?: string;
 }

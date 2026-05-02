@@ -154,6 +154,17 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
+      if (plugin.manifestError) {
+        throw new Error(
+          `Cannot build plugin ${plugin.pluginName}: ${plugin.manifestError}`
+        );
+      }
+      if (!plugin.manifest) {
+        throw new Error(
+          `Cannot build plugin ${plugin.pluginName}: plugin.json is missing or unreadable`
+        );
+      }
+
       this.logger.info(`Building plugin: ${plugin.pluginName}`);
 
       const destDir = this.getPluginDestDir(plugin);
@@ -1193,6 +1204,11 @@ export default App;
     // Add resource metadata
     content += `-- Resource Metadata\n`;
 
+    // Resource name (`name` is part of the schema; FXServer accepts it).
+    if (manifest.name) {
+      content += `name '${this.escapeLuaString(manifest.name)}'\n`;
+    }
+
     // FX Version (default to "cerulean" if not specified)
     content += `fx_version '${manifest.fx_version || 'cerulean'}'\n`;
 
@@ -1431,22 +1447,85 @@ export default App;
       }
     }
 
-    // Add any custom properties
+    // Honor `config` from plugin.json: emit each entry as a `set` directive
+    // so FXServer-side convars are available without a separate convars block.
+    if (manifest.config && Object.keys(manifest.config).length > 0) {
+      content += `\n-- Config\n`;
+      for (const [rawKey, value] of Object.entries(manifest.config)) {
+        const key = this.assertSafeManifestKey(rawKey, plugin.pluginName);
+        content += `set '${key}' ${this.formatLuaScalar(value, key, plugin.pluginName)}\n`;
+      }
+    }
+
+    // Add any custom properties (anything not in the standardProps allowlist)
     const customProps = this.getCustomProperties(manifest);
     if (Object.keys(customProps).length > 0) {
       content += `\n-- Additional Metadata\n`;
-      for (const [key, value] of Object.entries(customProps)) {
+      for (const [rawKey, value] of Object.entries(customProps)) {
+        const key = this.assertSafeManifestKey(rawKey, plugin.pluginName);
         if (Array.isArray(value)) {
           for (const val of value) {
-            content += `${key} '${this.escapeLuaString(String(val))}'\n`;
+            content += `${key} ${this.formatLuaScalar(val, key, plugin.pluginName)}\n`;
           }
         } else {
-          content += `${key} '${this.escapeLuaString(String(value))}'\n`;
+          content += `${key} ${this.formatLuaScalar(value, key, plugin.pluginName)}\n`;
         }
       }
     }
 
     return content;
+  }
+
+  /**
+   * Custom-property keys must be valid Lua identifiers (FXServer parses these
+   * as bareword directives). Reject anything that would produce a syntax error
+   * in the generated fxmanifest.lua.
+   */
+  private assertSafeManifestKey(key: string, pluginName: string): string {
+    if (!/^[a-z_][a-z0-9_]*$/i.test(key)) {
+      throw new Error(
+        `Invalid plugin.json key for plugin ${pluginName}: '${key}' must match /^[a-z_][a-z0-9_]*$/i`
+      );
+    }
+    return key;
+  }
+
+  /**
+   * Type-aware emission for fxmanifest scalars:
+   *  - boolean -> 'yes' | 'no' (FXServer convention)
+   *  - number  -> unquoted Lua number
+   *  - string  -> single-quoted, escaped
+   *  - object  -> hard error (silently stringifying produces a useless directive)
+   */
+  private formatLuaScalar(
+    value: unknown,
+    keyForError: string,
+    pluginName: string
+  ): string {
+    if (typeof value === 'boolean') {
+      return `'${value ? 'yes' : 'no'}'`;
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
+        throw new Error(
+          `Invalid numeric value for ${keyForError} in plugin ${pluginName}: ${value}`
+        );
+      }
+      return String(value);
+    }
+    if (typeof value === 'string') {
+      return `'${this.escapeLuaString(value)}'`;
+    }
+    if (value === null || typeof value === 'undefined') {
+      throw new Error(
+        `Null/undefined value for ${keyForError} in plugin ${pluginName} cannot be emitted to fxmanifest.lua`
+      );
+    }
+    // Objects (and any other non-scalar) are not representable as a single
+    // Lua directive; refuse rather than emit a useless stringified value.
+    throw new Error(
+      `Object value for ${keyForError} in plugin ${pluginName} is not supported in fxmanifest.lua emission`
+    );
   }
 
   /**

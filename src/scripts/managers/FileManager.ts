@@ -1,12 +1,17 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { glob } from 'glob'; // For pattern matching in file paths
+import { Ajv, type ValidateFunction } from 'ajv';
 // Removed ignore import
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
-import { PluginManifest, BasicPluginManifest } from '../types/Manifest.js';
+import { PluginManifest } from '../types/Manifest.js';
 import { Logger, createLogger } from '../Logger.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SCHEMA_PATH = path.resolve(__dirname, '../../utils/schema.json');
 
 /**
  * File manager
@@ -18,6 +23,7 @@ class FileManager {
   private plugins: Map<string, Plugin> = new Map();
   private files: Map<string, File> = new Map();
   private logger: Logger;
+  private manifestValidator: ValidateFunction | null = null;
 
   // Map of full path to plugin for efficient lookups
   private pathToPlugin: Map<string, Plugin> = new Map();
@@ -41,7 +47,7 @@ class FileManager {
    */
   async initialize(): Promise<void> {
     try {
-      // Removed loadGitignore call
+      await this.loadManifestSchema();
       await this.scanPlugins();
       this.logger.info(
         `FileManager initialized with ${this.plugins.size} plugins and ${this.files.size} files` // Reverted log message
@@ -50,6 +56,53 @@ class FileManager {
       this.logger.error('Failed to initialize FileManager', error);
       throw new Error('Failed to initialize FileManager', { cause: error });
     }
+  }
+
+  private async loadManifestSchema(): Promise<void> {
+    if (this.manifestValidator) return;
+    const schemaText = await fs.readFile(SCHEMA_PATH, 'utf-8');
+    const schema = JSON.parse(schemaText);
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    this.manifestValidator = ajv.compile(schema);
+  }
+
+  private formatAjvErrors(): string {
+    const errors = this.manifestValidator?.errors ?? [];
+    return errors
+      .map((e) => `${e.instancePath || '/'} ${e.message ?? ''}`.trim())
+      .join('; ');
+  }
+
+  private async applyManifestFromContent(
+    plugin: Plugin,
+    content: string
+  ): Promise<void> {
+    if (!this.manifestValidator) {
+      await this.loadManifestSchema();
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      plugin.manifestError = `Invalid JSON in plugin.json: ${msg}`;
+      plugin.manifest = undefined;
+      this.logger.error(
+        `Manifest parse failed for plugin ${plugin.pluginName}: ${msg}`
+      );
+      return;
+    }
+    if (!this.manifestValidator!(parsed)) {
+      const msg = `plugin.json failed schema validation: ${this.formatAjvErrors()}`;
+      plugin.manifestError = msg;
+      plugin.manifest = undefined;
+      this.logger.error(
+        `Manifest validation failed for plugin ${plugin.pluginName}: ${msg}`
+      );
+      return;
+    }
+    plugin.manifest = parsed as PluginManifest;
+    plugin.manifestError = undefined;
   }
 
   // Removed loadGitignore method
@@ -110,15 +163,15 @@ class FileManager {
           const pluginDir = path.dirname(pluginJsonPath);
           const plugin = await this.registerPlugin(pluginDir);
 
-          // Try to load the manifest for this plugin
           try {
             const manifest = await this.loadPluginManifest(pluginJsonPath);
             plugin.manifest = manifest;
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : String(error);
-            this.logger.warn(
-              `Warning: Failed to load manifest for plugin ${plugin.pluginName}: ${errorMessage}`
+            plugin.manifestError = errorMessage;
+            this.logger.error(
+              `Manifest validation failed for plugin ${plugin.pluginName} at ${this.pathToDisplay(pluginJsonPath)}: ${errorMessage}`
             );
           }
 
@@ -144,32 +197,32 @@ class FileManager {
   }
 
   /**
-   * Loads and parses a plugin manifest file
-   * @param manifestPath Path to the plugin.json file
+   * Loads, parses, and validates a plugin.json manifest. Throws on JSON-parse
+   * failure or schema-validation failure so the caller can mark the plugin
+   * `success: false` in the build summary instead of silently emitting a
+   * skeleton fxmanifest.lua.
    */
   private async loadPluginManifest(
     manifestPath: string
   ): Promise<PluginManifest> {
-    try {
-      const manifestContent = await fs.readFile(manifestPath, 'utf-8');
-      try {
-        return JSON.parse(manifestContent) as PluginManifest;
-      } catch (parseError) {
-        this.logger.warn(
-          `Warning: Invalid JSON in plugin manifest at ${this.pathToDisplay(
-            manifestPath
-          )}`
-        );
-        // Return a basic manifest with just the plugin name derived from the directory
-        const pluginDir = path.dirname(manifestPath);
-        const pluginName = path.basename(pluginDir);
-        return { name: pluginName } as BasicPluginManifest;
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to read plugin manifest: ${errorMessage}`);
+    if (!this.manifestValidator) {
+      await this.loadManifestSchema();
     }
+    const manifestContent = await fs.readFile(manifestPath, 'utf-8');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(manifestContent);
+    } catch (parseError) {
+      const msg = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new Error(`Invalid JSON in plugin.json: ${msg}`);
+    }
+    const valid = this.manifestValidator!(parsed);
+    if (!valid) {
+      throw new Error(
+        `plugin.json failed schema validation: ${this.formatAjvErrors()}`
+      );
+    }
+    return parsed as PluginManifest;
   }
 
   /**
@@ -441,10 +494,13 @@ class FileManager {
       const manifestPath = path.join(plugin.fullPath, 'plugin.json');
       const manifest = await this.loadPluginManifest(manifestPath);
       plugin.manifest = manifest; // Cache for future use
+      plugin.manifestError = undefined;
       return manifest;
     } catch (error) {
-      this.logger.warn(
-        `Warning: Could not load manifest for plugin ${plugin.pluginName}`
+      const msg = error instanceof Error ? error.message : String(error);
+      plugin.manifestError = msg;
+      this.logger.error(
+        `Manifest validation failed for plugin ${plugin.pluginName}: ${msg}`
       );
       return undefined;
     }
@@ -516,13 +572,7 @@ class FileManager {
 
         // If this is a plugin.json file, update the manifest in the plugin
         if (path.basename(normalizedPath) === 'plugin.json') {
-          try {
-            plugin.manifest = JSON.parse(content) as PluginManifest;
-          } catch (error) {
-            this.logger.warn(
-              `Warning: Invalid JSON in new plugin.json for plugin ${plugin.pluginName}`
-            );
-          }
+          await this.applyManifestFromContent(plugin, content);
         }
       } else {
         // If the file exists, just update its content
@@ -530,13 +580,7 @@ class FileManager {
 
         // If this is a plugin.json file, update the manifest in the plugin
         if (path.basename(normalizedPath) === 'plugin.json') {
-          try {
-            file.plugin.manifest = JSON.parse(content) as PluginManifest;
-          } catch (error) {
-            this.logger.warn(
-              `Warning: Invalid JSON in updated plugin.json for plugin ${file.plugin.pluginName}`
-            );
-          }
+          await this.applyManifestFromContent(file.plugin, content);
         }
       }
 
@@ -717,6 +761,7 @@ class FileManager {
       const pluginManifest: PluginManifest = manifest || {
         name: pluginName,
         version: '1.0.0',
+        fx_version: 'cerulean',
         description: `${pluginName} plugin`,
       };
 
@@ -905,11 +950,14 @@ class FileManager {
       const manifestPath = path.join(normalizedPath, 'plugin.json');
       try {
         reloadedPlugin.manifest = await this.loadPluginManifest(manifestPath);
+        reloadedPlugin.manifestError = undefined;
       } catch (error) {
-        this.logger.warn(
-          `Warning: Failed to load manifest for plugin at ${this.pathToDisplay(
+        const msg = error instanceof Error ? error.message : String(error);
+        reloadedPlugin.manifestError = msg;
+        this.logger.error(
+          `Manifest validation failed on reload for plugin at ${this.pathToDisplay(
             manifestPath
-          )}: ${error}`
+          )}: ${msg}`
         );
       }
 
