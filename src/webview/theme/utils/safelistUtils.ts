@@ -1,3 +1,5 @@
+import { config } from '../config/appConfig';
+
 // Define interfaces for color palettes to avoid circular dependency in types
 interface ColorPalette {
   [shade: number]: string;
@@ -28,13 +30,24 @@ function generateSafelist(
     'hover:border',
   ];
 
-  const generatedColorClasses = Object.keys(colorPalettes).flatMap((color) =>
+  // Trim to the active palettes only. Previously the safelist iterated
+  // every Tailwind color (~25 palettes), generating ~2200 utility classes
+  // that no plugin actually used; trimming to `config.brandColor` and
+  // `config.grayColor` cuts the emitted CSS roughly in half. If a plugin
+  // ever needs another palette it should be added to `appConfig` and
+  // referenced here, not silently included via the unused-color firehose.
+  const activeBrand = config.brandColor;
+  const activeGray = config.grayColor;
+  const activeColors = colorPalettes[activeBrand] ? [activeBrand] : [];
+  const activeGrays = grayPalettes[activeGray] ? [activeGray] : [];
+
+  const generatedColorClasses = activeColors.flatMap((color) =>
     colorShades.flatMap((shade) =>
       colorModifiers.map((modifier) => `${modifier}-${color}-${shade}`)
     )
   );
 
-  const generatedGrayClasses = Object.keys(grayPalettes).flatMap((color) =>
+  const generatedGrayClasses = activeGrays.flatMap((color) =>
     colorShades.flatMap((shade) =>
       colorModifiers.map((modifier) => `${modifier}-${color}-${shade}`)
     )

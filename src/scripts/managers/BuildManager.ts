@@ -23,21 +23,27 @@ class BuildManager {
   private distPath: string;
   private initialized: boolean = false;
   private logger: Logger;
+  private production: boolean;
 
   /**
    * Creates a new BuildManager instance
    * @param fileManager The FileManager instance to use for file operations
    * @param distPath Optional path to the distribution directory
    * @param logger Logger instance; defaults to a console-backed logger if omitted
+   * @param options.production If true, esbuild minifies and emits external
+   *   sourcemaps for server bundles (client bundles never get sourcemaps);
+   *   Vite is invoked with `--mode production`. Defaults to false.
    */
   constructor(
     fileManager: FileManager,
     distPath: string = 'dist',
-    logger: Logger = createLogger({ prefix: 'BuildManager' })
+    logger: Logger = createLogger({ prefix: 'BuildManager' }),
+    options: { production?: boolean } = {}
   ) {
     this.fileManager = fileManager;
     this.distPath = path.resolve(distPath);
     this.logger = logger;
+    this.production = options.production ?? false;
   }
 
   /**
@@ -411,12 +417,23 @@ class BuildManager {
             outfile: outputPath,
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
-            minify: false,
-            // Inline sourcemaps only for server-side bundles. Client bundles
-            // are downloaded by every connecting FiveM player; shipping
-            // base64-encoded `sourcesContent` would leak the full TypeScript
-            // source of every client file to anyone who joins the server.
-            sourcemap: isServerScript ? 'inline' : false,
+            // Production builds minify everything. Dev builds stay readable
+            // so the watch-loop console traces are debuggable.
+            minify: this.production,
+            // Sourcemaps:
+            //   - Client bundles: never. They're downloaded by every player
+            //     who connects, and `sourcesContent` would leak full TS.
+            //   - Server bundles: external `.map` siblings in production
+            //     (smaller IIFE shipped to FXServer, .map kept on disk for
+            //     debugging) and inline in dev (single-file convenience).
+            //   - The `.map` filename doesn't match `client/*.js` /
+            //     `server/*.js` manifest globs, so it's never listed in
+            //     `client_scripts` and never shipped over the wire.
+            sourcemap: isServerScript
+              ? this.production
+                ? 'external'
+                : 'inline'
+              : false,
             loader,
             logLevel: 'info',
             external: externalPackages.concat(isServerScript ? ['canvas'] : []), // Add canvas as external for server scripts
@@ -536,8 +553,14 @@ class BuildManager {
             outfile: outputPath,
             format: 'iife', // Use IIFE format for FiveM compatibility
             target: 'es2017',
-            minify: false,
-            sourcemap: isServerScript ? 'inline' : false,
+            minify: this.production,
+            // See sourcemap rationale in `buildPluginTs`. JS-source plugins
+            // share the same client/server distinction.
+            sourcemap: isServerScript
+              ? this.production
+                ? 'external'
+                : 'inline'
+              : false,
             external: externalPackages,
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',
@@ -675,7 +698,11 @@ class BuildManager {
     outputDir: string,
     pluginPagePath: string
   ): Promise<void> {
-    const buildCommand = `npx vite build --outDir=${outputDir}`;
+    // `vite build` defaults to production mode (always minifies), but
+    // pass `--mode` explicitly so .env.production loading + downstream
+    // plugins see the right `import.meta.env.MODE`.
+    const mode = this.production ? 'production' : 'development';
+    const buildCommand = `npx vite build --mode=${mode} --outDir=${outputDir}`;
     this.logger.info(`Executing: ${buildCommand} (page=${pluginPagePath})`);
 
     const child = spawn(buildCommand, {
@@ -685,6 +712,7 @@ class BuildManager {
       env: {
         ...process.env,
         U_CORE_PLUGIN_PAGE: pluginPagePath,
+        NODE_ENV: this.production ? 'production' : 'development',
       },
     });
 
