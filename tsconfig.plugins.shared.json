@@ -1,21 +1,21 @@
 {
   "compilerOptions": {
     "composite": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.plugins.tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.plugins.shared.tsbuildinfo",
+    "outDir": "./node_modules/.tmp/typecheck/plugins.shared",
+    "declaration": true,
     "module": "es2022",
     "target": "es2022",
     "lib": ["es2022"],
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "allowUnreachableCode": false,
     "strictFunctionTypes": true,
-    "moduleResolution": "bundler",
     "noImplicitAny": true,
     "noImplicitThis": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
-    "typeRoots": ["node_modules/@types", "node_modules/@citizenfx"]
+    "types": []
   },
-  "include": ["./src/plugins/**/*", "./src/core/**/*"],
-  "exclude": ["./src/plugins/**/html/**/*"]
+  "include": ["src/plugins/**/shared/**/*"]
 }
