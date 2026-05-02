@@ -7,6 +7,7 @@ import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
 import { PluginManifest } from '../types/Manifest.js';
+import { Logger, createLogger } from '../Logger.js';
 import {
   PluginReloadManager,
   ReloadOptions,
@@ -21,15 +22,22 @@ class BuildManager {
   private fileManager: FileManager;
   private distPath: string;
   private initialized: boolean = false;
+  private logger: Logger;
 
   /**
    * Creates a new BuildManager instance
    * @param fileManager The FileManager instance to use for file operations
    * @param distPath Optional path to the distribution directory
+   * @param logger Logger instance; defaults to a console-backed logger if omitted
    */
-  constructor(fileManager: FileManager, distPath: string = 'dist') {
+  constructor(
+    fileManager: FileManager,
+    distPath: string = 'dist',
+    logger: Logger = createLogger({ prefix: 'BuildManager' })
+  ) {
     this.fileManager = fileManager;
     this.distPath = path.resolve(distPath);
+    this.logger = logger;
   }
 
   /**
@@ -44,12 +52,10 @@ class BuildManager {
       }
 
       this.initialized = true;
-      console.log('BuildManager initialized successfully');
+      this.logger.info('BuildManager initialized successfully');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error('Error initializing BuildManager:', error);
-      throw new Error(`Failed to initialize BuildManager: ${errorMessage}`);
+      this.logger.error('Failed to initialize BuildManager', error);
+      throw new Error('Failed to initialize BuildManager', { cause: error });
     }
   }
 
@@ -63,12 +69,12 @@ class BuildManager {
     try {
       this.reloadManager = new PluginReloadManager(options);
       await this.reloadManager.initialize();
-      console.log('✓ Reload manager initialized successfully');
+      this.logger.info('✓ Reload manager initialized successfully');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.warn(`⚠ Failed to initialize reload manager: ${errorMessage}`);
-      console.warn('Plugins will be built but not automatically reloaded');
+      this.logger.warn(`⚠ Failed to initialize reload manager: ${errorMessage}`);
+      this.logger.warn('Plugins will be built but not automatically reloaded');
       this.reloadManager = null;
     }
   }
@@ -98,9 +104,9 @@ class BuildManager {
       const result = await this.reloadManager.reloadPlugin(plugin);
 
       if (result.success) {
-        console.log(`✓ Plugin ${plugin.pluginName} reloaded successfully`);
+        this.logger.info(`✓ Plugin ${plugin.pluginName} reloaded successfully`);
       } else {
-        console.warn(
+        this.logger.warn(
           `⚠ Plugin ${plugin.pluginName} reload failed: ${result.message}`
         );
       }
@@ -109,7 +115,7 @@ class BuildManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error reloading plugin ${pluginNameOrPath}:`, error);
+      this.logger.error(`Error reloading plugin ${pluginNameOrPath}:`, error);
 
       return {
         success: false,
@@ -148,7 +154,7 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      console.log(`Building plugin: ${plugin.pluginName}`);
+      this.logger.info(`Building plugin: ${plugin.pluginName}`);
 
       const destDir = this.getPluginDestDir(plugin);
       tmpDir = `${destDir}.tmp.${process.pid}`;
@@ -176,27 +182,26 @@ class BuildManager {
       await fs.rename(tmpDir, destDir);
       tmpDir = undefined;
 
-      console.log(
+      this.logger.info(
         `✓ Plugin ${
           plugin.pluginName
         } built successfully to ${this.pathToDisplay(destDir)}`
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`Error building plugin ${pluginNameOrPath}:`, error);
+      this.logger.error(`Error building plugin ${pluginNameOrPath}`, error);
       if (tmpDir) {
         try {
           await fs.rm(tmpDir, { recursive: true, force: true });
         } catch (cleanupError) {
-          console.warn(
-            `⚠ Failed to clean up temp build dir ${tmpDir}: ${cleanupError}`
+          this.logger.warn(
+            `⚠ Failed to clean up temp build dir ${tmpDir}`,
+            cleanupError
           );
         }
       }
-      throw new Error(
-        `Failed to build plugin ${pluginNameOrPath}: ${errorMessage}`
-      );
+      throw new Error(`Failed to build plugin ${pluginNameOrPath}`, {
+        cause: error,
+      });
     }
 
     // After successful build, reload if requested
@@ -204,7 +209,7 @@ class BuildManager {
       try {
         await this.reloadPlugin(pluginNameOrPath);
       } catch (reloadError) {
-        console.warn(
+        this.logger.warn(
           `⚠ Plugin built successfully but reload failed: ${reloadError}`
         );
       }
@@ -238,19 +243,19 @@ class BuildManager {
       );
 
       if (luaFiles.length === 0) {
-        console.log(`No Lua files found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No Lua files found in plugin ${plugin.pluginName}`);
         return;
       }
 
       await this.copyFilesToDist(plugin, luaFiles, outputDir);
-      console.log(
+      this.logger.info(
         `✓ Built ${luaFiles.length} Lua file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building Lua files for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -258,7 +263,7 @@ class BuildManager {
           `Failed to build Lua files for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building Lua files for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );
@@ -297,19 +302,19 @@ class BuildManager {
       );
 
       if (jsonFiles.length === 0) {
-        console.log(`No JSON files found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No JSON files found in plugin ${plugin.pluginName}`);
         return;
       }
 
       await this.copyFilesToDist(plugin, jsonFiles, outputDir);
-      console.log(
+      this.logger.info(
         `✓ Built ${jsonFiles.length} JSON file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building JSON files for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -317,7 +322,7 @@ class BuildManager {
           `Failed to build JSON files for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building JSON files for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );
@@ -356,7 +361,7 @@ class BuildManager {
       );
 
       if (tsFiles.length === 0) {
-        console.log(`No TypeScript files found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No TypeScript files found in plugin ${plugin.pluginName}`);
         return;
       }
 
@@ -385,7 +390,7 @@ class BuildManager {
           '.js': 'js',
         };
 
-        console.log(`Bundling TypeScript file: ${relativePath}`);
+        this.logger.info(`Bundling TypeScript file: ${relativePath}`);
 
         try {
           // Bundle the file
@@ -406,10 +411,15 @@ class BuildManager {
 
           // Check for errors
           if (result.errors.length > 0) {
-            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
-            throw new Error(
-              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            const formatted = await this.logger.formatEsbuildErrors(
+              result.errors
             );
+            this.logger.error(
+              `Errors bundling ${file.fullPath}:\n${formatted.join('\n')}`
+            );
+            throw new Error(`Failed to bundle ${file.fullPath}`, {
+              cause: result.errors[0],
+            });
           }
 
           // Verify the file was created
@@ -419,22 +429,22 @@ class BuildManager {
             );
           }
         } catch (bundleError) {
-          console.error(
-            `Error bundling TypeScript file ${file.fullPath}:`,
+          this.logger.error(
+            `Error bundling TypeScript file ${file.fullPath}`,
             bundleError
           );
           throw bundleError;
         }
       }
 
-      console.log(
+      this.logger.info(
         `✓ Built ${tsFiles.length} TypeScript file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building TypeScript files for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -442,7 +452,7 @@ class BuildManager {
           `Failed to build TypeScript files for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building TypeScript files for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );
@@ -481,7 +491,7 @@ class BuildManager {
       );
 
       if (jsFiles.length === 0) {
-        console.log(`No JavaScript files found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No JavaScript files found in plugin ${plugin.pluginName}`);
         return;
       }
 
@@ -501,7 +511,7 @@ class BuildManager {
         const isServerScript = this.isServerScript(file.fullPath);
         const externalPackages = this.getExternalPackages(isServerScript);
 
-        console.log(`Bundling JavaScript file: ${relativePath}`);
+        this.logger.info(`Bundling JavaScript file: ${relativePath}`);
 
         try {
           // Bundle the file
@@ -520,10 +530,15 @@ class BuildManager {
 
           // Check for errors
           if (result.errors.length > 0) {
-            console.error(`Errors bundling ${file.fullPath}:`, result.errors);
-            throw new Error(
-              `Failed to bundle ${file.fullPath}: ${result.errors.join(', ')}`
+            const formatted = await this.logger.formatEsbuildErrors(
+              result.errors
             );
+            this.logger.error(
+              `Errors bundling ${file.fullPath}:\n${formatted.join('\n')}`
+            );
+            throw new Error(`Failed to bundle ${file.fullPath}`, {
+              cause: result.errors[0],
+            });
           }
 
           // Verify the file was created
@@ -533,22 +548,22 @@ class BuildManager {
             );
           }
         } catch (bundleError) {
-          console.error(
-            `Error bundling JavaScript file ${file.fullPath}:`,
+          this.logger.error(
+            `Error bundling JavaScript file ${file.fullPath}`,
             bundleError
           );
           throw bundleError;
         }
       }
 
-      console.log(
+      this.logger.info(
         `✓ Built ${jsFiles.length} JavaScript file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building JavaScript files for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -556,7 +571,7 @@ class BuildManager {
           `Failed to build JavaScript files for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building JavaScript files for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );
@@ -598,11 +613,11 @@ class BuildManager {
       );
 
       if (!pageTsxFile) {
-        console.log(`No Page.tsx file found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No Page.tsx file found in plugin ${plugin.pluginName}`);
         return;
       }
 
-      console.log(
+      this.logger.info(
         `Building webview for plugin ${plugin.pluginName} from ${pageTsxFile.displayPath}`
       );
 
@@ -627,7 +642,7 @@ class BuildManager {
         // Generate and write temporary App.tsx
         const appContent = this.generateAppTsxContent(srcDir, pageTsxFile);
         await fs.writeFile(appFilePath, appContent, 'utf-8');
-        console.log(
+        this.logger.info(
           `Generated temporary App.tsx for plugin ${plugin.pluginName}`
         );
 
@@ -635,7 +650,7 @@ class BuildManager {
         await this.ensureWebviewFiles(srcDir);
 
         // Run Vite build
-        console.log(`Running Vite build for plugin ${plugin.pluginName}...`);
+        this.logger.info(`Running Vite build for plugin ${plugin.pluginName}...`);
         await this.runViteBuild(htmlOutputDir);
 
         // Verify the build output
@@ -646,7 +661,7 @@ class BuildManager {
           );
         }
 
-        console.log(
+        this.logger.info(
           `✓ Built webview for plugin ${
             plugin.pluginName
           } to ${this.pathToDisplay(htmlOutputDir)}`
@@ -655,7 +670,7 @@ class BuildManager {
         // Restore the original App.tsx
         if (originalAppContent) {
           await fs.writeFile(appFilePath, originalAppContent, 'utf-8');
-          console.log(`Restored original App.tsx`);
+          this.logger.info(`Restored original App.tsx`);
         }
       }
     } catch (error) {
@@ -666,7 +681,7 @@ class BuildManager {
           ? pluginNameOrPath
           : pluginNameOrPath.pluginName;
 
-      console.error(`Error building webview for plugin ${pluginName}:`, error);
+      this.logger.error(`Error building webview for plugin ${pluginName}:`, error);
       throw new Error(
         `Failed to build webview for plugin ${pluginName}: ${errorMessage}`
       );
@@ -680,7 +695,7 @@ class BuildManager {
    */
   private async runViteBuild(outputDir: string): Promise<void> {
     const buildCommand = `npx vite build --outDir=${outputDir}`;
-    console.log(`Executing: ${buildCommand}`);
+    this.logger.info(`Executing: ${buildCommand}`);
 
     // Use spawn to run the build command
     const child = spawn(buildCommand, {
@@ -750,7 +765,7 @@ export default App;
       const sourcePath = path.join(webviewSrcDir, 'main.tsx');
       if (fsSync.existsSync(sourcePath)) {
         await fs.copyFile(sourcePath, mainTsxPath);
-        console.log(`Copied main.tsx from ${sourcePath}`);
+        this.logger.info(`Copied main.tsx from ${sourcePath}`);
       }
     }
 
@@ -760,7 +775,7 @@ export default App;
       const sourcePath = path.join(webviewSrcDir, 'index.html');
       if (fsSync.existsSync(sourcePath)) {
         await fs.copyFile(sourcePath, indexHtmlPath);
-        console.log(`Copied index.html from ${sourcePath}`);
+        this.logger.info(`Copied index.html from ${sourcePath}`);
       }
     }
 
@@ -770,7 +785,7 @@ export default App;
       const sourcePath = path.join(webviewSrcDir, 'index.css');
       if (fsSync.existsSync(sourcePath)) {
         await fs.copyFile(sourcePath, indexCssPath);
-        console.log(`Copied index.css from ${sourcePath}`);
+        this.logger.info(`Copied index.css from ${sourcePath}`);
       }
     }
   }
@@ -869,34 +884,34 @@ export default App;
       const plugins = this.fileManager.getAllPlugins();
 
       if (plugins.length === 0) {
-        console.log('No plugins found to build');
+        this.logger.info('No plugins found to build');
         return;
       }
 
-      console.log(`Building all ${plugins.length} plugins...`);
+      this.logger.info(`Building all ${plugins.length} plugins...`);
 
       for (const plugin of plugins) {
         await this.buildPlugin(plugin.fullPath);
       }
 
-      console.log(`✓ All ${plugins.length} plugins built successfully`);
+      this.logger.info(`✓ All ${plugins.length} plugins built successfully`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error('Error building all plugins:', error);
+      this.logger.error('Error building all plugins:', error);
       throw new Error(`Failed to build all plugins: ${errorMessage}`);
     }
 
     // After all plugins are built, reload them if requested
     if (reload && this.reloadManager) {
       try {
-        console.log('\n🔄 Reloading all resources...');
+        this.logger.info('\n🔄 Reloading all resources...');
         const result = await this.reloadManager.reloadAllResources();
 
         if (result.success) {
-          console.log('✓ All resources reloaded successfully');
+          this.logger.info('✓ All resources reloaded successfully');
         } else {
-          console.warn('⚠ Some resources failed to reload');
+          this.logger.warn('⚠ Some resources failed to reload');
 
           // Log failed resources
           if (result.results) {
@@ -905,14 +920,14 @@ export default App;
               .map(([name]) => name);
 
             if (failedResources.length > 0) {
-              console.warn('Failed resources:', failedResources.join(', '));
+              this.logger.warn('Failed resources:', failedResources.join(', '));
             }
           }
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        console.warn(`⚠ Error reloading resources: ${errorMessage}`);
+        this.logger.warn(`⚠ Error reloading resources: ${errorMessage}`);
       }
     }
   }
@@ -1016,7 +1031,7 @@ export default App;
     this.ensureInitialized();
 
     try {
-      console.log(
+      this.logger.info(
         `Cleaning dist directory: ${this.pathToDisplay(this.distPath)}`
       );
 
@@ -1029,11 +1044,11 @@ export default App;
         await fs.mkdir(this.distPath, { recursive: true });
       }
 
-      console.log('✓ Dist directory cleaned successfully');
+      this.logger.info('✓ Dist directory cleaned successfully');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error('Error cleaning dist directory:', error);
+      this.logger.error('Error cleaning dist directory:', error);
       throw new Error(`Failed to clean dist directory: ${errorMessage}`);
     }
   }
@@ -1113,7 +1128,7 @@ export default App;
 
       // Check if the plugin has a manifest
       if (!plugin.manifest) {
-        console.warn(
+        this.logger.warn(
           `No manifest found for plugin ${plugin.pluginName}, skipping fxmanifest.lua generation`
         );
         return;
@@ -1132,12 +1147,12 @@ export default App;
       const manifestPath = path.join(destDir, 'fxmanifest.lua');
       await fs.writeFile(manifestPath, manifestContent, 'utf-8');
 
-      console.log(`✓ Generated fxmanifest.lua for plugin ${plugin.pluginName}`);
+      this.logger.info(`✓ Generated fxmanifest.lua for plugin ${plugin.pluginName}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building manifest for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -1145,7 +1160,7 @@ export default App;
           `Failed to build manifest for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building manifest for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );
@@ -1518,11 +1533,11 @@ export default App;
       );
 
       for (const file of otherFiles) {
-        console.log(`Copying other file: ${file.fileName}`);
+        this.logger.info(`Copying other file: ${file.fileName}`);
       }
 
       if (otherFiles.length === 0) {
-        console.log(`No other files found in plugin ${plugin.pluginName}`);
+        this.logger.info(`No other files found in plugin ${plugin.pluginName}`);
         return;
       }
 
@@ -1537,19 +1552,19 @@ export default App;
         .map(([ext, count]) => `${count} ${ext || '(no extension)'} file(s)`)
         .join(', ');
 
-      console.log(
+      this.logger.info(
         `Copying other files for plugin ${plugin.pluginName}: ${extensionSummary}`
       );
 
       await this.copyFilesToDist(plugin, otherFiles, outputDir);
-      console.log(
+      this.logger.info(
         `✓ Built ${otherFiles.length} other file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (typeof pluginNameOrPath === 'string') {
-        console.error(
+        this.logger.error(
           `Error building other files for plugin ${pluginNameOrPath}:`,
           error
         );
@@ -1557,7 +1572,7 @@ export default App;
           `Failed to build other files for plugin ${pluginNameOrPath}: ${errorMessage}`
         );
       } else {
-        console.error(
+        this.logger.error(
           `Error building other files for plugin ${pluginNameOrPath.pluginName}:`,
           error
         );

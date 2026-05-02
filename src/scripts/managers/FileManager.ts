@@ -6,6 +6,7 @@ import { glob } from 'glob'; // For pattern matching in file paths
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
 import { PluginManifest, BasicPluginManifest } from '../types/Manifest.js';
+import { Logger, createLogger } from '../Logger.js';
 
 /**
  * File manager
@@ -16,6 +17,7 @@ class FileManager {
   // Removed projectRoot and gitignore properties
   private plugins: Map<string, Plugin> = new Map();
   private files: Map<string, File> = new Map();
+  private logger: Logger;
 
   // Map of full path to plugin for efficient lookups
   private pathToPlugin: Map<string, Plugin> = new Map();
@@ -23,9 +25,14 @@ class FileManager {
   /**
    * Creates a new FileManager instance
    * @param rootPath Path to the plugins directory
+   * @param logger Logger instance; defaults to a console-backed logger if omitted
    */
-  constructor(rootPath: string = 'src/plugins') {
+  constructor(
+    rootPath: string = 'src/plugins',
+    logger: Logger = createLogger({ prefix: 'FileManager' })
+  ) {
     this.rootPath = path.resolve(rootPath); // Reverted to original initialization
+    this.logger = logger;
   }
 
   /**
@@ -36,14 +43,12 @@ class FileManager {
     try {
       // Removed loadGitignore call
       await this.scanPlugins();
-      console.log(
+      this.logger.info(
         `FileManager initialized with ${this.plugins.size} plugins and ${this.files.size} files` // Reverted log message
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error('Error initializing FileManager:', error);
-      throw new Error(`Failed to initialize FileManager: ${errorMessage}`);
+      this.logger.error('Failed to initialize FileManager', error);
+      throw new Error('Failed to initialize FileManager', { cause: error });
     }
   }
 
@@ -71,9 +76,6 @@ class FileManager {
       }
     }
 
-    console.log(`Original path: ${pathStr}`);
-    console.log(`Escaped path: ${result}`);
-
     return result;
   }
 
@@ -98,7 +100,7 @@ class FileManager {
       const pluginJsonPaths = await glob(pluginJsonPattern, options);
 
       if (pluginJsonPaths.length === 0) {
-        console.warn(
+        this.logger.warn(
           `No plugins found in ${this.pathToDisplay(this.rootPath)}`
         );
       }
@@ -115,7 +117,7 @@ class FileManager {
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : String(error);
-            console.warn(
+            this.logger.warn(
               `Warning: Failed to load manifest for plugin ${plugin.pluginName}: ${errorMessage}`
             );
           }
@@ -124,7 +126,7 @@ class FileManager {
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(
+          this.logger.error(
             `Error registering plugin at ${this.pathToDisplay(
               pluginJsonPath
             )}:`,
@@ -136,7 +138,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error('Error scanning plugins:', error);
+      this.logger.error('Error scanning plugins:', error);
       throw new Error(`Failed to scan plugins: ${errorMessage}`);
     }
   }
@@ -153,7 +155,7 @@ class FileManager {
       try {
         return JSON.parse(manifestContent) as PluginManifest;
       } catch (parseError) {
-        console.warn(
+        this.logger.warn(
           `Warning: Invalid JSON in plugin manifest at ${this.pathToDisplay(
             manifestPath
           )}`
@@ -239,7 +241,7 @@ class FileManager {
 
         // Manually ignore node_modules directories
         if (entry.isDirectory() && entry.name === 'node_modules') {
-          // console.log(`Ignoring node_modules directory: ${fullPath}`); // Optional debug log
+          // this.logger.info(`Ignoring node_modules directory: ${fullPath}`); // Optional debug log
           continue; // Skip this directory
         }
 
@@ -262,7 +264,7 @@ class FileManager {
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${currentDir}:`, error);
+      this.logger.error(`Error scanning directory ${currentDir}:`, error);
     }
   }
 
@@ -441,7 +443,7 @@ class FileManager {
       plugin.manifest = manifest; // Cache for future use
       return manifest;
     } catch (error) {
-      console.warn(
+      this.logger.warn(
         `Warning: Could not load manifest for plugin ${plugin.pluginName}`
       );
       return undefined;
@@ -465,7 +467,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      this.logger.error(
         `Error reading file ${this.pathToDisplay(filePath)}:`,
         error
       );
@@ -517,7 +519,7 @@ class FileManager {
           try {
             plugin.manifest = JSON.parse(content) as PluginManifest;
           } catch (error) {
-            console.warn(
+            this.logger.warn(
               `Warning: Invalid JSON in new plugin.json for plugin ${plugin.pluginName}`
             );
           }
@@ -531,7 +533,7 @@ class FileManager {
           try {
             file.plugin.manifest = JSON.parse(content) as PluginManifest;
           } catch (error) {
-            console.warn(
+            this.logger.warn(
               `Warning: Invalid JSON in updated plugin.json for plugin ${file.plugin.pluginName}`
             );
           }
@@ -542,7 +544,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      this.logger.error(
         `Error writing file ${this.pathToDisplay(filePath)}:`,
         error
       );
@@ -587,7 +589,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      this.logger.error(
         `Error deleting file ${this.pathToDisplay(filePath)}:`,
         error
       );
@@ -656,7 +658,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      this.logger.error(
         `Error copying file ${this.pathToDisplay(
           sourceFilePath
         )} to ${this.pathToDisplay(destinationFilePath)}:`,
@@ -733,7 +735,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error creating plugin ${pluginName}:`, error);
+      this.logger.error(`Error creating plugin ${pluginName}:`, error);
       throw new Error(`Failed to create plugin ${pluginName}: ${errorMessage}`);
     }
   }
@@ -788,7 +790,7 @@ class FileManager {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`Error removing plugin ${pluginNameOrPath}:`, error);
+      this.logger.error(`Error removing plugin ${pluginNameOrPath}:`, error);
       throw new Error(
         `Failed to remove plugin ${pluginNameOrPath}: ${errorMessage}`
       );
@@ -904,7 +906,7 @@ class FileManager {
       try {
         reloadedPlugin.manifest = await this.loadPluginManifest(manifestPath);
       } catch (error) {
-        console.warn(
+        this.logger.warn(
           `Warning: Failed to load manifest for plugin at ${this.pathToDisplay(
             manifestPath
           )}: ${error}`
@@ -914,11 +916,11 @@ class FileManager {
       // Re-scan the plugin files
       await this.scanPluginFiles(reloadedPlugin);
 
-      console.log(`Plugin reloaded successfully: ${reloadedPlugin.pluginName}`);
+      this.logger.info(`Plugin reloaded successfully: ${reloadedPlugin.pluginName}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      this.logger.error(
         `Error reloading plugin at ${this.pathToDisplay(pluginPath)}:`,
         error
       );
