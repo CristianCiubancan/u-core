@@ -124,7 +124,7 @@
       "title": "Drop client-side inline sourcemaps; remove dotenv from in-game server",
       "phase": "A",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "Operators must add `setr reloader_api_key \"<value>\"` (or equivalent convar) to `server.cfg` after this lands; `.env`-based config is no longer read by the in-game core server."
@@ -155,10 +155,12 @@
       ],
       "branch_name": "audit/pr-03-drop-client-sourcemaps-dotenv",
       "commit_message": "fix(build,core): drop client inline sourcemaps; read API key via GetConvar",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T00:31:00Z",
+      "completed_at": "2026-05-02T00:50:00Z",
+      "commit_shas": ["86f41e81e2cb5435a62f9cff64fb00d6e97afbd2"],
+      "notes": [
+        {"ts": "2026-05-02T00:50:00Z", "phase": "discovery", "issue": "PR-01 also touches src/plugins/[default]/core/server/index.ts (lines 1-14) — when both branches are merged, expect a conflict in the import block and API_KEY constant. Both changes are compatible (PR-01's placeholder rejection + timingSafeEqual + listen('127.0.0.1') wraps the same key value PR-03 now reads via GetConvar)."}
+      ]
     },
     {
       "id": "PR-04",
