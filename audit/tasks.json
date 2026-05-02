@@ -345,7 +345,7 @@
       "title": "Docker multi-stage + healthchecks + log rotation + base bumps",
       "phase": "A",
       "effort": "S",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [
         "When `BINARIES_ARCHIVE_URL` is bumped, the committed FXServer tarball SHA-256 checksum must be refreshed in the same commit. This step is manual."
@@ -385,10 +385,13 @@
       ],
       "branch_name": "audit/pr-08-docker-hardening",
       "commit_message": "chore(docker): multi-stage build, healthchecks, log rotation, non-root runtime",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-02T00:51:00Z",
+      "completed_at": "2026-05-02T01:15:00Z",
+      "commit_shas": ["ebf06944104c3986612dbe96f173a960f7bea366"],
+      "notes": [
+        {"ts": "2026-05-02T01:15:00Z", "phase": "implement", "issue": "Pinned Dockerfile ARG to FXServer build 13890 (sha256 7ebdc1ac...) — the build I could verify by direct download. Master's pre-existing Dockerfile referenced build 14482 with no committed sha. Reconciliation between Dockerfile ARG default and .env.example URL is PR-01's scope; PR-08 only touches Dockerfile/compose. Operators bumping FXServer must refresh fxserver.sha256 in the same commit."},
+        {"ts": "2026-05-02T01:15:00Z", "phase": "implement", "issue": "Compose volume mount changed: ./txData:/root/binaries/txData → ./txData:/home/fivem/binaries/txData to match the non-root runtime path. Existing operators with running stacks need to `docker compose down` before pulling this change."}
+      ]
     },
     {
       "id": "PR-09",
