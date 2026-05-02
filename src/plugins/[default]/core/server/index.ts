@@ -4,14 +4,35 @@ import * as http from 'http';
 import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
-// Simple authentication - you should use a more secure method in production
-const API_KEY = process.env.RELOADER_API_KEY || '***SCRUBBED***';
-console.log(
-  `[resource-manager] API_KEY is ${
-    API_KEY ? 'configured' : 'using default value'
-  }`
-);
+// Refuse to start without an explicitly-configured key. The previous fallback
+// to a literal `***SCRUBBED***` placeholder meant any operator who skipped
+// env config exposed an unauthenticated remote-resource-control endpoint.
+const PLACEHOLDER_API_KEYS = new Set(['<replace-me>', '***SCRUBBED***']);
+const RAW_API_KEY = process.env.RELOADER_API_KEY ?? '';
+if (!RAW_API_KEY || PLACEHOLDER_API_KEYS.has(RAW_API_KEY)) {
+  const reason = !RAW_API_KEY
+    ? 'unset or empty'
+    : `equal to placeholder "${RAW_API_KEY}"`;
+  console.error(
+    `[resource-manager] RELOADER_API_KEY is ${reason}. Refusing to start. ` +
+      `Set RELOADER_API_KEY in .env to a CSPRNG-generated value (e.g. ` +
+      `\`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"\`).`
+  );
+  throw new Error('RELOADER_API_KEY is unset or set to placeholder');
+}
+const API_KEY = RAW_API_KEY;
+const API_KEY_BUFFER = Buffer.from(API_KEY, 'utf8');
+console.log('[resource-manager] API_KEY is configured');
+
+function constantTimeKeyEqual(provided: string): boolean {
+  const providedBuffer = Buffer.from(provided, 'utf8');
+  if (providedBuffer.length !== API_KEY_BUFFER.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(providedBuffer, API_KEY_BUFFER);
+}
 
 // File watcher for auto-reload on rebuilds
 const WATCH_PATHS = ['dist'];
@@ -172,23 +193,12 @@ function restartAllResources(): {
   };
 }
 
-// Create HTTP server
+// Create HTTP server. Bound to localhost only; the reload endpoint is a
+// developer feature, not a public API, so no CORS headers are emitted.
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url || '', true);
   const path = parsedUrl.pathname;
   const query = parsedUrl.query;
-
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Handle OPTIONS preflight requests
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
 
   // Log incoming requests
   console.log(`[resource-manager] Received ${req.method} request to ${path}`);
@@ -197,7 +207,7 @@ const server = http.createServer((req, res) => {
   const authHeader = req.headers.authorization || '';
   const providedKey = authHeader.replace('Bearer ', '');
 
-  if (providedKey !== API_KEY) {
+  if (!constantTimeKeyEqual(providedKey)) {
     console.error(
       `[resource-manager] Authentication failed - invalid API key provided`
     );
@@ -279,12 +289,14 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// Start the server on port 3414
+// Start the server on port 3414, bound to localhost only. The Docker compose
+// publish maps `127.0.0.1:3414:3414`, so cross-host reach requires SSH
+// tunneling (or an explicit deployment-time change to both layers).
 const PORT = GetConvarInt('resource_manager_port', 3414);
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(
-    `[resource-manager] Resource management server running on port ${PORT}`
+    `[resource-manager] Resource management server running on 127.0.0.1:${PORT}`
   );
 
   // Initialize file monitoring

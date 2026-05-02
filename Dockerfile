@@ -8,8 +8,10 @@ RUN apt-get update && apt-get install -y \
     xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
-# Build arguments for URLs (these can be overridden at build time)
-ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/14482-1eed77dd20d49bab1a41f89427adafea7781a3fd/fx.tar.xz
+# Build arguments for URLs (these can be overridden at build time).
+# Keep this default in sync with .env.example's BINARIES_ARCHIVE_URL — bump
+# both together when upgrading FXServer.
+ARG BINARIES_ARCHIVE_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/25770-8ddccd4e4dfd6a760ce18651656463f961cc4761/fx.tar.xz
 ARG SERVER_DATA_REPO_URL=https://github.com/citizenfx/cfx-server-data
 
 # Optionally, set environment variables (if your start.sh or runtime logic requires them)

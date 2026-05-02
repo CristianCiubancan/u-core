@@ -9,7 +9,8 @@ services:
       - '30120:30120/tcp'
       - '30120:30120/udp'
       - '40120:40120/tcp'
-      - '3414:3414'
+      # Reload endpoint is a developer feature; bind to localhost only.
+      - '127.0.0.1:3414:3414'
     volumes:
       - ./txData:/root/binaries/txData
     restart: unless-stopped
@@ -28,8 +29,9 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     restart: unless-stopped
-    ports:
-      - '3306:3306'
+    # No host port publish: fivem service reaches the DB on the internal
+    # compose network at host `db:3306`. Add a localhost-bound publish here
+    # only when you need an external client (and prefer SSH tunneling).
 
 volumes:
   db_data:
