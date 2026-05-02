@@ -5,35 +5,45 @@ const compression = require('compression');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// Load environment variables
 dotenv.config();
 
-// Create Express app
 const app = express();
 
-// Configuration
 const config = {
   port: process.env.PORT || 3000,
+  host: process.env.ASSET_SERVER_HOST || '127.0.0.1',
   publicDir: path.join(__dirname, 'public'),
   defaultQuality: process.env.DEFAULT_QUALITY || 'medium',
-  cacheMaxAge: process.env.CACHE_MAX_AGE || 86400, // 1 day in seconds
+  cacheMaxAge: Number.parseInt(process.env.CACHE_MAX_AGE, 10) || 86400,
   compressionLevel: 6,
-  thumbnailSuffix: '-thumbnail', // Suffix for thumbnail directories
+  thumbnailSuffix: '-thumbnail',
+  authToken: process.env.ASSET_SERVER_TOKEN || '',
 };
 
-// Middleware
 app.use(cors());
 app.use(compression({ level: config.compressionLevel }));
 
-// Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   next();
 });
 
-// Logging middleware
+// TODO(auth): replace this stub with a real token-validation hook (JWT / shared
+// secret behind a reverse proxy). For now: if ASSET_SERVER_TOKEN is set, every
+// request must present it via `?token=` or the `x-asset-token` header. If it
+// is unset, the middleware is a no-op and requests are accepted (preserves the
+// existing local-dev workflow). Tracked in synthesis A-2 / PR-02.
+app.use((req, res, next) => {
+  if (!config.authToken) return next();
+  const provided = req.get('x-asset-token') || req.query.token;
+  if (provided !== config.authToken) {
+    return res.status(401).send('Unauthorized');
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -43,151 +53,150 @@ app.use((req, res, next) => {
   next();
 });
 
-// Check if public directory exists
-if (!fs.existsSync(config.publicDir)) {
+const dirExists = (p) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+if (!dirExists(config.publicDir)) {
   console.error(`Public directory not found: ${config.publicDir}`);
   console.error('Please run the optimization script first: npm run optimize');
   process.exit(1);
 }
 
-// Check if quality subdirectories exist
 const qualityDirs = ['high', 'medium', 'low', 'tiny'];
 for (const dir of qualityDirs) {
   const qualityDir = path.join(config.publicDir, dir);
-  if (!fs.existsSync(qualityDir)) {
+  if (!dirExists(qualityDir)) {
     console.warn(`Quality directory not found: ${qualityDir}`);
   }
 
-  // Check for thumbnail directories
   const thumbnailDir = path.join(
     config.publicDir,
     `${dir}${config.thumbnailSuffix}`
   );
-  if (!fs.existsSync(thumbnailDir)) {
+  if (!dirExists(thumbnailDir)) {
     console.warn(`Thumbnail directory not found: ${thumbnailDir}`);
     console.warn(`Run 'npm run thumbnails' to generate thumbnails.`);
   }
 }
 
-// Route to serve optimized assets
-app.get('/assets/:quality/*', (req, res) => {
-  const quality = req.params.quality;
-  const assetPath = req.params[0];
+const sendOptions = (root) => ({ root, dotfiles: 'deny' });
 
-  // Validate quality parameter
-  if (!qualityDirs.includes(quality)) {
-    return res
-      .status(400)
-      .send(
-        `Invalid quality parameter. Must be one of: ${qualityDirs.join(', ')}`
-      );
-  }
-
-  // Construct the file path
-  const filePath = path.join(config.publicDir, quality, assetPath);
-
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send('Asset not found');
-  }
-
-  // Set cache headers
+const sendScoped = (res, root, assetPath, notFoundMsg) => {
   res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-
-  // Send the file
-  res.sendFile(filePath);
-});
-
-// Route to serve thumbnail assets
-app.get('/thumbnails/:quality/*', (req, res) => {
-  const quality = req.params.quality;
-  const assetPath = req.params[0];
-
-  // Validate quality parameter
-  if (!qualityDirs.includes(quality)) {
-    return res
-      .status(400)
-      .send(
-        `Invalid quality parameter. Must be one of: ${qualityDirs.join(', ')}`
-      );
-  }
-
-  // Construct the file path with thumbnail suffix
-  const thumbnailDir = `${quality}${config.thumbnailSuffix}`;
-  const filePath = path.join(config.publicDir, thumbnailDir, assetPath);
-
-  // Check if thumbnail exists
-  if (!fs.existsSync(filePath)) {
-    // If thumbnail doesn't exist, try to serve the regular image
-    const regularFilePath = path.join(config.publicDir, quality, assetPath);
-    if (fs.existsSync(regularFilePath)) {
-      // Set cache headers
-      res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-      // Send the regular file as fallback
-      return res.sendFile(regularFilePath);
+  res.sendFile(assetPath, sendOptions(root), (err) => {
+    if (!err) return;
+    if (res.headersSent) return;
+    if (err.status === 404 || err.code === 'ENOENT') {
+      return res.status(404).send(notFoundMsg);
     }
-    return res.status(404).send('Thumbnail not found');
+    if (err.status === 403) {
+      return res.status(403).send('Forbidden');
+    }
+    return res.status(err.status || 500).send('Asset error');
+  });
+};
+
+app.get('/assets/:quality/*', (req, res) => {
+  const { quality } = req.params;
+  const assetPath = req.params[0];
+
+  if (!qualityDirs.includes(quality)) {
+    return res
+      .status(400)
+      .send(
+        `Invalid quality parameter. Must be one of: ${qualityDirs.join(', ')}`
+      );
   }
 
-  // Set cache headers
-  res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-
-  // Send the thumbnail file
-  res.sendFile(filePath);
+  const root = path.join(config.publicDir, quality);
+  sendScoped(res, root, assetPath, 'Asset not found');
 });
 
-// Route to serve thumbnails with default quality
+app.get('/thumbnails/:quality/*', (req, res) => {
+  const { quality } = req.params;
+  const assetPath = req.params[0];
+
+  if (!qualityDirs.includes(quality)) {
+    return res
+      .status(400)
+      .send(
+        `Invalid quality parameter. Must be one of: ${qualityDirs.join(', ')}`
+      );
+  }
+
+  const thumbRoot = path.join(
+    config.publicDir,
+    `${quality}${config.thumbnailSuffix}`
+  );
+  const fallbackRoot = path.join(config.publicDir, quality);
+
+  res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
+  res.sendFile(assetPath, sendOptions(thumbRoot), (err) => {
+    if (!err) return;
+    if (res.headersSent) return;
+    if (err.status === 404 || err.code === 'ENOENT') {
+      return res.sendFile(assetPath, sendOptions(fallbackRoot), (err2) => {
+        if (!err2) return;
+        if (res.headersSent) return;
+        if (err2.status === 404 || err2.code === 'ENOENT') {
+          return res.status(404).send('Thumbnail not found');
+        }
+        if (err2.status === 403) {
+          return res.status(403).send('Forbidden');
+        }
+        return res.status(err2.status || 500).send('Asset error');
+      });
+    }
+    if (err.status === 403) {
+      return res.status(403).send('Forbidden');
+    }
+    return res.status(err.status || 500).send('Asset error');
+  });
+});
+
 app.get('/thumbnails/*', (req, res) => {
   const assetPath = req.params[0];
-  const thumbnailDir = `${config.defaultQuality}${config.thumbnailSuffix}`;
-  const filePath = path.join(config.publicDir, thumbnailDir, assetPath);
+  const thumbRoot = path.join(
+    config.publicDir,
+    `${config.defaultQuality}${config.thumbnailSuffix}`
+  );
+  const fallbackRoot = path.join(config.publicDir, config.defaultQuality);
 
-  // Check if thumbnail exists
-  if (!fs.existsSync(filePath)) {
-    // If thumbnail doesn't exist, try to serve the regular image
-    const regularFilePath = path.join(
-      config.publicDir,
-      config.defaultQuality,
-      assetPath
-    );
-    if (fs.existsSync(regularFilePath)) {
-      // Set cache headers
-      res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-      // Send the regular file as fallback
-      return res.sendFile(regularFilePath);
-    }
-    return res.status(404).send('Thumbnail not found');
-  }
-
-  // Set cache headers
   res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-
-  // Send the thumbnail file
-  res.sendFile(filePath);
+  res.sendFile(assetPath, sendOptions(thumbRoot), (err) => {
+    if (!err) return;
+    if (res.headersSent) return;
+    if (err.status === 404 || err.code === 'ENOENT') {
+      return res.sendFile(assetPath, sendOptions(fallbackRoot), (err2) => {
+        if (!err2) return;
+        if (res.headersSent) return;
+        if (err2.status === 404 || err2.code === 'ENOENT') {
+          return res.status(404).send('Thumbnail not found');
+        }
+        if (err2.status === 403) {
+          return res.status(403).send('Forbidden');
+        }
+        return res.status(err2.status || 500).send('Asset error');
+      });
+    }
+    if (err.status === 403) {
+      return res.status(403).send('Forbidden');
+    }
+    return res.status(err.status || 500).send('Asset error');
+  });
 });
 
-// Route to serve assets with default quality
 app.get('/assets/*', (req, res) => {
   const assetPath = req.params[0];
-  const filePath = path.join(
-    config.publicDir,
-    config.defaultQuality,
-    assetPath
-  );
-
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send('Asset not found');
-  }
-
-  // Set cache headers
-  res.setHeader('Cache-Control', `public, max-age=${config.cacheMaxAge}`);
-
-  // Send the file
-  res.sendFile(filePath);
+  const root = path.join(config.publicDir, config.defaultQuality);
+  sendScoped(res, root, assetPath, 'Asset not found');
 });
 
-// Root route
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -254,9 +263,13 @@ app.get('/', (req, res) => {
   `);
 });
 
-// Start the server
-app.listen(config.port, () => {
-  console.log(`Asset server running at http://localhost:${config.port}`);
+app.listen(config.port, config.host, () => {
+  console.log(`Asset server running at http://${config.host}:${config.port}`);
   console.log(`Serving optimized assets from: ${config.publicDir}`);
   console.log(`Default quality: ${config.defaultQuality}`);
+  if (!config.authToken) {
+    console.warn(
+      '[asset-server] ASSET_SERVER_TOKEN not set — auth middleware is a pass-through (dev mode).'
+    );
+  }
 });
