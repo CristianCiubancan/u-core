@@ -1,18 +1,53 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
+import { builtinModules } from 'module';
 import * as esbuild from 'esbuild';
 import { spawn } from 'child_process';
+import { minimatch } from 'minimatch';
 import { FileManager } from './FileManager.js';
 import { Plugin } from '../types/Plugin.js';
 import { File } from '../types/File.js';
-import { PluginManifest } from '../types/Manifest.js';
+import { PluginManifest, ScriptList } from '../types/Manifest.js';
 import { Logger, createLogger } from '../Logger.js';
 import {
   PluginReloadManager,
   ReloadOptions,
   ReloadResult,
 } from './PluginReloadManager.js';
+
+type EntryPlatform = 'client' | 'server' | 'shared';
+
+interface ScriptEntry {
+  file: File;
+  platform: EntryPlatform;
+}
+
+/**
+ * Detect the legacy stub `Page.tsx` shape:
+ *   export default function Page() { return <div></div>; }
+ * Stubs trigger a full Vite cold-start that produces a webview with no
+ * meaningful contents — about a third of the cold-build time on a 4-plugin
+ * tree. When the page is structurally empty we emit a tiny placeholder
+ * `index.html` instead.
+ */
+function isStubPageTsx(source: string): boolean {
+  const collapsed = source.replace(/\s+/g, ' ').trim();
+  return /^export\s+default\s+function\s+\w+\s*\(\s*\)\s*\{\s*return\s*<div>\s*<\/div>\s*;?\s*\}\s*;?\s*$/.test(
+    collapsed
+  );
+}
+
+/**
+ * Externalize every Node built-in, both bare (`http`) and `node:`-prefixed
+ * (`node:http`). Without the prefixed variant, `import 'node:fs'` falls
+ * through esbuild's bundle path and ends up either failing at runtime or
+ * being stubbed by esbuild's polyfill.
+ */
+const NODE_BUILTIN_EXTERNALS: string[] = [
+  ...builtinModules,
+  ...builtinModules.map((m) => `node:${m}`),
+];
 
 /**
  * Build manager
@@ -368,21 +403,26 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      // Get all TypeScript files (excluding .tsx files which are handled separately)
-      const tsFiles = plugin.files.filter(
-        (file) =>
-          file.fileName.endsWith('.ts') && !file.fileName.endsWith('.tsx')
+      // Manifest-driven entries: only files explicitly declared in
+      // `client_scripts`/`server_scripts`/`shared_scripts` become bundles.
+      // The previous tree-walked behavior also emitted shared/, html/,
+      // and any stray .ts file as standalone IIFEs (~31 MB of dead disk
+      // for character-create alone).
+      const tsEntries = this.getScriptEntries(plugin).filter(
+        (e) =>
+          e.file.fileName.endsWith('.ts') && !e.file.fileName.endsWith('.tsx')
       );
 
-      if (tsFiles.length === 0) {
+      if (tsEntries.length === 0) {
         this.logger.info(`No TypeScript files found in plugin ${plugin.pluginName}`);
         return;
       }
 
       const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
-      // Process each TypeScript file
-      for (const file of tsFiles) {
+      // Process each TypeScript entry
+      for (const entry of tsEntries) {
+        const file = entry.file;
         // Get the relative path within the plugin
         const relativePath = path.relative(plugin.fullPath, file.fullPath);
 
@@ -394,8 +434,11 @@ class BuildManager {
         const outputDir = path.dirname(outputPath);
         await fs.mkdir(outputDir, { recursive: true });
 
-        // Determine if this is a server-side script
-        const isServerScript = this.isServerScript(file.fullPath);
+        // Server vs. client now flows from the manifest entry, not from a
+        // path-substring sniff. `shared_scripts` runs on whichever side
+        // requires it; FiveM treats it as both, so we bundle for browser
+        // (matches the previous default for `shared/`).
+        const isServerScript = entry.platform === 'server';
         const externalPackages = this.getExternalPackages(isServerScript);
 
         // Configure loader based on file type
@@ -456,7 +499,7 @@ class BuildManager {
       }
 
       this.logger.info(
-        `✓ Built ${tsFiles.length} TypeScript file(s) for plugin ${plugin.pluginName}`
+        `✓ Built ${tsEntries.length} TypeScript file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
@@ -502,21 +545,22 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      // Get all JavaScript files (excluding .jsx files)
-      const jsFiles = plugin.files.filter(
-        (file) =>
-          file.fileName.endsWith('.js') && !file.fileName.endsWith('.jsx')
+      // Manifest-driven entries: only declared JS files become bundles.
+      const jsEntries = this.getScriptEntries(plugin).filter(
+        (e) =>
+          e.file.fileName.endsWith('.js') && !e.file.fileName.endsWith('.jsx')
       );
 
-      if (jsFiles.length === 0) {
+      if (jsEntries.length === 0) {
         this.logger.info(`No JavaScript files found in plugin ${plugin.pluginName}`);
         return;
       }
 
       const destDir = outputDir ?? this.getPluginDestDir(plugin);
 
-      // Process each JavaScript file
-      for (const file of jsFiles) {
+      // Process each JavaScript entry
+      for (const entry of jsEntries) {
+        const file = entry.file;
         // Get the relative path within the plugin
         const relativePath = path.relative(plugin.fullPath, file.fullPath);
         const outputPath = path.join(destDir, relativePath);
@@ -525,8 +569,7 @@ class BuildManager {
         const outputDir = path.dirname(outputPath);
         await fs.mkdir(outputDir, { recursive: true });
 
-        // Determine if this is a server-side script
-        const isServerScript = this.isServerScript(file.fullPath);
+        const isServerScript = entry.platform === 'server';
         const externalPackages = this.getExternalPackages(isServerScript);
 
         this.logger.info(`Bundling JavaScript file: ${relativePath}`);
@@ -575,7 +618,7 @@ class BuildManager {
       }
 
       this.logger.info(
-        `✓ Built ${jsFiles.length} JavaScript file(s) for plugin ${plugin.pluginName}`
+        `✓ Built ${jsEntries.length} JavaScript file(s) for plugin ${plugin.pluginName}`
       );
     } catch (error) {
       const errorMessage =
@@ -641,6 +684,27 @@ class BuildManager {
       const pluginDistDir = outputDir ?? this.getPluginDestDir(plugin);
       const htmlOutputDir = path.join(pluginDistDir, 'html');
       await fs.mkdir(htmlOutputDir, { recursive: true });
+
+      // Skip the Vite cold-start when the page is a structural stub
+      // (`<div></div>`). Two of the four shipped plugins were stubs and
+      // each cost ~3s to compile a webview that rendered nothing.
+      const pageSource = await fs.readFile(pageTsxFile.fullPath, 'utf-8');
+      if (isStubPageTsx(pageSource)) {
+        this.logger.info(
+          `Stub Page.tsx detected for ${plugin.pluginName}; skipping Vite and emitting placeholder index.html`
+        );
+        const indexHtmlPath = path.join(htmlOutputDir, 'index.html');
+        await fs.writeFile(
+          indexHtmlPath,
+          '<!doctype html><html><head><meta charset="utf-8"><title>' +
+            plugin.pluginName +
+            '</title></head><body><div id="root"></div></body></html>\n'
+        );
+        this.logger.info(
+          `✓ Built webview placeholder for plugin ${plugin.pluginName} to ${this.pathToDisplay(htmlOutputDir)}`
+        );
+        return;
+      }
 
       await this.runViteBuild(htmlOutputDir, pageTsxFile.fullPath);
 
@@ -986,8 +1050,81 @@ class BuildManager {
    * @returns Whether the file is a server-side script
    * @private
    */
-  private isServerScript(filePath: string): boolean {
-    return filePath.includes('/server/') || filePath.includes('\\server\\');
+  /**
+   * Path-segment platform classifier. Returns the platform name when the
+   * file's immediate parent under the plugin root is one of `server`,
+   * `client`, or `shared`. Used as a fallback when a script entry sits
+   * outside the manifest globs (currently unused — manifest-driven
+   * bundling is the source of truth — but kept available for future
+   * tooling that needs to ask "is this a server file?").
+   *
+   * Replaces the previous substring sniff that matched any `/server/`
+   * anywhere in the path, which misclassified files like
+   * `client/server-utils/foo.ts` as server-platform bundles.
+   */
+  private getPathSegmentPlatform(
+    pluginRoot: string,
+    filePath: string
+  ): EntryPlatform | null {
+    const rel = path.relative(pluginRoot, filePath).replace(/\\/g, '/');
+    const segments = rel.split('/').filter(Boolean);
+    const head = segments[0];
+    if (head === 'server' || head === 'client' || head === 'shared') {
+      return head;
+    }
+    return null;
+  }
+
+  /**
+   * Derive script entries from the plugin's manifest globs. A source file
+   * (.ts or .js) becomes an entry only if its post-build `.js` path matches
+   * one of `client_scripts`/`server_scripts`/`shared_scripts`. Files that
+   * match no glob (e.g. `shared/types.ts`) are imported via the entry
+   * graph but never emitted as standalone IIFEs.
+   * @private
+   */
+  private getScriptEntries(plugin: Plugin): ScriptEntry[] {
+    const manifest = plugin.manifest;
+    if (!manifest) return [];
+
+    const toGlobs = (s: ScriptList | undefined): string[] =>
+      s === undefined ? [] : Array.isArray(s) ? s : [s];
+
+    const serverGlobs = toGlobs(manifest.server_scripts);
+    const clientGlobs = toGlobs(manifest.client_scripts);
+    const sharedGlobs = toGlobs(manifest.shared_scripts);
+
+    const entries: ScriptEntry[] = [];
+    const seen = new Set<string>();
+
+    for (const file of plugin.files) {
+      const fn = file.fileName;
+      const isCandidate =
+        (fn.endsWith('.ts') && !fn.endsWith('.tsx')) ||
+        (fn.endsWith('.js') && !fn.endsWith('.jsx'));
+      if (!isCandidate) continue;
+      if (seen.has(file.fullPath)) continue;
+
+      const rel = path.relative(plugin.fullPath, file.fullPath).replace(/\\/g, '/');
+      // Manifest globs target the post-build `.js` path, so map .ts → .js
+      // for matching. The source file's actual extension is preserved when
+      // bundling; this is just to compare against the manifest pattern.
+      const outputJs = rel.replace(/\.ts$/, '.js');
+      const matches = (globs: string[]) =>
+        globs.some((g) => minimatch(outputJs, g));
+
+      let platform: EntryPlatform | null = null;
+      if (matches(serverGlobs)) platform = 'server';
+      else if (matches(clientGlobs)) platform = 'client';
+      else if (matches(sharedGlobs)) platform = 'shared';
+
+      if (platform) {
+        entries.push({ file, platform });
+        seen.add(file.fullPath);
+      }
+    }
+
+    return entries;
   }
 
   /**
@@ -997,27 +1134,11 @@ class BuildManager {
    * @private
    */
   private getExternalPackages(isServerScript: boolean): string[] {
-    // For server scripts, make Node.js modules external
-    return isServerScript
-      ? [
-          'http',
-          'https',
-          'url',
-          'fs',
-          'path',
-          'os',
-          'crypto',
-          'buffer',
-          'stream',
-          'util',
-          'events',
-          'zlib',
-          'net',
-          'tls',
-          'dns',
-          'child_process',
-        ]
-      : [];
+    // For server scripts, externalize every Node built-in (both bare and
+    // `node:`-prefixed). The previous hand-rolled list missed `node:`
+    // imports, so `import 'node:fs'` was bundled into client/server JS
+    // and either crashed or silently stubbed at runtime.
+    return isServerScript ? [...NODE_BUILTIN_EXTERNALS] : [];
   }
 
   /**

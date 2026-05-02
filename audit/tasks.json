@@ -570,7 +570,7 @@
       "title": "Drive bundling from plugin.json + path-segment platform detection + skip stub Page.tsx",
       "phase": "B",
       "effort": "M",
-      "status": "pending",
+      "status": "completed",
       "requires_human": false,
       "pre_flight_warnings": [],
       "blocked_by": [
@@ -612,10 +612,18 @@
       ],
       "branch_name": "audit/pr-10-manifest-driven-bundling",
       "commit_message": "refactor(build): drive bundling from plugin.json globs; skip stub Page.tsx",
-      "started_at": null,
-      "completed_at": null,
-      "commit_shas": [],
-      "notes": []
+      "started_at": "2026-05-03T00:30:00Z",
+      "completed_at": "2026-05-03T00:45:00Z",
+      "commit_shas": [
+        "ec4b7dd9c50751fbc1ebebed50606cc303c9dc93"
+      ],
+      "notes": [
+        {
+          "ts": "2026-05-03T00:45:00Z",
+          "phase": "implement",
+          "issue": "Added `minimatch` as a direct dependency (was only transitive via `glob`) for manifest glob matching in `getScriptEntries`. FileManager.ts (in affected_files) was not modified — manifest-driven entry detection lives entirely in BuildManager.ts via the new `getScriptEntries`/`getPathSegmentPlatform` helpers. Observed character-create TypeScript entry count drop from 21 to 7 (no shared/, no html/* IIFEs) and total build time from ~6.7s to ~5.2s on a warm cache."
+        }
+      ]
     },
     {
       "id": "PR-11",
