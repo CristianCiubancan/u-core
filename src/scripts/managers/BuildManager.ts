@@ -139,10 +139,14 @@ class BuildManager {
    *
    * @param pluginNameOrPath The name or path of the plugin to build
    * @param reload Whether to trigger a hot reload after the build
+   * @param options.skipVite If true, copy the existing dist `html/` dir
+   *   into the temp dir instead of running Vite. Used by the watcher's
+   *   file-kind routing so a TS-only edit doesn't pay the Vite cold start.
    */
   async buildPlugin(
     pluginNameOrPath: string,
-    reload: boolean = false
+    reload: boolean = false,
+    options: { skipVite?: boolean } = {}
   ): Promise<void> {
     this.ensureInitialized();
 
@@ -176,7 +180,21 @@ class BuildManager {
       await fs.mkdir(path.dirname(destDir), { recursive: true });
       await fs.mkdir(tmpDir, { recursive: true });
 
-      await this.buildPluginPageTsx(plugin, tmpDir);
+      // File-kind routing fast path: when the watcher knows nothing under
+      // `html/` changed, copy the previous Vite output into the temp dir
+      // and skip the bundler. Falls back to a full Vite build if the
+      // previous output isn't on disk (first build, or a prior failure
+      // wiped it).
+      const existingHtmlDir = path.join(destDir, 'html');
+      if (options.skipVite && fsSync.existsSync(existingHtmlDir)) {
+        const tmpHtmlDir = path.join(tmpDir, 'html');
+        await fs.cp(existingHtmlDir, tmpHtmlDir, { recursive: true });
+        this.logger.info(
+          `Skipped Vite for ${plugin.pluginName}: copied previous html/ dist forward`
+        );
+      } else {
+        await this.buildPluginPageTsx(plugin, tmpDir);
+      }
 
       await Promise.all([
         this.buildPluginLua(plugin, tmpDir),
