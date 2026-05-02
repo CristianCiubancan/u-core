@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { FileManager } from './managers/FileManager.js';
 import { BuildManager } from './managers/BuildManager.js';
 import { Plugin } from './types/Plugin.js';
+import { Logger, createLogger } from './Logger.js';
 import chalk from 'chalk';
 import * as os from 'os';
 import * as path from 'path';
@@ -56,6 +57,7 @@ class PluginBuilder {
     { success: boolean; time: number; error?: string }
   > = new Map();
   private watcher: chokidar.FSWatcher | null = null;
+  private logger: Logger;
 
   constructor(options: Partial<BuildOptions> = {}) {
     // Set default options
@@ -71,10 +73,15 @@ class PluginBuilder {
       watch: options.watch !== undefined ? options.watch : false,
     };
 
-    this.fileManager = new FileManager(this.options.pluginsDir);
+    this.logger = createLogger({ level: this.options.logLevel });
+    this.fileManager = new FileManager(
+      this.options.pluginsDir,
+      createLogger({ level: this.options.logLevel, prefix: 'FileManager' })
+    );
     this.buildManager = new BuildManager(
       this.fileManager,
-      this.options.distDir
+      this.options.distDir,
+      createLogger({ level: this.options.logLevel, prefix: 'BuildManager' })
     );
   }
 

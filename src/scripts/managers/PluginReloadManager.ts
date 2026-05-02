@@ -4,6 +4,7 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import { Plugin } from '../types/Plugin.js';
+import { Logger, createLogger } from '../Logger.js';
 
 /**
  * Options for configuring the PluginReloadManager
@@ -57,18 +58,25 @@ export interface ReloadResult {
 export class PluginReloadManager {
   private apiKey: string;
   private baseUrl: string;
-  private logLevel: ReloadOptions['logLevel'];
   private initialized: boolean = false;
   private useHttps: boolean;
+  private logger: Logger;
 
   /**
    * Creates a new PluginReloadManager instance
    * @param options Configuration options
+   * @param logger Logger instance; defaults to a console-backed logger if omitted
    */
-  constructor(options: ReloadOptions = {}) {
+  constructor(
+    options: ReloadOptions = {},
+    logger: Logger = createLogger({
+      level: options.logLevel,
+      prefix: 'PluginReloadManager',
+    })
+  ) {
     this.apiKey = options.apiKey || process.env.RELOADER_API_KEY || '';
-    this.logLevel = options.logLevel || 'info';
     this.useHttps = options.https || false;
+    this.logger = logger;
 
     const host = options.host || 'localhost';
     const port = options.port || 3414;
@@ -95,15 +103,10 @@ export class PluginReloadManager {
       this.initialized = true;
       this.log('info', 'Plugin reload manager initialized successfully');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.log(
-        'error',
-        `Failed to initialize plugin reload manager: ${errorMessage}`
-      );
-      throw new Error(
-        `Failed to initialize PluginReloadManager: ${errorMessage}`
-      );
+      this.logger.error('Failed to initialize PluginReloadManager', error);
+      throw new Error('Failed to initialize PluginReloadManager', {
+        cause: error,
+      });
     }
   }
 
@@ -287,47 +290,15 @@ export class PluginReloadManager {
   }
 
   /**
-   * Logs a message with the specified level
-   * @param level The log level
-   * @param message The message to log
+   * Logs a message with the specified level via the injected Logger.
+   * Kept as a private indirection so existing call sites in this file
+   * (this.log('info', '...')) continue to compile without churn.
    * @private
    */
   private log(
     level: 'verbose' | 'info' | 'warn' | 'error',
     message: string
   ): void {
-    const logLevels = {
-      'verbose': 0,
-      'info': 1,
-      'warn': 2,
-      'error': 3,
-    };
-
-    // Skip if level is lower than configured level
-    if (logLevels[level] < logLevels[this.logLevel!]) {
-      return;
-    }
-
-    // Format timestamp
-    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-    // Format prefix based on level
-    let prefix;
-    switch (level) {
-      case 'verbose':
-        prefix = `[${timestamp}] [VERBOSE]`;
-        break;
-      case 'info':
-        prefix = `[${timestamp}] [INFO]`;
-        break;
-      case 'warn':
-        prefix = `[${timestamp}] [WARN]`;
-        break;
-      case 'error':
-        prefix = `[${timestamp}] [ERROR]`;
-        break;
-    }
-
-    console.log(`${prefix} ${message}`);
+    this.logger[level](message);
   }
 }
