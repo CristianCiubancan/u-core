@@ -18,6 +18,13 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
 
+    /* Type whitelist — without this, every package under typeRoots loads
+       globally (notably @types/node, which leaks process/Buffer/setImmediate
+       into NUI/browser code). Vite's `define` for ASSET_SERVER_URL is the
+       only thing that keeps the current process.env access working at
+       runtime; an explicit whitelist makes that contract enforceable. */
+    "types": ["vite/client", "react", "react-dom"],
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
@@ -27,9 +34,7 @@
   },
   "include": [
     "src/webview/**/*",
-    "src/plugins/**/html/**/*",
-    "src/plugins/**/shared/**/*",
-    "src/webview/utils/**/*",
-    "src/webview/theme/tailwind.config.ts"
-  ]
+    "src/plugins/**/html/**/*"
+  ],
+  "references": [{ "path": "./tsconfig.plugins.shared.json" }]
 }
