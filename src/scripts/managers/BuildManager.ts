@@ -1012,6 +1012,15 @@ class BuildManager {
         configFile: false,
         mode,
         logLevel: 'warn',
+        // Vite's lib mode does NOT auto-replace `process.env.NODE_ENV` the
+        // way app mode does. React's source has hundreds of these checks;
+        // without the replacement, the bundled output references `process`
+        // at runtime and CEF throws ReferenceError at the first React import.
+        define: {
+          'process.env.NODE_ENV': JSON.stringify(
+            this.production ? 'production' : 'development'
+          ),
+        },
         build: {
           outDir: htmlOutputDir,
           emptyOutDir: true,
@@ -1263,6 +1272,16 @@ class BuildManager {
       // `manualChunks` which is incompatible with `inlineDynamicImports`
       // (forced on by IIFE/lib output) and would error in consumer mode.
       const consumerEntry = path.resolve('src/webview/main.tsx');
+      // Lib mode disables Vite's auto-replacement of `process.env.NODE_ENV`,
+      // so dev-mode bundles still ship React's `if (process.env.NODE_ENV
+      // === 'production')` guards verbatim and crash in CEF the moment
+      // they execute. Statically replacing the value here matches what
+      // the app-mode default would do.
+      const define = {
+        'process.env.NODE_ENV': JSON.stringify(
+          this.production ? 'production' : 'development'
+        ),
+      };
       const config: InlineConfig =
         style === 'consumer'
           ? {
@@ -1270,6 +1289,7 @@ class BuildManager {
               mode,
               logLevel: 'warn',
               plugins: [pluginPageEntry(), react()],
+              define,
               build: {
                 outDir: outputDir,
                 emptyOutDir: true,
@@ -1299,6 +1319,7 @@ class BuildManager {
               logLevel: 'warn',
               plugins: [pluginPageEntry(), react()],
               root: path.resolve('src'),
+              define,
               build: {
                 outDir: outputDir,
                 emptyOutDir: true,
