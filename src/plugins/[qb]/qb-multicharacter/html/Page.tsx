@@ -2,23 +2,38 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
 import {
-  PiBriefcaseLight,
-  PiBankLight,
-  PiMoneyLight,
-  PiPlayFill,
-  PiTrashLight,
-  PiPlusLight,
-  PiXLight,
-} from 'react-icons/pi';
+  Briefcase,
+  Wallet,
+  CircleDollarSign,
+  Play,
+  Trash2,
+  Plus,
+  X,
+} from 'lucide-react';
 
-import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
-import { fetchNui } from '../../../../webview/utils/fetchNui';
-import { isEnvBrowser } from '../../../../webview/utils/misc';
-import FormInput from '../../../../webview/components/forms/FormInput';
-import FormSelect from '../../../../webview/components/forms/FormSelect';
-import DatePicker from '../../../../webview/components/forms/DatePicker';
-import Paper from '../../../../webview/components/ui/Paper';
-import ActionLink from '../../../../webview/components/ui/ActionLink';
+import { useNuiEvent } from '@/hooks/useNuiEvent';
+import { fetchNui } from '@/utils/fetchNui';
+import { isEnvBrowser } from '@/utils/misc';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import Paper from '@/components/ui/Paper';
 
 import type {
   CharacterRow,
@@ -359,14 +374,33 @@ export default function Page() {
           />
         )}
 
-        {deleteOpen && screen === 'characters' && (
-          <DeleteOverlay
-            character={characters[selectedIndex] ?? null}
-            onCancel={() => setDeleteOpen(false)}
-            onConfirm={onConfirmDelete}
-            t={t}
-          />
-        )}
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <p className="font-mono text-[9px] tracking-[0.4em] text-destructive uppercase">
+                ✕ Void Record
+              </p>
+              <DialogTitle>
+                {characters[selectedIndex]
+                  ? `${characters[selectedIndex]!.charinfo.firstname} ${characters[selectedIndex]!.charinfo.lastname}`
+                  : t('ui.deletechar_header')}
+              </DialogTitle>
+              <DialogDescription>
+                {t('ui.deletechar_description')}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
+                <X />
+                {t('ui.cancel')}
+              </Button>
+              <Button variant="destructive" onClick={onConfirmDelete}>
+                <Trash2 />
+                {t('ui.confirm')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -486,19 +520,15 @@ function CharactersPanel({
       <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
         {showActions ? (
           <>
-            <ActionLink
-              icon={<PiPlayFill className="text-[13px]" />}
-              label={t('ui.play_button')}
-              onClick={onPlay}
-              accent
-            />
+            <Button onClick={onPlay}>
+              <Play />
+              {t('ui.play_button')}
+            </Button>
             {allowDelete && (
-              <ActionLink
-                icon={<PiTrashLight className="text-[13px]" />}
-                label={t('ui.delete_button')}
-                onClick={onPrepareDelete}
-                danger
-              />
+              <Button variant="destructive" onClick={onPrepareDelete}>
+                <Trash2 />
+                {t('ui.delete_button')}
+              </Button>
             )}
           </>
         ) : (
@@ -567,7 +597,7 @@ function SlotRow({
             </span>
           )}
           {!data && (
-            <PiPlusLight className="text-lg text-gray-600 group-hover:text-brand-400 transition-colors" />
+            <Plus className="text-lg text-gray-600 group-hover:text-brand-400 transition-colors" />
           )}
         </div>
       </div>
@@ -586,15 +616,15 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
           than truncating to "..." or pushing the active badge off-screen. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1 font-mono text-[9.5px] text-gray-400">
         <span className="inline-flex items-center gap-1 truncate max-w-full">
-          <PiBriefcaseLight className="text-gray-500 shrink-0" />
+          <Briefcase className="text-gray-500 shrink-0" />
           <span className="truncate">{data.job?.label ?? '—'}</span>
         </span>
         <span className="inline-flex items-center gap-1 shrink-0">
-          <PiMoneyLight className="text-gray-500" />
+          <CircleDollarSign className="text-gray-500" />
           ${dollar.format(data.money?.cash ?? 0)}
         </span>
         <span className="inline-flex items-center gap-1 shrink-0">
-          <PiBankLight className="text-gray-500" />
+          <Wallet className="text-gray-500" />
           ${dollar.format(data.money?.bank ?? 0)}
         </span>
       </div>
@@ -662,61 +692,104 @@ function RegisterPanel({
         </div>
       </Paper>
 
-      {/* Form fields paper. z-10 lifts this above the action-bar Paper
-          below — both have backdrop-filter (=> independent stacking
-          contexts), so the FormSelect / DatePicker popups inside this
-          paper would otherwise render *behind* the action bar wherever
-          they overflow downward. The popup's own z-20 only stacks
-          within this paper's context, not against siblings. */}
-      <Paper className="px-5 py-4 z-10">
+      {/* Form fields paper. The Radix-based Select / DatePicker popups
+          portal to document.body and pick their own collision-aware
+          placement, so we no longer need z-index gymnastics on the
+          form paper. */}
+      <Paper className="px-5 py-4">
         <div className="grid grid-cols-1 gap-3">
-          <FormInput
+          <Field
             id="qbm-firstname"
             label={t('ui.firstname')}
-            value={data.firstname}
-            onChange={(e) => onChange({ firstname: e.target.value })}
             error={fieldErrors.firstname}
-          />
-          <FormInput
+          >
+            <Input
+              id="qbm-firstname"
+              value={data.firstname}
+              onChange={(e) => onChange({ firstname: e.target.value })}
+              aria-invalid={!!fieldErrors.firstname}
+            />
+          </Field>
+          <Field
             id="qbm-lastname"
             label={t('ui.lastname')}
-            value={data.lastname}
-            onChange={(e) => onChange({ lastname: e.target.value })}
             error={fieldErrors.lastname}
-          />
+          >
+            <Input
+              id="qbm-lastname"
+              value={data.lastname}
+              onChange={(e) => onChange({ lastname: e.target.value })}
+              aria-invalid={!!fieldErrors.lastname}
+            />
+          </Field>
           {customNationality ? (
-            <FormInput
+            <Field
               id="qbm-nationality"
               label={t('ui.nationality')}
-              value={data.nationality}
-              onChange={(e) => onChange({ nationality: e.target.value })}
               error={fieldErrors.nationality}
-            />
+            >
+              <Input
+                id="qbm-nationality"
+                value={data.nationality}
+                onChange={(e) => onChange({ nationality: e.target.value })}
+                aria-invalid={!!fieldErrors.nationality}
+              />
+            </Field>
           ) : (
-            <FormSelect
+            <Field
               id="qbm-nationality"
               label={t('ui.nationality')}
-              options={nationalityOptions}
-              value={data.nationality}
-              onChange={(value) => onChange({ nationality: value })}
-              placeholder={t('ui.nationality')}
               error={fieldErrors.nationality}
-            />
+            >
+              <Select
+                value={data.nationality || undefined}
+                onValueChange={(value) => onChange({ nationality: value })}
+              >
+                <SelectTrigger
+                  id="qbm-nationality"
+                  aria-invalid={!!fieldErrors.nationality}
+                >
+                  <SelectValue placeholder={t('ui.nationality')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {nationalityOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           )}
-          <FormSelect
+          <Field
             id="qbm-gender"
             label={t('ui.gender')}
-            options={genderOptions}
-            value={data.gender}
-            onChange={(value) => onChange({ gender: value })}
-            placeholder={t('ui.gender')}
             error={fieldErrors.gender}
-          />
+          >
+            <Select
+              value={data.gender || undefined}
+              onValueChange={(value) => onChange({ gender: value })}
+            >
+              <SelectTrigger
+                id="qbm-gender"
+                aria-invalid={!!fieldErrors.gender}
+              >
+                <SelectValue placeholder={t('ui.gender')} />
+              </SelectTrigger>
+              <SelectContent>
+                {genderOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
           <DatePicker
             id="qbm-birthdate"
             label={t('ui.birthdate')}
             selected={data.date}
-            onChange={(date) => onChange({ date })}
+            onChange={(date) => onChange({ date: date ?? null })}
             error={fieldErrors.date}
           />
         </div>
@@ -724,79 +797,53 @@ function RegisterPanel({
 
       {/* Action bar paper */}
       <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
-        <ActionLink
-          icon={<PiXLight className="text-[13px]" />}
-          label={t('ui.cancel')}
-          onClick={onCancel}
-        />
-        <ActionLink
-          icon={<PiPlayFill className="text-[13px]" />}
-          label={t('ui.create_button')}
-          onClick={onCreate}
-          accent
-        />
+        <Button variant="secondary" onClick={onCancel}>
+          <X />
+          {t('ui.cancel')}
+        </Button>
+        <Button onClick={onCreate}>
+          <Play />
+          {t('ui.create_button')}
+        </Button>
       </Paper>
     </>
   );
 }
 
 // ============================================================
-// Delete overlay (modal that doesn't replace the grid)
+// Field — small wrapper that pairs a Label and inline error caption
+// around any input primitive. Keeps the form fields visually aligned
+// without each call site repeating the wrapper markup.
 // ============================================================
 
-interface DeleteOverlayProps {
-  character: CharacterRow | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-  t: (k: string) => string;
-}
-
-function DeleteOverlay({
-  character,
-  onCancel,
-  onConfirm,
-  t,
-}: DeleteOverlayProps) {
+function Field({
+  id,
+  label,
+  error,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_180ms_ease-out_both] pointer-events-auto"
-      onClick={onCancel}
-    >
-      <div
-        className="relative w-[400px] max-w-[90vw] bg-gray-950 border border-gray-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
-        onClick={(e) => e.stopPropagation()}
+    <div className="space-y-1.5">
+      <Label
+        htmlFor={id}
+        className={error ? 'text-destructive' : undefined}
       >
-        <div className="absolute -top-px -left-px w-10 h-px bg-red-500/80" />
-        <div className="absolute -top-px -left-px w-px h-10 bg-red-500/80" />
-
-        <div className="p-6 space-y-4">
-          <p className="font-mono text-[9px] tracking-[0.4em] text-red-400 uppercase">
-            ✕ Void Record
-          </p>
-          <h3 className="font-display text-xl font-light text-gray-100 leading-tight">
-            {character
-              ? `${character.charinfo.firstname} ${character.charinfo.lastname}`
-              : t('ui.deletechar_header')}
-          </h3>
-          <p className="text-sm text-gray-400 font-serif italic leading-snug">
-            {t('ui.deletechar_description')}
-          </p>
-
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <ActionLink
-              icon={<PiXLight className="text-[13px]" />}
-              label={t('ui.cancel')}
-              onClick={onCancel}
-            />
-            <ActionLink
-              icon={<PiTrashLight className="text-[13px]" />}
-              label={t('ui.confirm')}
-              onClick={onConfirm}
-              danger
-            />
-          </div>
-        </div>
-      </div>
+        {label}
+      </Label>
+      {children}
+      {error && (
+        <p
+          className="font-mono text-[9px] tracking-[0.2em] uppercase text-destructive"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 }
