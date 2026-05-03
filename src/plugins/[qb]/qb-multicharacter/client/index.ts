@@ -114,6 +114,11 @@ function openCharMenu(visible: boolean): void {
         customNationality: Config.customNationality,
         enableDeleteButton: Config.EnableDeleteButton,
         countries,
+        // Forward the QBCore locale so the webview can mirror it via
+        // i18n.changeLanguage. Replicated convar, so this reflects whatever
+        // server.cfg has (`setr qb_locale "<lang>"`); falls back to en
+        // when the convar is unset or empty.
+        locale: GetConvar('qb_locale', 'en') || 'en',
       });
       skyCam(visible);
       if (!loadScreenCheckState) {

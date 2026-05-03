@@ -52,6 +52,7 @@ interface UiOpenMessage {
   enableDeleteButton: boolean;
   nChar: number;
   countries: string[];
+  locale?: string;
 }
 
 interface SetupCharactersMessage {
@@ -97,6 +98,14 @@ export default function Page() {
   // ---------- NUI inbound ----------
 
   useNuiEvent<UiOpenMessage>('ui', (data) => {
+    // Mirror the server-side `setr qb_locale "<lang>"` convar — the
+    // client passes it through via the 'ui' message so changing the
+    // convar requires nothing more than re-opening the menu. Unknown
+    // locales hit i18next's fallbackLng ('en') automatically.
+    if (data.locale && BUNDLES[data.locale] && i18n.language !== data.locale) {
+      void i18n.changeLanguage(data.locale);
+    }
+
     setCustomNationality(!!data.customNationality);
     setAllowDelete(!!data.enableDeleteButton);
     setCharacterAmount(data.nChar);
