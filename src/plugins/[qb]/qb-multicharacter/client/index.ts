@@ -245,10 +245,15 @@ onNet(
 
 // ---------------- NUI callbacks ----------------
 
+// `RegisterNuiCallback(type, callback)` is the one-shot API; the
+// two-step `RegisterNuiCallbackType + on('__cfx_nui:type', cb)`
+// pattern doesn't actually wire the URL route in current FXServer
+// builds — fetches from the NUI just hit "TypeError: Failed to fetch"
+// because CEF never sees a registered handler for the path.
+
 type NuiCb = (response: unknown) => void;
 
-RegisterNuiCallbackType('closeUI');
-on('__cfx_nui:closeUI', (data: { cData?: any }, cb: NuiCb) => {
+RegisterNuiCallback('closeUI', (data: { cData?: any }, cb: NuiCb) => {
   const cData = data?.cData;
   DoScreenFadeOut(10);
   if (cData) {
@@ -265,15 +270,13 @@ on('__cfx_nui:closeUI', (data: { cData?: any }, cb: NuiCb) => {
   cb('ok');
 });
 
-RegisterNuiCallbackType('disconnectButton');
-on('__cfx_nui:disconnectButton', (_data: unknown, cb: NuiCb) => {
+RegisterNuiCallback('disconnectButton', (_data: unknown, cb: NuiCb) => {
   destroyPed();
   emitNet('qb-multicharacter:server:disconnect');
   cb('ok');
 });
 
-RegisterNuiCallbackType('selectCharacter');
-on('__cfx_nui:selectCharacter', (data: { cData: any }, cb: NuiCb) => {
+RegisterNuiCallback('selectCharacter', (data: { cData: any }, cb: NuiCb) => {
   DoScreenFadeOut(10);
   emitNet('qb-multicharacter:server:loadUserData', data.cData);
   openCharMenu(false);
@@ -281,8 +284,7 @@ on('__cfx_nui:selectCharacter', (data: { cData: any }, cb: NuiCb) => {
   cb('ok');
 });
 
-RegisterNuiCallbackType('cDataPed');
-on('__cfx_nui:cDataPed', async (payload: { cData?: any }, cb: NuiCb) => {
+RegisterNuiCallback('cDataPed', async (payload: { cData?: any }, cb: NuiCb) => {
   destroyPed();
   const cData = payload?.cData;
   if (!cData) {
@@ -319,8 +321,7 @@ on('__cfx_nui:cDataPed', async (payload: { cData?: any }, cb: NuiCb) => {
   cb('ok');
 });
 
-RegisterNuiCallbackType('setupCharacters');
-on('__cfx_nui:setupCharacters', (_data: unknown, cb: NuiCb) => {
+RegisterNuiCallback('setupCharacters', (_data: unknown, cb: NuiCb) => {
   QBCore.Functions.TriggerCallback(
     'qb-multicharacter:server:setupCharacters',
     (result: unknown[]) => {
@@ -331,14 +332,12 @@ on('__cfx_nui:setupCharacters', (_data: unknown, cb: NuiCb) => {
   );
 });
 
-RegisterNuiCallbackType('removeBlur');
-on('__cfx_nui:removeBlur', (_data: unknown, cb: NuiCb) => {
+RegisterNuiCallback('removeBlur', (_data: unknown, cb: NuiCb) => {
   SetTimecycleModifier('default');
   cb('ok');
 });
 
-RegisterNuiCallbackType('createNewCharacter');
-on('__cfx_nui:createNewCharacter', async (data: any, cb: NuiCb) => {
+RegisterNuiCallback('createNewCharacter', async (data: any, cb: NuiCb) => {
   DoScreenFadeOut(150);
   // Webview now sends gender as 0/1 directly so we don't have to
   // round-trip the localized 'Male'/'Female' string back through Lang.
@@ -347,8 +346,7 @@ on('__cfx_nui:createNewCharacter', async (data: any, cb: NuiCb) => {
   cb('ok');
 });
 
-RegisterNuiCallbackType('removeCharacter');
-on('__cfx_nui:removeCharacter', (data: { citizenid: string }, cb: NuiCb) => {
+RegisterNuiCallback('removeCharacter', (data: { citizenid: string }, cb: NuiCb) => {
   emitNet('qb-multicharacter:server:deleteCharacter', data.citizenid);
   destroyPed();
   emit('qb-multicharacter:client:chooseChar');

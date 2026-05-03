@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
 
@@ -95,6 +95,14 @@ export default function Page() {
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Timers owned by the 'ui' open sequence (see useNuiEvent below). Tracked
+  // in a ref so a second 'ui' message can cancel the first run instead of
+  // stacking duplicate fetchNui calls on top of each other — that's how a
+  // single open turned into hundreds of "Failed to fetch" errors.
+  const timersRef = useRef<{ stage?: number; setup?: number; finish?: number }>(
+    {}
+  );
+
   // ---------- NUI inbound ----------
 
   useNuiEvent<UiOpenMessage>('ui', (data) => {
@@ -120,6 +128,20 @@ export default function Page() {
       gender: '',
     }));
 
+    // Cancel any pending timers from a previous open before scheduling new
+    // ones, so back-to-back 'ui' messages don't pile up duplicate
+    // setupCharacters fetches.
+    if (timersRef.current.stage !== undefined) {
+      window.clearInterval(timersRef.current.stage);
+    }
+    if (timersRef.current.setup !== undefined) {
+      window.clearTimeout(timersRef.current.setup);
+    }
+    if (timersRef.current.finish !== undefined) {
+      window.clearTimeout(timersRef.current.finish);
+    }
+    timersRef.current = {};
+
     if (data.toggle) {
       setVisible(true);
       setScreen('loading');
@@ -128,29 +150,23 @@ export default function Page() {
       // Mirrors the original's two-step delay: client posts setupCharacters
       // after ~2s, then we wait another 2s of staged loading text before
       // revealing the slot grid. Animations keep dev-mode usable too.
-      const stageTimer = window.setInterval(() => {
+      timersRef.current.stage = window.setInterval(() => {
         setLoadingStage((s) => Math.min(s + 1, LOADING_STAGES.length - 1));
       }, 500);
 
-      const setupTimer = window.setTimeout(() => {
+      timersRef.current.setup = window.setTimeout(() => {
         void fetchNui('setupCharacters');
       }, 2000);
 
-      const finishTimer = window.setTimeout(() => {
-        window.clearInterval(stageTimer);
+      timersRef.current.finish = window.setTimeout(() => {
+        if (timersRef.current.stage !== undefined) {
+          window.clearInterval(timersRef.current.stage);
+          timersRef.current.stage = undefined;
+        }
         setScreen('characters');
         setLoadingStage(0);
         void fetchNui('removeBlur');
       }, 4000);
-
-      // Defer cleanup — these IDs are owned by this branch only. We can
-      // afford to leak across re-fires; setVisible(true) re-runs from
-      // scratch on each open.
-      return () => {
-        window.clearInterval(stageTimer);
-        window.clearTimeout(setupTimer);
-        window.clearTimeout(finishTimer);
-      };
     } else {
       setVisible(isEnvBrowser());
       setScreen('loading');
