@@ -87,10 +87,12 @@ const SelectContent = React.forwardRef<
       className={cn(
         'relative z-50 max-h-60 overflow-hidden',
         // Lock the content width to the trigger width so the dropdown
-        // never overhangs the right side of the form column. Without
-        // this, content auto-sizes against item width + paddings and
-        // can grow wider than the trigger.
-        position === 'popper' && 'w-[var(--radix-select-trigger-width)]',
+        // never overhangs the right side of the form column. Both
+        // width AND max-width — the Viewport's `min-w` (in shadcn's
+        // default config) would otherwise let the inner content
+        // expand the visual content box past the trigger.
+        position === 'popper' &&
+          'w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
         position === 'popper' &&
@@ -103,8 +105,15 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         className={cn(
           'p-1',
+          // Drop shadcn's default `min-w-[var(--radix-select-trigger-width)]`
+          // here. Combined with item paddings (pl-2 pr-7), it pushed the
+          // viewport's intrinsic width past the trigger and made the
+          // dropdown overhang the right side of the form column. The
+          // Content above already pins width to the trigger; let
+          // overflow-hidden on Content clip any item that needs more
+          // room.
           position === 'popper' &&
-            'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
+            'h-[var(--radix-select-trigger-height)] w-full'
         )}
       >
         {children}
