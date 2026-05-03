@@ -33,10 +33,12 @@
 
     /* shadcn-style path alias. `@/` resolves to src/webview so that
        components written against the upstream shadcn templates can use
-       `@/components/ui/...` and `@/lib/utils` import paths verbatim. */
-    "baseUrl": ".",
+       `@/components/ui/...` and `@/lib/utils` import paths verbatim.
+       baseUrl is intentionally omitted — TS 4.1+ resolves `paths`
+       relative to this tsconfig's directory, and baseUrl is being
+       deprecated in TS 6/7. */
     "paths": {
-      "@/*": ["src/webview/*"]
+      "@/*": ["./src/webview/*"]
     }
   },
   "include": [

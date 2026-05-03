@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Container from '../components/ui/Container';
-import Button from '../components/ui/Button';
+import { Button } from '../components/ui/button';
 import FormInput from '../components/forms/FormInput';
 import FormSelect from '../components/forms/FormSelect';
 import FormTextarea from '../components/forms/FormTextarea';

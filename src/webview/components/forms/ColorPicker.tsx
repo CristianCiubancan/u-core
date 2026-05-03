@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
 import { colorPalettes, grayPalettes } from '../../theme/colors';
-import Button from '../ui/Button'; // Assuming a Button component exists
+import { Button } from '../ui/button';
 
 interface ColorPickerProps
   extends Omit<
