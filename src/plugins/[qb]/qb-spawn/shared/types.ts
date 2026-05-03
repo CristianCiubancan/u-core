@@ -25,18 +25,29 @@ export type ApartmentOptionMap = Record<string, ApartmentOption>;
 
 /** UI inbound message. `setupLocations` runs for the existing-character
  *  flow (preset spawns + owned houses); `setupAppartements` runs for
- *  brand-new characters who must pick a starter apartment. */
+ *  brand-new characters who must pick a starter apartment.
+ *
+ *  `firstSpawn` is a u-core extension: qb-multicharacter sets
+ *  `cData._firstSpawn = true` on createCharacter, qb-apartments forwards
+ *  cData unchanged, and qb-spawn's client surfaces it here. The UI uses
+ *  it to suppress "Last Location" for a brand-new character (whose
+ *  `position` still points at the createPed interior) regardless of
+ *  what `isNew` says — `isNew` only flips for the
+ *  Apartments.Starting=true branch, but the position-is-meaningless
+ *  problem applies to both branches of new-character flow. */
 export type SpawnSetupMessage =
   | {
       action: 'setupLocations';
       locations: SpawnLocationMap;
       houses: OwnedHouse[];
       isNew: false;
+      firstSpawn?: boolean;
     }
   | {
       action: 'setupAppartements';
       locations: ApartmentOptionMap;
       isNew: true;
+      firstSpawn?: boolean;
     };
 
 export interface SpawnShowUiMessage {

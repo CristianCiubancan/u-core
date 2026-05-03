@@ -261,7 +261,16 @@ onNet('qb-multicharacter:server:loadUserData', async (cData: any) => {
 
 onNet('qb-multicharacter:server:createCharacter', async (data: any) => {
   const src = (global as any).source as number;
-  const newData = { cid: data.cid, charinfo: data };
+  // `_firstSpawn: true` is a u-core-only marker that travels through
+  // qb-apartments (which forwards `cData` unchanged to `qb-spawn:client:
+  // setupSpawns`) and lands at qb-spawn's React. It tells the spawn UI
+  // to suppress the "Last Location" option for this player's first
+  // spawn — without it, picking Last Location for a brand-new char
+  // teleports them into the character creation interior because
+  // `cData.position` is still the createPed coords, not a real spawn
+  // they've used. Properties prefixed with `_` are ignored by upstream
+  // QBCore code paths so this is safe to add.
+  const newData = { cid: data.cid, charinfo: data, _firstSpawn: true };
   if (!QBCore.Player.Login(src, false, newData)) return;
 
   await waitForPreloading(src);

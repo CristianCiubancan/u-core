@@ -63,12 +63,14 @@ interface SetupLocationsMessage {
   locations: Record<string, { location: string; label: string; coords: unknown }>;
   houses: Array<{ house: string; label: string }>;
   isNew: false;
+  firstSpawn?: boolean;
 }
 
 interface SetupAppartementsMessage {
   action: 'setupAppartements';
   locations: Record<string, { id?: string; label: string }>;
   isNew: true;
+  firstSpawn?: boolean;
 }
 
 export default function Page() {
@@ -79,6 +81,11 @@ export default function Page() {
   const [houses, setHouses] = useState<SpawnOption[]>([]);
   const [apartments, setApartments] = useState<SpawnOption[]>([]);
   const [isNew, setIsNew] = useState<boolean>(false);
+  // True for the player's first spawn after createCharacter; suppresses
+  // the "Last Location" option since `cData.position` would point at
+  // the character creation interior. Sourced from qb-multicharacter via
+  // the `_firstSpawn` cData marker; see `shared/types.ts`.
+  const [firstSpawn, setFirstSpawn] = useState<boolean>(false);
   const [selected, setSelected] = useState<SpawnOption | null>(null);
 
   useNuiEvent<ShowUiMessage>('showUi', (data) => {
@@ -103,6 +110,7 @@ export default function Page() {
     setHouses(housesNext);
     setApartments([]);
     setIsNew(false);
+    setFirstSpawn(!!data.firstSpawn);
     setSelected(null);
   });
 
@@ -118,6 +126,7 @@ export default function Page() {
     setPresets([]);
     setHouses([]);
     setIsNew(true);
+    setFirstSpawn(!!data.firstSpawn);
     setSelected(null);
   });
 
@@ -156,12 +165,19 @@ export default function Page() {
 
   // ---------- Memoized row groups ----------
 
+  // Hide "Last Location" when:
+  //   - isNew=true: only apartments are valid spawns for new char with
+  //     Apartments.Starting=true (already covered by upstream contract).
+  //   - firstSpawn=true: u-core marker for createCharacter where
+  //     `cData.position` still points at the char creation interior;
+  //     covers the Apartments.Starting=false branch where isNew=false
+  //     but the last-location coords are still meaningless.
   const lastLocationOption: SpawnOption | null = useMemo(
     () =>
-      isNew
+      isNew || firstSpawn
         ? null
         : { type: 'current', name: 'current', label: t('ui.last_location') },
-    [isNew, t]
+    [isNew, firstSpawn, t]
   );
 
   if (!visible) return null;

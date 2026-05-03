@@ -32,6 +32,17 @@ let cam: number | null = null;
 let cam2: number | null = null;
 let houseConfig: Record<string, { coords: { enter: { x: number; y: number; z: number } }; adress: string }> = {};
 
+// Fallback cam target for the first-spawn case (qb-multicharacter sets
+// `_firstSpawn` on cData). For brand-new chars `QBCore.Functions.
+// GetPlayerData().position` isn't a usable world location — it's either
+// missing (no replicated PlayerData yet) or the createPed/character-
+// creation interior coords. Without a fallback, openUI's `if (pos)`
+// branch is skipped entirely, RenderScriptCams stays off, and the
+// gameplay cam shows the player's ped at qb-multicharacter's
+// HiddenCoords (the "kitchen" interior). Set in setupSpawns when
+// firstSpawn=true; consumed by openUI.
+let firstSpawnCamTarget: { x: number; y: number; z: number } | null = null;
+
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -125,6 +136,16 @@ onNet('qb-spawn:client:openUI', (value: boolean) => {
         // GetPlayerData isn't ready — skip the cam and just show the
         // UI. No cam is better than no UI.
       }
+      // First-spawn override: see firstSpawnCamTarget comment up top.
+      // For brand-new chars `playerData.position` is either missing or
+      // points at the createPed/character-creation interior, so we
+      // unconditionally prefer the stashed fallback (first apartment
+      // or first preset spawn). Without this the cam either never gets
+      // created (gameplay cam shows the ped at HiddenCoords — the
+      // "kitchen") or flies to the createPed interior.
+      if (firstSpawnCamTarget) {
+        pos = firstSpawnCamTarget;
+      }
       if (pos) {
         cam = CreateCamWithParams(
           'DEFAULT_SCRIPTED_CAMERA',
@@ -160,10 +181,47 @@ onNet(
 onNet(
   'qb-spawn:client:setupSpawns',
   (
-    cData: { citizenid: string } | null | undefined,
+    cData: { citizenid: string; _firstSpawn?: boolean } | null | undefined,
     isNew: boolean,
     apps: ApartmentOptionMap
   ) => {
+    // u-core marker added by qb-multicharacter's createCharacter handler
+    // — propagates through qb-apartments unchanged and reaches us here.
+    // Tells the React UI to hide "Last Location" for this player's
+    // first spawn, since `cData.position` would otherwise point at the
+    // character creation interior.
+    const firstSpawn = !!cData?._firstSpawn;
+
+    // Stash a sensible fallback cam target for openUI. Prefer the first
+    // apartment (Apartments.Starting=true path) since that's what the
+    // player will be picking from; otherwise the first preset Spawn.
+    // Static `apps` type is `{id, label}` but at runtime qb-apartments
+    // hands us its full Locations table including `coords.enter`, so we
+    // read it through `any`.
+    if (firstSpawn) {
+      let target: { x: number; y: number; z: number } | null = null;
+      if (apps) {
+        const firstApt = (Object.values(apps) as any[])[0];
+        const enter = firstApt?.coords?.enter;
+        if (enter && typeof enter.x === 'number') {
+          target = { x: enter.x, y: enter.y, z: enter.z };
+        }
+      }
+      if (!target) {
+        const firstPreset = (Object.values(Spawns) as SpawnLocation[])[0];
+        if (firstPreset?.coords) {
+          target = {
+            x: firstPreset.coords.x,
+            y: firstPreset.coords.y,
+            z: firstPreset.coords.z,
+          };
+        }
+      }
+      firstSpawnCamTarget = target;
+    } else {
+      firstSpawnCamTarget = null;
+    }
+
     if (!isNew) {
       QBCore.Functions.TriggerCallback(
         'qb-spawn:server:getOwnedHouses',
@@ -186,6 +244,7 @@ onNet(
               locations: Spawns,
               houses: myHouses,
               isNew: false,
+              firstSpawn,
             };
             SendNUIMessage(message);
           }, 500);
@@ -197,6 +256,7 @@ onNet(
         action: 'setupAppartements',
         locations: apps,
         isNew: true,
+        firstSpawn,
       };
       SendNUIMessage(message);
     }

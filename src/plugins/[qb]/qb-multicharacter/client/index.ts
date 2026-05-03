@@ -386,6 +386,13 @@ RegisterNuiCallback('removeBlur', (_data: unknown, cb: NuiCb) => {
 
 RegisterNuiCallback('createNewCharacter', async (data: any, cb: NuiCb) => {
   DoScreenFadeOut(150);
+  // Mirror selectCharacter's teardown: tear down the multichar sky cam
+  // and preview ped before the server hands off to qb-spawn. Without
+  // this, the multichar cam stays the active scripted cam so the
+  // player keeps seeing the character-creation interior even though
+  // qb-spawn's openUI fires correctly.
+  openCharMenu(false);
+  destroyPed();
   // Webview now sends gender as 0/1 directly so we don't have to
   // round-trip the localized 'Male'/'Female' string back through Lang.
   emitNet('qb-multicharacter:server:createCharacter', data);
