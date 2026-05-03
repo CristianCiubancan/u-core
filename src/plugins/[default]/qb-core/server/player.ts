@@ -168,12 +168,21 @@ function showSuccess(msg: string): void {
  *  defaults are invoked at apply time (lazy initialization for
  *  citizenid / phone / account / fingerprint / walletid / serial /
  *  bloodtype). */
-function applyDefaults(target: any, defaults: any): void {
+async function applyDefaults(target: any, defaults: any): Promise<void> {
   for (const key of Object.keys(defaults)) {
     const def = defaults[key];
     if (typeof def === 'function') {
       if (target[key] === undefined || target[key] === null) {
-        target[key] = def();
+        // The factories that need DB uniqueness checks (CreateCitizenId,
+        // CreateFingerId, CreateWalletId, CreateSerialNumber, plus the
+        // qb-core/player.ts variants of CreatePhoneNumber and
+        // CreateAccountNumber) are async — they return Promises. Without
+        // `await` here the Promise object lands in PlayerData, then
+        // JSON.stringify produces `{}` for it, and the row inserts with
+        // empty-object citizenid/phone/account/fingerprint/walletid/etc.
+        // Symptom: SQL syntax error from oxmysql and a corrupt row even
+        // when the SQL parses, since downstream resources expect strings.
+        target[key] = await def();
       }
     } else if (
       def !== null &&
@@ -181,7 +190,7 @@ function applyDefaults(target: any, defaults: any): void {
       !Array.isArray(def)
     ) {
       target[key] = target[key] ?? {};
-      applyDefaults(target[key], def);
+      await applyDefaults(target[key], def);
     } else {
       target[key] = target[key] ?? def;
     }
@@ -421,7 +430,7 @@ export function installPlayer(QBCore: QBCoreShape): void {
       playerData.gang = null;
     }
 
-    applyDefaults(playerData, getPlayerDefaults(QBCore));
+    await applyDefaults(playerData, getPlayerDefaults(QBCore));
 
     if (playerData.job && QBCore.Shared.ForceJobDefaultDutyAtLogin) {
       const jobInfo = QBCore.Shared.Jobs[playerData.job.name];
