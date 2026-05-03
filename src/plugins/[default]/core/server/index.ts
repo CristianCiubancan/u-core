@@ -3,27 +3,31 @@ import * as http from 'http';
 import * as url from 'url';
 import * as crypto from 'crypto';
 
-// Read the API key from FXServer's convar mechanism (set via
-// `setr reloader_api_key "<value>"` in server.cfg). Avoids shipping the
-// `dotenv` package into the in-game bundle and the path-relative sourcemap
-// that leaks dev-machine pnpm layout.
+// Read the API key, preferring the FXServer convar (set via
+// `setr reloader_api_key "<value>"` in server.cfg) and falling back to the
+// RELOADER_API_KEY environment variable. The env path is what the docker
+// compose stack uses (env_file: .env) so the secret never has to land in
+// a wizard-managed cfg file or be substituted by the txAdmin recipe runner.
 //
 // Refuse to start without an explicitly-configured key. The previous fallback
 // to a literal `***SCRUBBED***` placeholder meant any operator who skipped
 // config exposed an unauthenticated remote-resource-control endpoint.
 const PLACEHOLDER_API_KEYS = new Set(['<replace-me>', '***SCRUBBED***']);
-const RAW_API_KEY = GetConvar('reloader_api_key', '');
+const CONVAR_API_KEY = GetConvar('reloader_api_key', '');
+const ENV_API_KEY = process.env.RELOADER_API_KEY ?? '';
+const RAW_API_KEY = CONVAR_API_KEY || ENV_API_KEY;
 if (!RAW_API_KEY || PLACEHOLDER_API_KEYS.has(RAW_API_KEY)) {
   const reason = !RAW_API_KEY
     ? 'unset or empty'
     : `equal to placeholder "${RAW_API_KEY}"`;
   console.error(
-    `[resource-manager] reloader_api_key convar is ${reason}. Refusing to ` +
-      `start. Add \`setr reloader_api_key "<value>"\` to your server.cfg ` +
-      `with a CSPRNG-generated value (e.g. ` +
+    `[resource-manager] reloader_api_key is ${reason}. Refusing to start. ` +
+      `Set RELOADER_API_KEY in the environment (.env for docker) or add ` +
+      `\`setr reloader_api_key "<value>"\` to server.cfg, with a CSPRNG- ` +
+      `generated value (e.g. ` +
       `\`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"\`).`
   );
-  throw new Error('reloader_api_key convar is unset or set to placeholder');
+  throw new Error('reloader_api_key is unset or set to placeholder');
 }
 const API_KEY = RAW_API_KEY;
 const API_KEY_BUFFER = Buffer.from(API_KEY, 'utf8');
