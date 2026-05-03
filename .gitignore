@@ -77,3 +77,6 @@ asset-server/original/*
 
 # ───────── Project-local agent settings ─────────
 **/.claude/settings.local.json
+
+# Screenshots dropped into the working tree for issue reports.
+Screenshot*.png
