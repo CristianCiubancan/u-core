@@ -19,6 +19,14 @@ const tailwindConfig: Config = {
   theme: {
     extend: {
       fontSize: generateFontSizes(),
+      fontFamily: {
+        // Display serif for headings + character names; pairs with the
+        // Libre Baskerville body and JetBrains Mono for IDs/stats. Fonts
+        // are loaded once in _shared/html/style.css.
+        display: ['"Fraunces"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        serif: ['"Libre Baskerville"', 'Georgia', 'serif'],
+      },
       colors: {
         brand: brandPalette,
         gray: grayPalette,

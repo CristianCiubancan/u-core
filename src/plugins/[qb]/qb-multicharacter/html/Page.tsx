@@ -1,22 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
+import {
+  PiBriefcaseLight,
+  PiBankLight,
+  PiMoneyLight,
+  PiPlayFill,
+  PiTrashLight,
+  PiPlusLight,
+  PiXLight,
+} from 'react-icons/pi';
 
 import { useNuiEvent } from '../../../../webview/hooks/useNuiEvent';
 import { fetchNui } from '../../../../webview/utils/fetchNui';
 import { isEnvBrowser } from '../../../../webview/utils/misc';
-import Button from '../../../../webview/components/ui/Button';
 import FormInput from '../../../../webview/components/forms/FormInput';
 import FormSelect from '../../../../webview/components/forms/FormSelect';
+import DatePicker from '../../../../webview/components/forms/DatePicker';
 
 import type {
   CharacterRow,
   NewCharacterPayload,
 } from '../shared/types';
 
-// Eager-loaded locale bundles. Keeping them static so the bundle is
-// self-contained — at ~1.5KB per locale this is much smaller than the
-// dynamic-import scaffolding would be.
 import ar from '../translations/ar.json';
 import cs from '../translations/cs.json';
 import de from '../translations/de.json';
@@ -33,8 +39,6 @@ import sv from '../translations/sv.json';
 import tr from '../translations/tr.json';
 import vi from '../translations/vi.json';
 
-import './style.css';
-
 const NAMESPACE = 'qb-multicharacter';
 const BUNDLES: Record<string, unknown> = {
   ar, cs, de, en, es, fi, fr, it, ja, nl, 'pt-br': ptbr, pt, sv, tr, vi,
@@ -43,7 +47,7 @@ for (const [lng, resources] of Object.entries(BUNDLES)) {
   i18n.addResourceBundle(lng, NAMESPACE, resources, true, true);
 }
 
-type Screen = 'loading' | 'characters' | 'register' | 'delete';
+type Screen = 'loading' | 'characters' | 'register';
 
 interface UiOpenMessage {
   action: 'ui';
@@ -72,6 +76,33 @@ const LOADING_STAGES = [
 
 const dollar = new Intl.NumberFormat('en-US');
 
+interface RegisterFormData {
+  firstname: string;
+  lastname: string;
+  nationality: string;
+  gender: string;
+  date: Date | null;
+}
+
+const EMPTY_FORM: RegisterFormData = {
+  firstname: '',
+  lastname: '',
+  nationality: '',
+  gender: '',
+  date: null,
+};
+
+type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function formatIsoDate(d: Date | null): string {
+  if (!d) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 export default function Page() {
   const { t } = useTranslation(NAMESPACE);
 
@@ -84,21 +115,10 @@ export default function Page() {
   const [customNationality, setCustomNationality] = useState<boolean>(false);
   const [nationalities, setNationalities] = useState<string[]>([]);
   const [loadingStage, setLoadingStage] = useState<number>(0);
-  const [registerData, setRegisterData] = useState({
-    firstname: '',
-    lastname: '',
-    nationality: '',
-    gender: '',
-    date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 10),
-  });
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [registerData, setRegisterData] = useState<RegisterFormData>(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
 
-  // Timers owned by the 'ui' open sequence (see useNuiEvent below). Tracked
-  // in a ref so a second 'ui' message can cancel the first run instead of
-  // stacking duplicate fetchNui calls on top of each other — that's how a
-  // single open turned into hundreds of "Failed to fetch" errors.
   const timersRef = useRef<{ stage?: number; setup?: number; finish?: number }>(
     {}
   );
@@ -106,10 +126,6 @@ export default function Page() {
   // ---------- NUI inbound ----------
 
   useNuiEvent<UiOpenMessage>('ui', (data) => {
-    // Mirror the server-side `setr qb_locale "<lang>"` convar — the
-    // client passes it through via the 'ui' message so changing the
-    // convar requires nothing more than re-opening the menu. Unknown
-    // locales hit i18next's fallbackLng ('en') automatically.
     if (data.locale && BUNDLES[data.locale] && i18n.language !== data.locale) {
       void i18n.changeLanguage(data.locale);
     }
@@ -119,18 +135,10 @@ export default function Page() {
     setCharacterAmount(data.nChar);
     setNationalities(Array.isArray(data.countries) ? data.countries : []);
     setSelectedIndex(-1);
-    setValidationError(null);
-    setRegisterData((prev) => ({
-      ...prev,
-      firstname: '',
-      lastname: '',
-      nationality: '',
-      gender: '',
-    }));
+    setFieldErrors({});
+    setRegisterData(EMPTY_FORM);
+    setDeleteOpen(false);
 
-    // Cancel any pending timers from a previous open before scheduling new
-    // ones, so back-to-back 'ui' messages don't pile up duplicate
-    // setupCharacters fetches.
     if (timersRef.current.stage !== undefined) {
       window.clearInterval(timersRef.current.stage);
     }
@@ -147,9 +155,6 @@ export default function Page() {
       setScreen('loading');
       setLoadingStage(0);
 
-      // Mirrors the original's two-step delay: client posts setupCharacters
-      // after ~2s, then we wait another 2s of staged loading text before
-      // revealing the slot grid. Animations keep dev-mode usable too.
       timersRef.current.stage = window.setInterval(() => {
         setLoadingStage((s) => Math.min(s + 1, LOADING_STAGES.length - 1));
       }, 500);
@@ -174,8 +179,6 @@ export default function Page() {
   });
 
   useNuiEvent<SetupCharactersMessage>('setupCharacters', (data) => {
-    // Build a sparse 1-indexed array keyed by `cid` so empty slots stay
-    // null. The cid is 1-based in the QBCore schema; we keep parity.
     const max = characterAmount > 0 ? characterAmount : 5;
     const slots: Array<CharacterRow | null> = new Array(max + 1).fill(null);
     for (const row of data.characters ?? []) {
@@ -187,31 +190,32 @@ export default function Page() {
     setCharacters(slots);
   });
 
-  // ---------- Slot selection ----------
+  useEffect(() => {
+    if (characterAmount > 0) {
+      setCharacters((prev) => {
+        const next = new Array<CharacterRow | null>(characterAmount + 1).fill(null);
+        for (let i = 1; i < Math.min(prev.length, next.length); i++) {
+          next[i] = prev[i] ?? null;
+        }
+        return next;
+      });
+    }
+  }, [characterAmount]);
+
+  // ---------- Slot interaction ----------
 
   const onSlotClick = (index: number) => {
     setSelectedIndex(index);
     const existing = characters[index];
     if (existing) {
       void fetchNui('cDataPed', { cData: existing });
+      setScreen('characters');
     } else {
+      setRegisterData(EMPTY_FORM);
+      setFieldErrors({});
       void fetchNui('cDataPed', {});
-      resetRegisterData();
       setScreen('register');
     }
-  };
-
-  const resetRegisterData = () => {
-    setRegisterData({
-      firstname: '',
-      lastname: '',
-      nationality: '',
-      gender: '',
-      date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10),
-    });
-    setValidationError(null);
   };
 
   // ---------- Actions ----------
@@ -219,11 +223,7 @@ export default function Page() {
   const onPlay = () => {
     if (selectedIndex < 1) return;
     const cData = characters[selectedIndex];
-    if (!cData) {
-      resetRegisterData();
-      setScreen('register');
-      return;
-    }
+    if (!cData) return;
     void fetchNui('selectCharacter', { cData });
     setScreen('loading');
   };
@@ -233,45 +233,64 @@ export default function Page() {
     const cData = characters[selectedIndex];
     if (!cData) return;
     void fetchNui('removeCharacter', { citizenid: cData.citizenid });
+    setDeleteOpen(false);
     setScreen('characters');
   };
 
-  const onCreate = () => {
-    const { firstname, lastname, nationality, gender, date } = registerData;
-    if (!firstname.trim() || firstname.trim().length < 2) {
-      setValidationError(t('ui.forgotten_field'));
-      return;
-    }
-    if (!lastname.trim() || lastname.trim().length < 2) {
-      setValidationError(t('ui.forgotten_field'));
-      return;
-    }
-    if (!nationality.trim()) {
-      setValidationError(t('ui.forgotten_field'));
-      return;
-    }
-    if (!gender) {
-      setValidationError(t('ui.forgotten_field'));
-      return;
-    }
-    if (!date) {
-      setValidationError(t('ui.forgotten_field'));
-      return;
-    }
+  const updateRegister = (patch: Partial<RegisterFormData>) => {
+    setRegisterData((prev) => {
+      const next = { ...prev, ...patch };
+      // Re-render the preview ped when gender flips so the player can see
+      // the model swap mid-form. Empty cData payload tells the client this
+      // is the "no character yet" branch; it picks the model from `gender`.
+      if (patch.gender !== undefined && patch.gender !== prev.gender) {
+        void fetchNui('cDataPed', { gender: patch.gender });
+      }
+      return next;
+    });
+    setFieldErrors((prev) => {
+      const cleared = { ...prev };
+      for (const key of Object.keys(patch)) {
+        delete cleared[key as keyof RegisterFormData];
+      }
+      return cleared;
+    });
+  };
 
+  const validateForm = (): FieldErrors => {
+    const errors: FieldErrors = {};
+    const required = t('ui.forgotten_field');
+    if (!registerData.firstname.trim() || registerData.firstname.trim().length < 2) {
+      errors.firstname = required;
+    }
+    if (!registerData.lastname.trim() || registerData.lastname.trim().length < 2) {
+      errors.lastname = required;
+    }
+    if (!registerData.nationality.trim()) errors.nationality = required;
+    if (!registerData.gender) errors.gender = required;
+    if (!registerData.date) errors.date = required;
+    return errors;
+  };
+
+  const onCreate = () => {
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
     const payload: NewCharacterPayload = {
-      firstname: firstname.trim(),
-      lastname: lastname.trim(),
-      nationality: nationality.trim(),
-      birthdate: date,
-      gender: gender === 'female' ? 1 : 0,
+      firstname: registerData.firstname.trim(),
+      lastname: registerData.lastname.trim(),
+      nationality: registerData.nationality.trim(),
+      birthdate: formatIsoDate(registerData.date),
+      gender: registerData.gender === 'female' ? 1 : 0,
       cid: selectedIndex,
     };
     void fetchNui('createNewCharacter', payload);
     setScreen('loading');
   };
 
-  // ---------- Derived view models ----------
+  // ---------- Derived ----------
 
   const slots = useMemo(() => {
     const out: Array<{ index: number; data: CharacterRow | null }> = [];
@@ -294,60 +313,47 @@ export default function Page() {
     [t]
   );
 
-  // ---------- Effects ----------
-
-  // Re-init slot array length whenever the announced character cap changes.
-  useEffect(() => {
-    if (characterAmount > 0) {
-      setCharacters((prev) => {
-        const next = new Array<CharacterRow | null>(characterAmount + 1).fill(null);
-        for (let i = 1; i < Math.min(prev.length, next.length); i++) {
-          next[i] = prev[i] ?? null;
-        }
-        return next;
-      });
-    }
-  }, [characterAmount]);
-
   if (!visible) return null;
 
   return (
-    <div className="qbm-root">
-      <div className="qbm-card glass rounded-2xl p-8 text-on-dark">
-        {screen === 'loading' && <LoadingScreen text={t(LOADING_STAGES[loadingStage])} />}
+    <div className="fixed inset-0 flex items-center justify-center font-serif text-gray-100">
+      <div className="w-[min(1080px,94vw)] max-h-[92vh] overflow-y-auto">
+        <DossierShell>
+          {screen === 'loading' && (
+            <LoadingPanel text={t(LOADING_STAGES[loadingStage])} />
+          )}
+          {screen === 'characters' && (
+            <CharactersPanel
+              slots={slots}
+              selectedIndex={selectedIndex}
+              allowDelete={allowDelete}
+              onSlotClick={onSlotClick}
+              onPlay={onPlay}
+              onPrepareDelete={() => setDeleteOpen(true)}
+              t={t}
+            />
+          )}
+          {screen === 'register' && (
+            <RegisterPanel
+              data={registerData}
+              fieldErrors={fieldErrors}
+              customNationality={customNationality}
+              nationalityOptions={nationalityOptions}
+              genderOptions={genderOptions}
+              slotIndex={selectedIndex}
+              totalSlots={characterAmount}
+              onChange={updateRegister}
+              onCancel={() => setScreen('characters')}
+              onCreate={onCreate}
+              t={t}
+            />
+          )}
+        </DossierShell>
 
-        {screen === 'characters' && (
-          <CharactersScreen
-            slots={slots}
-            selectedIndex={selectedIndex}
-            allowDelete={allowDelete}
-            onSlotClick={onSlotClick}
-            onPlay={onPlay}
-            onPrepareDelete={() => setScreen('delete')}
-            t={t}
-          />
-        )}
-
-        {screen === 'register' && (
-          <RegisterScreen
-            data={registerData}
-            customNationality={customNationality}
-            nationalityOptions={nationalityOptions}
-            genderOptions={genderOptions}
-            error={validationError}
-            onChange={(patch) => {
-              setRegisterData((prev) => ({ ...prev, ...patch }));
-              setValidationError(null);
-            }}
-            onCancel={() => setScreen('characters')}
-            onCreate={onCreate}
-            t={t}
-          />
-        )}
-
-        {screen === 'delete' && (
-          <DeleteConfirmScreen
-            onCancel={() => setScreen('characters')}
+        {deleteOpen && screen === 'characters' && (
+          <DeleteOverlay
+            character={characters[selectedIndex] ?? null}
+            onCancel={() => setDeleteOpen(false)}
             onConfirm={onConfirmDelete}
             t={t}
           />
@@ -357,18 +363,76 @@ export default function Page() {
   );
 }
 
-// ---------------- Sub-screens ----------------
+// ============================================================
+// Layout shell
+// ============================================================
 
-function LoadingScreen({ text }: { text: string }) {
+function DossierShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-6 py-16">
-      <div className="h-12 w-12 rounded-full border-4 border-brand-500/40 border-t-brand-400 animate-spin" />
-      <p className="text-lg opacity-80">{text}</p>
+    <div className="relative bg-zinc-950/85 backdrop-blur-md border border-zinc-800/80 shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden">
+      {/* indigo accent rail on the left edge */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand-500" />
+      <Letterhead />
+      <div className="px-10 pb-10 pt-2">{children}</div>
     </div>
   );
 }
 
-interface CharactersScreenProps {
+function Letterhead() {
+  return (
+    <div className="flex items-end justify-between px-10 pt-8 pb-5 border-b border-zinc-800/70">
+      <div>
+        <p className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+          Department of Citizen Affairs
+        </p>
+        <h1 className="font-display text-4xl font-light leading-none mt-2 text-zinc-50">
+          Identity Registry
+        </h1>
+      </div>
+      <div className="text-right">
+        <p className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
+          Form&nbsp;C–07&nbsp;/&nbsp;rev.&nbsp;{new Date().getFullYear()}
+        </p>
+        <p className="font-mono text-[10px] text-zinc-600 mt-1">
+          ref&nbsp;{Math.random().toString(16).slice(2, 8).toUpperCase()}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Loading
+// ============================================================
+
+function LoadingPanel({ text }: { text: string }) {
+  const [dots, setDots] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setDots((d) => (d + 1) % 4), 350);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center gap-6 py-24">
+      <div className="flex items-center gap-3">
+        <span className="block h-px w-12 bg-zinc-700" />
+        <span className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+          processing
+        </span>
+        <span className="block h-px w-12 bg-zinc-700" />
+      </div>
+      <p className="font-display text-2xl text-zinc-100 italic font-light">
+        {text}
+        <span className="text-brand-400">{'.'.repeat(dots)}</span>
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// Character grid
+// ============================================================
+
+interface CharactersPanelProps {
   slots: Array<{ index: number; data: CharacterRow | null }>;
   selectedIndex: number;
   allowDelete: boolean;
@@ -378,7 +442,7 @@ interface CharactersScreenProps {
   t: (key: string) => string;
 }
 
-function CharactersScreen({
+function CharactersPanel({
   slots,
   selectedIndex,
   allowDelete,
@@ -386,190 +450,275 @@ function CharactersScreen({
   onPlay,
   onPrepareDelete,
   t,
-}: CharactersScreenProps) {
+}: CharactersPanelProps) {
+  const selected = slots.find((s) => s.index === selectedIndex);
+  const showActions = selected?.data;
+
   return (
-    <div className="space-y-6">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold text-shadow-sm">
+    <div className="space-y-8 pt-6">
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-display text-2xl font-light text-zinc-200">
           {t('ui.characters_header')}
-        </h1>
-        <span className="text-sm opacity-60">
-          {slots.filter((s) => s.data).length} / {slots.length}
+        </h2>
+        <span className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
+          {slots.filter((s) => s.data).length} / {slots.length} on record
         </span>
-      </header>
+      </div>
 
       <div
-        className="grid gap-4"
+        className="grid gap-3"
         style={{
           gridTemplateColumns: `repeat(${Math.min(slots.length, 5)}, minmax(0, 1fr))`,
         }}
       >
-        {slots.map(({ index, data }) => {
-          const isSelected = index === selectedIndex;
-          // Slot uses a div with role/tabIndex rather than a real <button>
-          // because each populated slot embeds play/delete <button>s for
-          // the selected state, and nested <button>s aren't valid HTML —
-          // React 19 logs a hydration warning for them.
-          return (
-            <div
-              key={index}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSlotClick(index)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSlotClick(index);
-                }
-              }}
-              className={`qbm-slot glass-brand-dark rounded-xl p-4 flex flex-col justify-between text-left cursor-pointer transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                isSelected ? 'qbm-slot-selected' : 'border border-brand-500/20'
-              }`}
-            >
-              {data ? (
-                <CharacterSlotContent
-                  data={data}
-                  isSelected={isSelected}
-                  allowDelete={allowDelete}
-                  onPlay={onPlay}
-                  onPrepareDelete={onPrepareDelete}
-                />
-              ) : (
-                <div className="flex flex-1 items-center justify-center text-5xl text-brand-300/70 select-none">
-                  +
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {slots.map(({ index, data }, idx) => (
+          <SlotCard
+            key={index}
+            index={index}
+            data={data}
+            isSelected={index === selectedIndex}
+            onClick={() => onSlotClick(index)}
+            t={t}
+            mountDelay={idx * 50}
+          />
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-4 min-h-[2.5rem]">
+        {showActions && (
+          <>
+            <ActionLink
+              icon={<PiPlayFill className="text-[15px]" />}
+              label={t('ui.play_button')}
+              onClick={onPlay}
+              accent
+            />
+            {allowDelete && (
+              <ActionLink
+                icon={<PiTrashLight className="text-[15px]" />}
+                label={t('ui.delete_button')}
+                onClick={onPrepareDelete}
+                danger
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-interface SlotContentProps {
-  data: CharacterRow;
+interface SlotCardProps {
+  index: number;
+  data: CharacterRow | null;
   isSelected: boolean;
-  allowDelete: boolean;
-  onPlay: () => void;
-  onPrepareDelete: () => void;
+  onClick: () => void;
+  t: (key: string) => string;
+  mountDelay: number;
 }
 
-function CharacterSlotContent({
+function SlotCard({
+  index,
   data,
   isSelected,
-  allowDelete,
-  onPlay,
-  onPrepareDelete,
-}: SlotContentProps) {
+  onClick,
+  t,
+  mountDelay,
+}: SlotCardProps) {
   return (
-    <>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      style={{ animationDelay: `${mountDelay}ms` }}
+      className={[
+        'group relative aspect-[3/4] cursor-pointer',
+        'border border-zinc-800/80',
+        'bg-gradient-to-b from-zinc-900/80 to-zinc-950/80',
+        'transition-all duration-300 ease-out',
+        'animate-[fadeIn_400ms_ease-out_both]',
+        'hover:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-brand-500/60',
+        isSelected
+          ? 'border-brand-500/60 shadow-[inset_3px_0_0_0_rgba(99,102,241,0.9),0_8px_30px_rgba(99,102,241,0.18)]'
+          : '',
+      ].join(' ')}
+    >
+      {/* corner case file number */}
+      <span className="absolute top-3 left-3 font-mono text-[9px] tracking-[0.3em] text-zinc-600 uppercase">
+        File&nbsp;{String(index).padStart(2, '0')}
+      </span>
       {isSelected && (
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
-            className="rounded-full bg-brand-500/80 hover:bg-brand-400 px-3 py-1 text-xs font-medium"
-          >
-            ▶
-          </button>
-          {allowDelete && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPrepareDelete();
-              }}
-              className="rounded-full bg-red-600/80 hover:bg-red-500 px-3 py-1 text-xs font-medium"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+        <span className="absolute top-3 right-3 font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
+          ▸ Active
+        </span>
       )}
 
-      <div className="space-y-1 text-sm">
-        <div className="flex items-center gap-2 opacity-80">
-          <span className="opacity-60">job</span>
-          <span>{data.job?.label ?? '—'}</span>
-        </div>
-        <div className="flex items-center gap-2 opacity-80">
-          <span className="opacity-60">cash</span>
-          <span>${dollar.format(data.money?.cash ?? 0)}</span>
-        </div>
-        <div className="flex items-center gap-2 opacity-80">
-          <span className="opacity-60">bank</span>
-          <span>${dollar.format(data.money?.bank ?? 0)}</span>
-        </div>
-      </div>
-
-      <div className="mt-3 truncate text-base font-medium">
-        {data.charinfo.firstname} {data.charinfo.lastname}
-      </div>
-    </>
+      {data ? <SlotContent data={data} /> : <SlotEmpty t={t} />}
+    </div>
   );
 }
 
-interface RegisterScreenProps {
-  data: {
-    firstname: string;
-    lastname: string;
-    nationality: string;
-    gender: string;
-    date: string;
-  };
+function SlotContent({ data }: { data: CharacterRow }) {
+  return (
+    <div className="absolute inset-0 flex flex-col justify-between p-4 pt-10">
+      <div className="flex flex-col gap-2 font-mono text-[11px] text-zinc-400">
+        <StatRow icon={<PiBriefcaseLight />} value={data.job?.label ?? '—'} />
+        <StatRow
+          icon={<PiMoneyLight />}
+          value={`$${dollar.format(data.money?.cash ?? 0)}`}
+        />
+        <StatRow
+          icon={<PiBankLight />}
+          value={`$${dollar.format(data.money?.bank ?? 0)}`}
+        />
+      </div>
+      <div className="space-y-1">
+        <span className="block h-px bg-zinc-700/60" />
+        <p className="font-display text-lg font-light text-zinc-50 leading-tight truncate">
+          {data.charinfo.firstname}
+        </p>
+        <p className="font-display text-lg font-light text-zinc-300 leading-tight truncate -mt-1">
+          {data.charinfo.lastname}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SlotEmpty({ t }: { t: (k: string) => string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-zinc-500 group-hover:text-zinc-300 transition-colors">
+      <PiPlusLight className="text-3xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
+      <p className="font-mono text-[9px] tracking-[0.3em] uppercase">
+        {t('ui.create_button')}
+      </p>
+    </div>
+  );
+}
+
+function StatRow({
+  icon,
+  value,
+}: {
+  icon: React.ReactNode;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-zinc-600 text-[14px] shrink-0">{icon}</span>
+      <span className="truncate text-zinc-300">{value}</span>
+    </div>
+  );
+}
+
+// ============================================================
+// Inline action link (text + icon, hairline border, no rounded glass pill)
+// ============================================================
+
+interface ActionLinkProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  accent?: boolean;
+  danger?: boolean;
+}
+
+function ActionLink({ icon, label, onClick, accent, danger }: ActionLinkProps) {
+  const tone = danger
+    ? 'text-red-300 hover:text-red-200 border-red-500/40 hover:border-red-400'
+    : accent
+      ? 'text-brand-300 hover:text-brand-200 border-brand-500/50 hover:border-brand-400'
+      : 'text-zinc-300 hover:text-zinc-100 border-zinc-700 hover:border-zinc-500';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 px-4 py-1.5 border-b border-l-0 border-r-0 border-t-0 ${tone} transition-colors font-mono text-[10px] tracking-[0.3em] uppercase`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+// ============================================================
+// Register form
+// ============================================================
+
+interface RegisterPanelProps {
+  data: RegisterFormData;
+  fieldErrors: FieldErrors;
   customNationality: boolean;
   nationalityOptions: Array<{ label: string; value: string }>;
   genderOptions: Array<{ label: string; value: string }>;
-  error: string | null;
-  onChange: (patch: Partial<RegisterScreenProps['data']>) => void;
+  slotIndex: number;
+  totalSlots: number;
+  onChange: (patch: Partial<RegisterFormData>) => void;
   onCancel: () => void;
   onCreate: () => void;
-  t: (key: string) => string;
+  t: (k: string) => string;
 }
 
-function RegisterScreen({
+function RegisterPanel({
   data,
+  fieldErrors,
   customNationality,
   nationalityOptions,
   genderOptions,
-  error,
+  slotIndex,
+  totalSlots,
   onChange,
   onCancel,
   onCreate,
   t,
-}: RegisterScreenProps) {
+}: RegisterPanelProps) {
   return (
-    <div className="space-y-5">
-      <header className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-shadow-sm">
-          {t('ui.chardel_header')}
-        </h2>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-2xl opacity-60 hover:opacity-100 transition"
-          aria-label={t('ui.cancel')}
-        >
-          ×
-        </button>
-      </header>
+    <div className="space-y-8 pt-6">
+      <div className="flex items-end justify-between border-b border-zinc-800/70 pb-4">
+        <div>
+          <p className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+            Section II · Enrollment
+          </p>
+          <h2 className="font-display text-2xl font-light text-zinc-100 mt-1">
+            {t('ui.chardel_header')}
+          </h2>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
+            File&nbsp;{String(slotIndex).padStart(2, '0')}&nbsp;/&nbsp;
+            {String(totalSlots).padStart(2, '0')}
+          </span>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label={t('ui.cancel')}
+            className="text-zinc-500 hover:text-zinc-200 transition-colors"
+          >
+            <PiXLight className="text-2xl" />
+          </button>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <FormInput
           id="qbm-firstname"
           label={t('ui.firstname')}
           value={data.firstname}
           onChange={(e) => onChange({ firstname: e.target.value })}
+          error={fieldErrors.firstname}
         />
         <FormInput
           id="qbm-lastname"
           label={t('ui.lastname')}
           value={data.lastname}
           onChange={(e) => onChange({ lastname: e.target.value })}
+          error={fieldErrors.lastname}
         />
         {customNationality ? (
           <FormInput
@@ -577,6 +726,7 @@ function RegisterScreen({
             label={t('ui.nationality')}
             value={data.nationality}
             onChange={(e) => onChange({ nationality: e.target.value })}
+            error={fieldErrors.nationality}
           />
         ) : (
           <FormSelect
@@ -586,6 +736,7 @@ function RegisterScreen({
             value={data.nationality}
             onChange={(value) => onChange({ nationality: value })}
             placeholder={t('ui.nationality')}
+            error={fieldErrors.nationality}
           />
         )}
         <FormSelect
@@ -595,52 +746,92 @@ function RegisterScreen({
           value={data.gender}
           onChange={(value) => onChange({ gender: value })}
           placeholder={t('ui.gender')}
+          error={fieldErrors.gender}
         />
-        <div className="space-y-2 sm:col-span-2">
-          <label htmlFor="qbm-date" className="block font-medium">
-            {t('ui.birthdate')}
-          </label>
-          <input
-            id="qbm-date"
-            type="date"
-            value={data.date}
-            min="1900-01-01"
-            max="2100-12-31"
-            onChange={(e) => onChange({ date: e.target.value })}
-            className="w-full px-4 py-2 glass-brand-dark rounded-lg border border-brand-500/20 focus:outline-none focus:ring-2 focus:ring-brand-700/50"
+        <div className="sm:col-span-2">
+          <DatePicker
+            id="qbm-birthdate"
+            label={t('ui.birthdate')}
+            selected={data.date}
+            onChange={(date) => onChange({ date })}
+            error={fieldErrors.date}
           />
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-900/30 px-4 py-2 text-sm text-red-200">
-          {t('ui.ran_into_issue')} — {error}
-        </div>
-      )}
-
-      <Button fullWidth size="lg" onClick={onCreate}>
-        {t('ui.create_button')}
-      </Button>
+      <div className="flex items-center justify-end gap-3 border-t border-zinc-800/70 pt-6">
+        <ActionLink
+          icon={<PiXLight className="text-[15px]" />}
+          label={t('ui.cancel')}
+          onClick={onCancel}
+        />
+        <ActionLink
+          icon={<PiPlayFill className="text-[15px]" />}
+          label={t('ui.create_button')}
+          onClick={onCreate}
+          accent
+        />
+      </div>
     </div>
   );
 }
 
-interface DeleteConfirmScreenProps {
+// ============================================================
+// Delete overlay (modal that doesn't replace the grid)
+// ============================================================
+
+interface DeleteOverlayProps {
+  character: CharacterRow | null;
   onCancel: () => void;
   onConfirm: () => void;
-  t: (key: string) => string;
+  t: (k: string) => string;
 }
 
-function DeleteConfirmScreen({ onCancel, onConfirm, t }: DeleteConfirmScreenProps) {
+function DeleteOverlay({
+  character,
+  onCancel,
+  onConfirm,
+  t,
+}: DeleteOverlayProps) {
   return (
-    <div className="space-y-5 text-center py-10">
-      <h2 className="text-xl font-semibold">{t('ui.deletechar_header')}</h2>
-      <p className="opacity-80">{t('ui.deletechar_description')}</p>
-      <div className="flex justify-center gap-3">
-        <Button onClick={onConfirm} className="bg-red-600/80 hover:bg-red-500">
-          {t('ui.confirm')}
-        </Button>
-        <Button onClick={onCancel}>{t('ui.cancel')}</Button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_180ms_ease-out_both]"
+      onClick={onCancel}
+    >
+      <div
+        className="relative w-[420px] max-w-[90vw] bg-zinc-950 border border-zinc-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="absolute -top-px -left-px w-12 h-px bg-red-500/80" />
+        <div className="absolute -top-px -left-px w-px h-12 bg-red-500/80" />
+
+        <div className="p-8 space-y-5">
+          <p className="font-mono text-[10px] tracking-[0.4em] text-red-400 uppercase">
+            ✕ Void Record
+          </p>
+          <h3 className="font-display text-2xl font-light text-zinc-100 leading-tight">
+            {character
+              ? `${character.charinfo.firstname} ${character.charinfo.lastname}`
+              : t('ui.deletechar_header')}
+          </h3>
+          <p className="text-sm text-zinc-400 font-serif italic">
+            {t('ui.deletechar_description')}
+          </p>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <ActionLink
+              icon={<PiXLight className="text-[15px]" />}
+              label={t('ui.cancel')}
+              onClick={onCancel}
+            />
+            <ActionLink
+              icon={<PiTrashLight className="text-[15px]" />}
+              label={t('ui.confirm')}
+              onClick={onConfirm}
+              danger
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

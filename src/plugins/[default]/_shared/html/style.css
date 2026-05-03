@@ -2,9 +2,37 @@
  * src/webview/theme/tailwind.config.ts already globs the entire src tree,
  * so this single stylesheet contains every utility class any plugin's
  * webview references and purging is global, not per-plugin. */
+
+/* Fonts available to every consumer plugin. Fraunces is the display
+ * serif (high contrast, optical sizing); JetBrains Mono carries IDs,
+ * stats, and meta-text; Libre Baskerville stays as the body serif. */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=JetBrains+Mono:wght@300..600&family=Libre+Baskerville:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* CEF NUI defaults to an opaque base, which would smother the in-game
+ * camera scene that consumer plugins render over. Force transparent so
+ * the game shows through wherever a plugin's component doesn't paint. */
+html,
+body {
+  background: transparent !important;
+}
+
+/* Shared keyframes consumers reference via Tailwind's `animate-[name_…]`
+ * arbitrary-value syntax. Defined here so each plugin doesn't have to
+ * re-declare them. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @layer components {
   input[type='number'] {

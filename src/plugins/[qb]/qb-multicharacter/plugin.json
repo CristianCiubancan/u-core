@@ -12,7 +12,6 @@
   "files": [
     "html/index.html",
     "html/main.js",
-    "html/style.css",
     "countries.json"
   ],
   "dependencies": ["qb-core", "qb-spawn"]

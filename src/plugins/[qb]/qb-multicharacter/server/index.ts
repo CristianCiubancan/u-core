@@ -36,7 +36,19 @@ async function giveStarterItems(src: number): Promise<void> {
   const charinfo = Player.PlayerData.charinfo as CharInfo;
   const citizenid: string = Player.PlayerData.citizenid;
 
-  for (const item of QBCore.Shared.StarterItems as any[]) {
+  // QBCore.Shared.StarterItems is a Lua table; depending on the QBCore
+  // build it surfaces in JS as either an array (numeric keys) or an
+  // object (named keys). Normalize before iterating; tolerate it being
+  // missing entirely on builds that handed starter items to qb-inventory.
+  const raw = (QBCore.Shared as any)?.StarterItems;
+  const items: any[] = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object'
+      ? Object.values(raw)
+      : [];
+  if (items.length === 0) return;
+
+  for (const item of items) {
     const info: Record<string, unknown> = {};
     if (item.item === 'id_card') {
       info.citizenid = citizenid;

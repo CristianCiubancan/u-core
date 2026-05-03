@@ -9,10 +9,9 @@ import { Config } from '../shared/config';
 
 const QBCore = (exports as any)['qb-core'].GetCoreObject();
 
-const RANDOM_MODELS: number[] = [
-  GetHashKey('mp_m_freemode_01'),
-  GetHashKey('mp_f_freemode_01'),
-];
+const MALE_MODEL = GetHashKey('mp_m_freemode_01');
+const FEMALE_MODEL = GetHashKey('mp_f_freemode_01');
+const RANDOM_MODELS: number[] = [MALE_MODEL, FEMALE_MODEL];
 
 let cam: number | null = null;
 let charPed: number | null = null;
@@ -292,42 +291,52 @@ RegisterNuiCallback('selectCharacter', (data: { cData: any }, cb: NuiCb) => {
   cb('ok');
 });
 
-RegisterNuiCallback('cDataPed', async (payload: { cData?: any }, cb: NuiCb) => {
-  destroyPed();
-  const cData = payload?.cData;
-  if (!cData) {
-    await initializePedModel(null, null);
-    cb('ok');
-    return;
-  }
+RegisterNuiCallback(
+  'cDataPed',
+  async (payload: { cData?: any; gender?: string | number }, cb: NuiCb) => {
+    destroyPed();
+    const cData = payload?.cData;
+    if (!cData) {
+      // For empty slots the form's selected gender drives which freemode
+      // model spawns — flipping the dropdown updates the preview ped
+      // immediately. Falls back to a random pick when no gender is set.
+      const hint = payload?.gender;
+      let model: number | null = null;
+      if (hint === 'male' || hint === 0 || hint === '0') model = MALE_MODEL;
+      else if (hint === 'female' || hint === 1 || hint === '1') model = FEMALE_MODEL;
+      await initializePedModel(model, null);
+      cb('ok');
+      return;
+    }
 
-  if (!cachedPlayerSkins[cData.citizenid]) {
-    const skin = await new Promise<{ model: number | null; data: string | null }>(
-      (resolve) => {
-        QBCore.Functions.TriggerCallback(
-          'qb-multicharacter:server:getSkin',
-          (model: string | null, data: string | null) => {
-            const numericModel =
-              model !== null && model !== undefined ? Number(model) : null;
-            resolve({
-              model: Number.isFinite(numericModel) ? (numericModel as number) : null,
-              data: data ?? null,
-            });
-          },
-          cData.citizenid
-        );
-      }
+    if (!cachedPlayerSkins[cData.citizenid]) {
+      const skin = await new Promise<{ model: number | null; data: string | null }>(
+        (resolve) => {
+          QBCore.Functions.TriggerCallback(
+            'qb-multicharacter:server:getSkin',
+            (model: string | null, data: string | null) => {
+              const numericModel =
+                model !== null && model !== undefined ? Number(model) : null;
+              resolve({
+                model: Number.isFinite(numericModel) ? (numericModel as number) : null,
+                data: data ?? null,
+              });
+            },
+            cData.citizenid
+          );
+        }
+      );
+      cachedPlayerSkins[cData.citizenid] = skin;
+    }
+
+    const cached = cachedPlayerSkins[cData.citizenid];
+    await initializePedModel(
+      cached.model,
+      cached.data ? JSON.parse(cached.data) : null
     );
-    cachedPlayerSkins[cData.citizenid] = skin;
+    cb('ok');
   }
-
-  const cached = cachedPlayerSkins[cData.citizenid];
-  await initializePedModel(
-    cached.model,
-    cached.data ? JSON.parse(cached.data) : null
-  );
-  cb('ok');
-});
+);
 
 RegisterNuiCallback('setupCharacters', (_data: unknown, cb: NuiCb) => {
   QBCore.Functions.TriggerCallback(

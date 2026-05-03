@@ -267,14 +267,19 @@ const server = http.createServer((req, res) => {
   })();
 });
 
-// Start the server on port 3414, bound to localhost only. The Docker compose
-// publish maps `127.0.0.1:3414:3414`, so cross-host reach requires SSH
-// tunneling (or an explicit deployment-time change to both layers).
+// Start the server. Bind to all interfaces inside the container — the
+// docker-compose port publish (`127.0.0.1:3414:3414`) is what restricts
+// reach to host-loopback only; binding to 127.0.0.1 *inside* the container
+// would make Docker's NAT unable to forward, since the host port hits
+// the container's eth0, not its loopback. Outside Docker (pnpm
+// start:windows) this still binds to 0.0.0.0, which is fine for a
+// developer machine guarded by the API_KEY auth.
 const PORT = GetConvarInt('resource_manager_port', 3414);
+const HOST = '0.0.0.0';
 
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, HOST, () => {
   console.log(
-    `[resource-manager] Resource management server running on 127.0.0.1:${PORT}`
+    `[resource-manager] Resource management server running on ${HOST}:${PORT}`
   );
 });
 
