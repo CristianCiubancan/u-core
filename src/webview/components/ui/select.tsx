@@ -9,17 +9,69 @@ import { cn } from '@/lib/utils';
  * Trigger reads as the same hairline-underline as Input. Content
  * portal'd to body (auto flip + scroll lock from Radix). Items pick
  * up brand tint on highlight.
+ *
+ * Width pinning: Radix's `--radix-select-trigger-width` CSS variable
+ * was empirically not winning at runtime even when applied via
+ * inline style on the Content. We measure the trigger ourselves with
+ * a ResizeObserver and share the pixel value through a tiny context;
+ * the Content reads that value and clamps its width directly. This
+ * is bulletproof against Radix internals.
  */
-const Select = SelectPrimitive.Root;
+
+const SelectWidthContext = React.createContext<number | undefined>(undefined);
+
+const Select = ({
+  children,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Root>) => {
+  const [width, setWidth] = React.useState<number | undefined>();
+  // Clone the value object so each Select instance gets its own
+  // reference and dependent context consumers re-render correctly.
+  const value = React.useMemo(() => width, [width]);
+  return (
+    <SelectWidthContext.Provider value={value}>
+      <SelectMeasureContext.Provider value={setWidth}>
+        <SelectPrimitive.Root {...props}>{children}</SelectPrimitive.Root>
+      </SelectMeasureContext.Provider>
+    </SelectWidthContext.Provider>
+  );
+};
+
+const SelectMeasureContext = React.createContext<
+  React.Dispatch<React.SetStateAction<number | undefined>>
+>(() => {});
+
 const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => {
+  const setWidth = React.useContext(SelectMeasureContext);
+  const localRef = React.useRef<HTMLButtonElement>(null);
+
+  // Forward both refs.
+  React.useImperativeHandle(
+    ref,
+    () => localRef.current as HTMLButtonElement,
+    []
+  );
+
+  React.useLayoutEffect(() => {
+    const el = localRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [setWidth]);
+
+  return (
   <SelectPrimitive.Trigger
-    ref={ref}
+    ref={localRef}
     className={cn(
       'flex w-full items-center justify-between',
       'bg-transparent border-0 border-b border-input/70 px-1 py-1.5 pr-6',
@@ -39,7 +91,8 @@ const SelectTrigger = React.forwardRef<
       <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
-));
+  );
+});
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectScrollUpButton = React.forwardRef<
@@ -79,22 +132,23 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', style, ...props }, ref) => (
+>(({ className, children, position = 'popper', style, ...props }, ref) => {
+  // Pixel width measured by the matching SelectTrigger via the
+  // surrounding Select wrapper. This is the bulletproof replacement
+  // for Radix's `--radix-select-trigger-width` CSS variable, which
+  // empirically wasn't being honored at runtime regardless of how we
+  // applied it (Tailwind class, inline style with var()).
+  const triggerWidth = React.useContext(SelectWidthContext);
+  return (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
       position={position}
-      // Inline style for the trigger-width pin — Radix sets several
-      // inline styles on this element via its positioning logic, and
-      // empirically a Tailwind class (`w-[var(...)]`) was being beaten
-      // by them at runtime even though the rule existed in the
-      // compiled CSS. Inline `style` has the same specificity as
-      // Radix's, but our value resolves first because we set it last.
       style={
-        position === 'popper'
+        position === 'popper' && triggerWidth
           ? {
-              width: 'var(--radix-select-trigger-width)',
-              maxWidth: 'var(--radix-select-trigger-width)',
+              width: `${triggerWidth}px`,
+              maxWidth: `${triggerWidth}px`,
               ...style,
             }
           : style
@@ -129,7 +183,8 @@ const SelectContent = React.forwardRef<
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
-));
+  );
+});
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef<

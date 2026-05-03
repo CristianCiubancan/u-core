@@ -692,11 +692,11 @@ function RegisterPanel({
         </div>
       </Paper>
 
-      {/* Form fields paper. The Radix-based Select / DatePicker popups
-          portal to document.body and pick their own collision-aware
-          placement, so we no longer need z-index gymnastics on the
-          form paper. */}
-      <Paper className="px-5 py-4">
+      {/* Fields sit directly over the dossier scene without their own
+          paper backing — the section header above and the action bar
+          below carry the visual weight; piling another paper on the
+          fields just felt like an opaque slab over the wardrobe. */}
+      <div className="px-1">
         <div className="grid grid-cols-1 gap-3">
           <Field
             id="qbm-firstname"
@@ -793,7 +793,7 @@ function RegisterPanel({
             error={fieldErrors.date}
           />
         </div>
-      </Paper>
+      </div>
 
       {/* Action bar paper */}
       <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
