@@ -5,7 +5,8 @@
   "games": ["gta5"],
   "lua54": true,
   "author": "u-core (TS port of qbcore-framework/qb-core)",
-  "description": "WIP port of qb-core. Phase 2a: Shared data wiring + GetCoreObject exports. The `-port-wip` suffix keeps this from claiming the `qb-core` resource name while upstream is still authoritative; we rename to plain `qb-core` and patch the txAdmin recipe once Phase 2b/c land the runtime code.",
+  "description": "WIP port of qb-core. Server side fully ported (Functions/Player/Events/Exports/Debug). Client side covers Functions/Events/Loops/DrawText with vehicle-properties getters/setters as core-fields-only stubs. The `-port-wip` suffix keeps this from claiming the `qb-core` resource name while upstream is still authoritative; we rename to plain `qb-core` and patch the txAdmin recipe once Phase 4 (locale) lands and we've verified end-to-end against the existing qb-multicharacter / qb-spawn flow.",
+  "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
   "dependencies": ["oxmysql"]
 }
