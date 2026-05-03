@@ -200,7 +200,12 @@ const SelectContent = React.forwardRef<
       className={cn(
         'relative z-50 max-h-60 overflow-hidden',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
+        // No drop shadow — the previous shadow-[0_8px_32px_rgba(0,0,0,.45)]
+        // painted a 32px-blur dark halo around the dropdown that read as
+        // "background extends past the trigger" against a dark scene. The
+        // hairline border + backdrop-blur carry enough separation; the
+        // dossier vocabulary specifically avoids drop shadows.
+        'outline-none',
         'data-[state=open]:animate-[fadeIn_140ms_ease-out_both]',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',

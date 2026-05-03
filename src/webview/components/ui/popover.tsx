@@ -30,7 +30,10 @@ const PopoverContent = React.forwardRef<
       className={cn(
         'z-50 w-72 outline-none',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.45)]',
+        // Drop shadow removed — it painted a halo wider than the popup
+        // that read as the dropdown "extending past" the trigger. The
+        // hairline border carries enough separation against the
+        // backdrop-blurred scene.
         'p-3',
         className
       )}
