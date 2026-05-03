@@ -18,6 +18,46 @@ const Countries: string[] = JSON.parse(
   LoadResourceFile(GetCurrentResourceName(), 'countries.json') || '[]'
 );
 
+/**
+ * Read `Apartments.Starting` from qb-apartments' config.lua at boot.
+ *
+ * Upstream qb-multicharacter declares `'@qb-apartments/config.lua'` as
+ * a `shared_script` in its fxmanifest, which makes the Lua-global
+ * `Apartments.Starting` available in-process. `createCharacter` then
+ * gates the apartments-vs-default branch on this value: when it's
+ * `false`, server admins are opting their server out of the
+ * "start in an apartment" UX and the new char goes through
+ * `closeNUIdefault` (DefaultSpawn) instead of `apartments:client:
+ * setupSpawnUI`.
+ *
+ * Our TS bundle can't reach a Lua-global from another resource, so
+ * we read+parse the config file directly. Cache once at module load;
+ * the file doesn't change at runtime. Defaults to `true` (matches the
+ * stock qb-apartments config) when:
+ *   - qb-apartments isn't installed → `LoadResourceFile` returns nil
+ *   - the file isn't parseable
+ *   - the assignment is absent or commented out
+ *
+ * Lua comments are stripped before matching so a server admin can
+ * `-- Apartments.Starting = false` to mean "treat as default true".
+ */
+function readApartmentsStarting(): boolean {
+  try {
+    const raw = LoadResourceFile('qb-apartments', 'config.lua');
+    if (!raw) return true;
+    // Strip line comments (`-- …` to end of line) before matching so
+    // a commented-out assignment doesn't trigger a false positive.
+    const stripped = raw.replace(/--.*$/gm, '');
+    const match = stripped.match(/Apartments\.Starting\s*=\s*(true|false)/);
+    if (!match) return true;
+    return match[1] === 'true';
+  } catch {
+    return true;
+  }
+}
+
+const APARTMENTS_STARTING = readApartmentsStarting();
+
 // Tracks whether other resources have finished their preload hooks for a
 // given source. We block `loadUserData` until this flips so downstream
 // scripts (qb-clothing, qb-houses, …) see a fully-initialized player.
@@ -275,11 +315,16 @@ onNet('qb-multicharacter:server:createCharacter', async (data: any) => {
 
   await waitForPreloading(src);
 
-  // qb-apartments exposes `Apartments.Starting` via a shared script. We
-  // can't `@qb-apartments/config.lua` from a JS bundle, so default to
-  // the apartments path whenever the resource is started — that mirrors
-  // the QBCore stock config (Apartments.Starting = true).
-  if (GetResourceState('qb-apartments') === 'started') {
+  // Match upstream's two-part gate: qb-apartments must be running AND
+  // its `Apartments.Starting` config flag must be true. The flag is
+  // read+parsed from qb-apartments/config.lua at module load (see
+  // `readApartmentsStarting`); when admins set it to false they're
+  // opting out of the "start in an apartment" UX and new chars take
+  // the DefaultSpawn / `closeNUIdefault` path instead.
+  if (
+    GetResourceState('qb-apartments') === 'started' &&
+    APARTMENTS_STARTING
+  ) {
     const randbucket = `${GetPlayerPed(String(src))}${Math.floor(Math.random() * 999) + 1}`;
     SetPlayerRoutingBucket(String(src), Number(randbucket));
     console.log(`^2[qb-core]^7 ${GetPlayerName(String(src))} has successfully loaded!`);
