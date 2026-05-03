@@ -406,12 +406,23 @@ function CharactersScreen({
       >
         {slots.map(({ index, data }) => {
           const isSelected = index === selectedIndex;
+          // Slot uses a div with role/tabIndex rather than a real <button>
+          // because each populated slot embeds play/delete <button>s for
+          // the selected state, and nested <button>s aren't valid HTML —
+          // React 19 logs a hydration warning for them.
           return (
-            <button
+            <div
               key={index}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onSlotClick(index)}
-              className={`qbm-slot glass-brand-dark rounded-xl p-4 flex flex-col justify-between text-left transition-all duration-200 hover:scale-[1.02] ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSlotClick(index);
+                }
+              }}
+              className={`qbm-slot glass-brand-dark rounded-xl p-4 flex flex-col justify-between text-left cursor-pointer transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 isSelected ? 'qbm-slot-selected' : 'border border-brand-500/20'
               }`}
             >
@@ -428,7 +439,7 @@ function CharactersScreen({
                   +
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
