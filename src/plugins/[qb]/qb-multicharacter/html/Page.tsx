@@ -322,7 +322,7 @@ export default function Page() {
           the game world shows through the gaps. pointer-events-none on
           the column itself plus pointer-events-auto per paper means
           clicks fall through the gaps to FiveM. */}
-      <div className="absolute right-6 top-6 bottom-6 w-[min(440px,40vw)] flex flex-col gap-3 overflow-y-auto pointer-events-none">
+      <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-none pr-1">
         <Letterhead />
 
         {screen === 'loading' && (
@@ -409,21 +409,21 @@ function Paper({
 
 function Letterhead() {
   return (
-    <Paper className="px-6 py-5 shrink-0">
+    <Paper className="px-5 py-4 shrink-0">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-500 uppercase">
+        <div className="min-w-0">
+          <p className="font-mono text-[8.5px] tracking-[0.35em] text-zinc-500 uppercase truncate">
             Department of Citizen Affairs
           </p>
-          <h1 className="font-display text-3xl font-light leading-none mt-2 text-zinc-50">
+          <h1 className="font-display text-[1.6rem] font-light leading-tight mt-1.5 text-zinc-50">
             Identity Registry
           </h1>
         </div>
         <div className="text-right shrink-0">
-          <p className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
-            Form C–07
+          <p className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-500 uppercase">
+            Form&nbsp;C–07
           </p>
-          <p className="font-mono text-[9px] text-zinc-600 mt-1">
+          <p className="font-mono text-[8.5px] text-zinc-600 mt-0.5">
             rev.&nbsp;{new Date().getFullYear()}
           </p>
         </div>
@@ -490,11 +490,11 @@ function CharactersPanel({
       {/* Section header floats above the cards — no paper. text-shadow
           keeps it legible if the camera framing ever puts a bright
           surface behind the column. */}
-      <div className="flex items-baseline justify-between px-1 pointer-events-none [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)]">
-        <h2 className="font-display text-xl font-light text-zinc-100">
+      <div className="flex items-baseline justify-between gap-2 px-0.5 pt-1 pointer-events-none [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)]">
+        <h2 className="font-display text-lg font-light text-zinc-100 truncate">
           {t('ui.characters_header')}
         </h2>
-        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-300 uppercase">
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-300 uppercase shrink-0">
           {slots.filter((s) => s.data).length}/{slots.length} on record
         </span>
       </div>
@@ -511,18 +511,18 @@ function CharactersPanel({
         />
       ))}
 
-      <Paper className="px-4 py-3 flex items-center justify-end gap-2 mt-auto">
+      <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
         {showActions ? (
           <>
             <ActionLink
-              icon={<PiPlayFill className="text-[15px]" />}
+              icon={<PiPlayFill className="text-[13px]" />}
               label={t('ui.play_button')}
               onClick={onPlay}
               accent
             />
             {allowDelete && (
               <ActionLink
-                icon={<PiTrashLight className="text-[15px]" />}
+                icon={<PiTrashLight className="text-[13px]" />}
                 label={t('ui.delete_button')}
                 onClick={onPrepareDelete}
                 danger
@@ -530,7 +530,7 @@ function CharactersPanel({
             )}
           </>
         ) : (
-          <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-500 uppercase">
             Select a file
           </span>
         )}
@@ -573,12 +573,12 @@ function SlotRow({
           }
         }}
         style={{ animationDelay: `${mountDelay}ms` }}
-        className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 px-3 py-3 outline-none"
+        className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5 px-3 py-2.5 outline-none"
       >
         {/* file number (left) */}
-        <div className="font-mono text-[9px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
+        <div className="font-mono text-[8.5px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
           <div className="text-zinc-600">File</div>
-          <div className="text-zinc-200 text-base font-display tracking-normal">
+          <div className="text-zinc-200 text-[15px] font-display tracking-normal leading-tight">
             {String(index).padStart(2, '0')}
           </div>
         </div>
@@ -591,12 +591,12 @@ function SlotRow({
         {/* status badge (right) */}
         <div className="shrink-0">
           {isSelected && data && (
-            <span className="font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
-              ▸ Active
+            <span className="font-mono text-[8.5px] tracking-[0.3em] text-brand-400 uppercase">
+              ▸&nbsp;Active
             </span>
           )}
           {!data && (
-            <PiPlusLight className="text-xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
+            <PiPlusLight className="text-lg text-zinc-600 group-hover:text-brand-400 transition-colors" />
           )}
         </div>
       </div>
@@ -608,11 +608,13 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
   const fullName = `${data.charinfo.firstname} ${data.charinfo.lastname}`.trim();
   return (
     <>
-      <p className="font-display text-base font-light text-zinc-50 leading-tight truncate">
+      <p className="font-display text-[15px] font-light text-zinc-50 leading-tight truncate">
         {fullName || '—'}
       </p>
-      <div className="flex items-center gap-3 mt-1 font-mono text-[10px] text-zinc-400">
-        <span className="inline-flex items-center gap-1 truncate">
+      {/* Stats wrap to a second row when the column is too narrow rather
+          than truncating to "..." or pushing the active badge off-screen. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1 font-mono text-[9.5px] text-zinc-400">
+        <span className="inline-flex items-center gap-1 truncate max-w-full">
           <PiBriefcaseLight className="text-zinc-500 shrink-0" />
           <span className="truncate">{data.job?.label ?? '—'}</span>
         </span>
@@ -631,7 +633,7 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
 
 function SlotEmpty({ t }: { t: (k: string) => string }) {
   return (
-    <div className="font-mono text-[10px] tracking-[0.25em] text-zinc-500 uppercase group-hover:text-zinc-300 transition-colors">
+    <div className="font-mono text-[9.5px] tracking-[0.25em] text-zinc-500 uppercase group-hover:text-zinc-300 transition-colors truncate">
       {t('ui.create_button')}
     </div>
   );
@@ -659,7 +661,7 @@ function ActionLink({ icon, label, onClick, accent, danger }: ActionLinkProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-4 py-1.5 border-b border-l-0 border-r-0 border-t-0 ${tone} transition-colors font-mono text-[10px] tracking-[0.3em] uppercase`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border-b border-l-0 border-r-0 border-t-0 ${tone} transition-colors font-mono text-[9.5px] tracking-[0.25em] uppercase whitespace-nowrap`}
     >
       {icon}
       <span>{label}</span>
@@ -701,24 +703,24 @@ function RegisterPanel({
   return (
     <>
       {/* Floating section header */}
-      <div className="flex items-end justify-between px-1 [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)] pointer-events-none">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-300 uppercase">
+      <div className="flex items-end justify-between gap-2 px-0.5 pt-1 [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)] pointer-events-none">
+        <div className="min-w-0">
+          <p className="font-mono text-[8.5px] tracking-[0.35em] text-zinc-300 uppercase truncate">
             Section II · Enrollment
           </p>
-          <h2 className="font-display text-xl font-light text-zinc-100 mt-1">
+          <h2 className="font-display text-lg font-light text-zinc-100 mt-0.5 truncate">
             {t('ui.chardel_header')}
           </h2>
         </div>
-        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-300 uppercase">
-          File&nbsp;{String(slotIndex).padStart(2, '0')}&nbsp;/&nbsp;
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-300 uppercase shrink-0">
+          File&nbsp;{String(slotIndex).padStart(2, '0')}/
           {String(totalSlots).padStart(2, '0')}
         </span>
       </div>
 
       {/* Form fields paper */}
-      <Paper className="px-5 py-5">
-        <div className="grid grid-cols-1 gap-4">
+      <Paper className="px-4 py-4">
+        <div className="grid grid-cols-1 gap-3">
           <FormInput
             id="qbm-firstname"
             label={t('ui.firstname')}
@@ -772,14 +774,14 @@ function RegisterPanel({
       </Paper>
 
       {/* Action bar paper */}
-      <Paper className="px-4 py-3 flex items-center justify-end gap-2 mt-auto">
+      <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
         <ActionLink
-          icon={<PiXLight className="text-[15px]" />}
+          icon={<PiXLight className="text-[13px]" />}
           label={t('ui.cancel')}
           onClick={onCancel}
         />
         <ActionLink
-          icon={<PiPlayFill className="text-[15px]" />}
+          icon={<PiPlayFill className="text-[13px]" />}
           label={t('ui.create_button')}
           onClick={onCreate}
           accent
@@ -808,37 +810,37 @@ function DeleteOverlay({
 }: DeleteOverlayProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_180ms_ease-out_both]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_180ms_ease-out_both] pointer-events-auto"
       onClick={onCancel}
     >
       <div
-        className="relative w-[420px] max-w-[90vw] bg-zinc-950 border border-zinc-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
+        className="relative w-[400px] max-w-[90vw] bg-zinc-950 border border-zinc-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="absolute -top-px -left-px w-12 h-px bg-red-500/80" />
-        <div className="absolute -top-px -left-px w-px h-12 bg-red-500/80" />
+        <div className="absolute -top-px -left-px w-10 h-px bg-red-500/80" />
+        <div className="absolute -top-px -left-px w-px h-10 bg-red-500/80" />
 
-        <div className="p-8 space-y-5">
-          <p className="font-mono text-[10px] tracking-[0.4em] text-red-400 uppercase">
+        <div className="p-6 space-y-4">
+          <p className="font-mono text-[9px] tracking-[0.4em] text-red-400 uppercase">
             ✕ Void Record
           </p>
-          <h3 className="font-display text-2xl font-light text-zinc-100 leading-tight">
+          <h3 className="font-display text-xl font-light text-zinc-100 leading-tight">
             {character
               ? `${character.charinfo.firstname} ${character.charinfo.lastname}`
               : t('ui.deletechar_header')}
           </h3>
-          <p className="text-sm text-zinc-400 font-serif italic">
+          <p className="text-sm text-zinc-400 font-serif italic leading-snug">
             {t('ui.deletechar_description')}
           </p>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-1">
             <ActionLink
-              icon={<PiXLight className="text-[15px]" />}
+              icon={<PiXLight className="text-[13px]" />}
               label={t('ui.cancel')}
               onClick={onCancel}
             />
             <ActionLink
-              icon={<PiTrashLight className="text-[15px]" />}
+              icon={<PiTrashLight className="text-[13px]" />}
               label={t('ui.confirm')}
               onClick={onConfirm}
               danger
