@@ -67,7 +67,7 @@ txData/${SERVER_NAME}/resources/[GENERATED]/<bracket-path>/<plugin-name>/
 
 so FXServer picks them up directly — there is no separate copy step. To run a generated plugin, add `ensure <plugin-name>` to your `server.cfg` once.
 
-The watcher (`pnpm dev`) re-bundles only the changed plugin and posts to `http://localhost:3414` (authed by `RELOADER_API_KEY`) to trigger an in-game reload. The companion FiveM resource that exposes that endpoint is the bundled `[default]/core` plugin — your `server.cfg` must contain `ensure core` for hot-reload to work. See [`txData/server.cfg.example`](./txData/server.cfg.example) for a starter config. If the connection fails at startup the watcher still rebuilds, it just won't auto-reload.
+The watcher (`pnpm dev`) re-bundles only the changed plugin and posts to `http://localhost:3414` (authed by `RELOADER_API_KEY`) to trigger an in-game reload. The companion FiveM resource that exposes that endpoint is the bundled `[default]/core` plugin — your `server.cfg` must contain `ensure core` for hot-reload to work. See [`txadmin/server.cfg`](./txadmin/server.cfg) for the deployed config (also covers the recipe-managed defaults). If the connection fails at startup the watcher still rebuilds, it just won't auto-reload.
 
 For first-time setup (clone → build → run), see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -94,9 +94,10 @@ u-core/
 ├── asset-server/             # Separate sub-package (uses npm) — image optimizer + server
 ├── scripts/
 │   └── start-windows.js      # Launcher for native FXServer.exe
-├── txData/                   # Server data; build output lands under [GENERATED]/
+├── txadmin/                  # txAdmin recipe + server.cfg (source of truth for fresh deploys)
+├── txData/                   # Wizard-generated runtime state (gitignored); plugin output lands under [GENERATED]/
 ├── docker-compose.yml
-├── Dockerfile                # FiveM binaries container (Ubuntu 20.04)
+├── Dockerfile                # FiveM binaries container (Ubuntu 24.04)
 └── tsconfig.{plugins,scripts,webview}.json
 ```
 
@@ -168,12 +169,47 @@ The shared `src/webview/` folder provides Tailwind config, theme, i18n setup, de
 ## Docker deployment
 
 ```bash
-docker-compose up -d --build
+docker-compose up -d --build      # or: pnpm start:docker
 ```
 
-This brings up a FiveM container that downloads FXServer from `BINARIES_ARCHIVE_URL` at image build time and a MariaDB 10.5 sidecar. `txData/` is bind-mounted into the FiveM container at `/root/binaries/txData`, so `pnpm build` on the host writes directly into the running server's resource tree.
+This brings up a FiveM container that downloads FXServer from `BINARIES_ARCHIVE_URL` at image build time and a MariaDB 11.4 sidecar. `txData/` is bind-mounted into the FiveM container at `/home/fivem/binaries/txData`, so `pnpm build` on the host writes directly into the running server's resource tree.
 
-Exposed ports: `30120/tcp+udp` (FiveM), `40120/tcp` (txAdmin), `3414/tcp` (reload endpoint), `3306/tcp` (MariaDB).
+Exposed ports: `30120/tcp+udp` (FiveM), `40120/tcp` (txAdmin), `3414/tcp` (reload endpoint, localhost-only), `3306/tcp` (MariaDB, internal compose network only).
+
+### First-run wizard (fresh `SERVER_NAME`)
+
+The container ships only the FXServer binaries — no resources. On a brand-new `SERVER_NAME`, txAdmin's wizard at `http://localhost:40120/` provisions everything from a recipe.
+
+Use this repo's recipe URL when prompted:
+
+```
+https://raw.githubusercontent.com/CristianCiubancan/u-core/master/txadmin/recipe.yaml
+```
+
+It is a fork of [`qbcore-framework/txAdminRecipe`](https://github.com/qbcore-framework/txAdminRecipe) that pulls our `server.cfg` and `myLogo.png` from [`txadmin/`](./txadmin/) instead of upstream's. Resource downloads (qb-core, the QBCore job pack, pma-voice, etc.) still hit the same upstream repos, so resource updates flow through without recipe changes. Wizard prompts:
+
+- **Server name** — matches `SERVER_NAME` in `.env`.
+- **DB connection** — host `db`, port `3306`, user/password/database from `.env`.
+- **License key** — from [keymaster.fivem.net](https://keymaster.fivem.net/).
+- **Admin user** — your txAdmin login.
+
+Subsequent boots reuse the populated `txData/${SERVER_NAME}/` and skip the wizard.
+
+### Maintaining the recipe fork
+
+Resource refs are pinned to upstream branches (`ref: main`/`master`), so QBCore resource updates flow automatically. What does **not** flow:
+
+- New / removed / renamed resources in upstream's recipe.
+- Changes to upstream's `server.cfg` defaults.
+
+Periodically diff against upstream and merge intentionally:
+
+```bash
+diff <(curl -sL https://raw.githubusercontent.com/qbcore-framework/txAdminRecipe/main/qbcore.yaml) txadmin/recipe.yaml
+diff <(curl -sL https://raw.githubusercontent.com/qbcore-framework/txAdminRecipe/main/server.cfg) txadmin/server.cfg
+```
+
+Our deliberate divergences in `server.cfg`: `voice_useSendingRangeOnly false` (per pma-voice) and `ensure webpack` before `[standalone]` (avoids the screenshot-basic startup race against webpack's first-boot yarn install).
 
 ## Asset server
 

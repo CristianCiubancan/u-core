@@ -17,6 +17,25 @@ U-Core is a TypeScript build framework for FiveM server resources. It is **not**
 
 Required env vars (loaded from `.env` via dotenv): `SERVER_NAME`, `RELOADER_API_KEY`, `MYSQL_*`, `BINARIES_ARCHIVE_URL`.
 
+## Server bootstrap (txAdmin recipe)
+
+The Docker image ships only the FXServer binaries. Everything under `txData/${SERVER_NAME}/` (resource trees, `server.cfg`, txAdmin profile) is **wizard-generated** on first run and fully gitignored. Source of truth for what gets deployed lives in `txadmin/`:
+
+- `txadmin/recipe.yaml` — txAdmin recipe URL: `https://raw.githubusercontent.com/CristianCiubancan/u-core/master/txadmin/recipe.yaml`. Fork of [`qbcore-framework/txAdminRecipe`](https://github.com/qbcore-framework/txAdminRecipe). The **only** divergence from upstream is the `move_path` calls for `server.cfg` and `myLogo.png` — they pull from this repo's `txadmin/` subpath instead of upstream's. Resource downloads (qb-core, qb-* job pack, pma-voice, etc.) all still hit the same upstream repos at the same refs, so resource updates flow through automatically.
+- `txadmin/server.cfg` — deliberately diverges from upstream in two places:
+  - `setr voice_useSendingRangeOnly false` (per pma-voice recommendation; ignore client-sent position info).
+  - Explicit `ensure webpack` before `[standalone]`. Without this, screenshot-basic (which declares `dependency 'webpack'`) loses a race against webpack's first-boot yarn-install build task and fails to start. Do not remove this line.
+
+  All `{{placeholder}}` tokens (`{{serverEndpoints}}`, `{{dbConnectionString}}`, `{{svLicense}}`, etc.) are substituted by txAdmin's recipe runner — leave them intact.
+
+**Editing `txData/${SERVER_NAME}/server.cfg` directly is a workaround, not a fix.** It won't propagate to new `SERVER_NAME` deploys and may be overwritten if the recipe is re-run. For durable cfg changes, edit `txadmin/server.cfg` and push — the next wizard run picks it up.
+
+**Recipe maintenance:** periodically diff against upstream and merge structural changes manually:
+```bash
+diff <(curl -sL https://raw.githubusercontent.com/qbcore-framework/txAdminRecipe/main/qbcore.yaml) txadmin/recipe.yaml
+diff <(curl -sL https://raw.githubusercontent.com/qbcore-framework/txAdminRecipe/main/server.cfg) txadmin/server.cfg
+```
+
 ## Build pipeline (the non-obvious bit)
 
 The build is orchestrated by `src/scripts/build.ts` → `BuildManager` (`src/scripts/managers/BuildManager.ts`). For each discovered plugin it runs, in order:

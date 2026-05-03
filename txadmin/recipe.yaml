@@ -1,9 +1,9 @@
 $engine: 3
 $onesync: on
-name: U-Core (QBCore Framework fork)
+name: "U-Core (QBCore Framework fork)"
 version: 2.2.4
-author: JericoFx & Kakarot & Hamy (upstream); CristianCiubancan (fork)
-description: U-Core deploy: upstream QBCore Framework with our server.cfg overrides.
+author: "JericoFx & Kakarot & Hamy (upstream); CristianCiubancan (fork)"
+description: "U-Core deploy - upstream QBCore Framework with our server.cfg overrides."
 
 # This recipe is a near-byte-identical fork of qbcore-framework/txAdminRecipe.
 # The only divergence is that `server.cfg` and `myLogo.png` are sourced from
