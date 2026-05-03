@@ -14,15 +14,23 @@ import { QBCore } from './qbcore';
 import { installFunctions } from './functions';
 import { installPlayer } from './player';
 import { installEvents } from './events';
+import { installCommands } from './commands';
 import { installExtraExports } from './exports';
 import { installDebug } from './debug';
 
-// Replace the throw-on-call Functions / Player stubs from qbcore.ts
-// with the real implementations, then wire up server-side event
-// handlers and the runtime-extension exports.
+// Replace the throw-on-call Functions / Player / Commands stubs from
+// qbcore.ts with the real implementations, then wire up server-side
+// event handlers and the runtime-extension exports. Commands MUST run
+// after Functions+Player+Events because the built-in admin commands
+// reach into Functions.GetPlayer / Player.Functions.SetJob / etc, and
+// Add() is what downstream qb-* resources call at THEIR module load
+// — installing it before they boot prevents the cascading throw chain
+// that crashes qb-multicharacter and emits SCRIPT ERRORs in every
+// other dependent resource.
 installFunctions(QBCore);
 installPlayer(QBCore);
 installEvents(QBCore);
+installCommands(QBCore);
 installExtraExports(QBCore);
 installDebug(QBCore);
 
@@ -52,6 +60,15 @@ exportFn('GetSharedVehicles', () => QBCore.Shared.Vehicles);
 exportFn('GetSharedWeapons', () => QBCore.Shared.Weapons);
 exportFn('GetSharedJobs', () => QBCore.Shared.Jobs);
 exportFn('GetSharedGangs', () => QBCore.Shared.Gangs);
+// Mirror upstream's `GetShared(namespace, item)` export — generic
+// keyed access into QBCore.Shared used by a handful of consumer
+// resources to look up an item/vehicle/weapon/job/gang by string
+// name without having to choose the right specific export.
+exportFn(
+  'GetShared',
+  (namespace: string, item: string) =>
+    (QBCore.Shared as Record<string, Record<string, unknown>>)[namespace]?.[item]
+);
 
 // Mirror upstream's pattern of re-exporting every QBCore.Functions
 // member as a top-level export, so callers can do
@@ -75,5 +92,9 @@ console.log(
   }, Locations=${Object.keys(QBCore.Shared.Locations).length}.`
 );
 console.log(
-  '^3[qb-core]^7 Phase 2 server-side complete. Functions + Player + Events + ExtraExports + Debug wired. Commands stubbed pending Phase 3 client port (commands are server-registered but expose client-side keybinds).'
+  `^3[qb-core]^7 server port complete. Functions + Player + Events + Commands (${
+    Object.keys((QBCore as any).Commands.List as Record<string, unknown>).length
+  } admin cmds) + ExtraExports + Debug + Lang (${
+    Object.keys((QBCore as any).Lang.phrases as Record<string, string>).length
+  } phrases) wired.`
 );

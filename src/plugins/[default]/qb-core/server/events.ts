@@ -12,6 +12,7 @@
 
 import type { QBCoreShape } from './qbcore';
 import type { QBPlayer } from './player';
+import { Lang } from '../shared/lang';
 
 const oxmysql = (exports as any).oxmysql;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -28,7 +29,10 @@ export function installEvents(QBCore: QBCoreShape): void {
   >;
   const ClientCallbacks = QBCore.ClientCallbacks as Record<
     string,
-    { callback?: (...args: unknown[]) => void }
+    {
+      callback?: (...args: unknown[]) => void;
+      promise?: { resolve?: (v: unknown) => void };
+    }
   >;
   const ServerCallbacks = QBCore.ServerCallbacks as Record<
     string,
@@ -95,12 +99,21 @@ export function installEvents(QBCore: QBCoreShape): void {
     );
     emit('QBCore:Server:PlayerDropped', player);
 
-    // Save the player's last-known state to DB before tearing down.
-    try {
-      await (QBCore.Player as any).Save(src);
-    } catch {
-      /* noop — Save already logs its own errors */
-    }
+    // Fire-and-forget Save — match upstream's pattern. Player.Save
+    // reads `Players[source]?.PlayerData` synchronously on entry and
+    // captures it into a local before awaiting the SQL, so deleting
+    // Players[src] immediately after invoking Save() doesn't lose
+    // data — the in-flight oxmysql call still has the captured
+    // PlayerData in its closure.
+    //
+    // The earlier draft awaited Save here. That held the player in
+    // the Players[] map for the full duration of the SQL round-trip
+    // (5-10s on cold oxmysql). During that window, a fast reconnect
+    // would hit `IsLicenseInUse(license)` in playerConnecting and
+    // get rejected as duplicate-license — symptom: "first reconnect
+    // attempt fails, retry works." Removing the await closes that
+    // race.
+    void (QBCore.Player as any).Save(src);
 
     // u-core divergence from upstream: also fire `OnPlayerUnload`
     // events on hard disconnect. Upstream skips this — only the
@@ -156,15 +169,17 @@ export function installEvents(QBCore: QBCoreShape): void {
       }
 
       if (!databaseConnected) {
-        deferrals.done('Error connecting to the database');
+        deferrals.done(Lang.t('error.connecting_database_error'));
         return;
       }
 
       if (QBCore.Config.Server.Whitelist) {
         await sleep(0);
-        deferrals.update(`Checking whitelist for ${name}`);
+        deferrals.update(
+          Lang.t('info.checking_whitelisted').replace('%s', name)
+        );
         if (!Functions.IsWhitelisted(src)) {
-          deferrals.done('You are not whitelisted on this server');
+          deferrals.done(Lang.t('error.not_whitelisted'));
           return;
         }
       }
@@ -176,23 +191,21 @@ export function installEvents(QBCore: QBCoreShape): void {
         | undefined;
 
       if (!license) {
-        deferrals.done('No valid Rockstar license could be found');
+        deferrals.done(Lang.t('error.no_valid_license'));
         return;
       }
       if (
         QBCore.Config.Server.CheckDuplicateLicense &&
         Functions.IsLicenseInUse(license)
       ) {
-        deferrals.done('Duplicate Rockstar license found');
+        deferrals.done(Lang.t('error.duplicate_license'));
         return;
       }
 
       await sleep(0);
-      deferrals.update(`Checking ban status for ${name}`);
+      deferrals.update(Lang.t('info.checking_ban').replace('%s', name));
       if (!bansTableExists) {
-        deferrals.done(
-          'The "bans" table does not exist in the database. Please import the QBCore SQL.'
-        );
+        deferrals.done(Lang.t('error.ban_table_not_found'));
         return;
       }
 
@@ -206,12 +219,12 @@ export function installEvents(QBCore: QBCoreShape): void {
           return;
         }
       } catch {
-        deferrals.done('Error connecting to the database');
+        deferrals.done(Lang.t('error.connecting_database_error'));
         return;
       }
 
       await sleep(0);
-      deferrals.update(`Welcome ${name}, you are being connected.`);
+      deferrals.update(Lang.t('info.join_server').replace('%s', name));
       deferrals.done();
 
       emitNet('QBCore:Client:SharedUpdate', src, QBCore.Shared);
@@ -235,7 +248,7 @@ export function installEvents(QBCore: QBCoreShape): void {
         }
       }
     } else {
-      Functions.Kick(src, 'No permission', undefined, undefined);
+      Functions.Kick(src, Lang.t('error.no_permission'), undefined, undefined);
     }
   });
 
@@ -244,7 +257,7 @@ export function installEvents(QBCore: QBCoreShape): void {
     if (Functions.HasPermission(src, 'admin')) {
       QBCore.Config.Server.Closed = false;
     } else {
-      Functions.Kick(src, 'No permission', undefined, undefined);
+      Functions.Kick(src, Lang.t('error.no_permission'), undefined, undefined);
     }
   });
 
@@ -258,6 +271,11 @@ export function installEvents(QBCore: QBCoreShape): void {
       const key = name + src;
       const cb = ClientCallbacks[key];
       if (cb) {
+        // Resolve the await-mode Promise (registered when caller
+        // omitted `cb`). Same pattern client/events.ts uses for
+        // QBCore:Client:TriggerCallback. Without this, every
+        // `await TriggerClientCallback(...)` would hang forever.
+        cb.promise?.resolve?.(rest.length === 1 ? rest[0] : rest);
         if (cb.callback) cb.callback(...rest);
         delete ClientCallbacks[key];
       }
@@ -310,10 +328,10 @@ export function installEvents(QBCore: QBCoreShape): void {
     if (!player) return;
     if (player.PlayerData.job.onduty) {
       player.Functions.SetJobDuty(false);
-      emitNet('QBCore:Notify', src, 'You are now off duty');
+      emitNet('QBCore:Notify', src, Lang.t('info.off_duty'));
     } else {
       player.Functions.SetJobDuty(true);
-      emitNet('QBCore:Notify', src, 'You are now on duty');
+      emitNet('QBCore:Notify', src, Lang.t('info.on_duty'));
     }
     emit('QBCore:Server:SetDuty', src, player.PlayerData.job.onduty);
     emitNet('QBCore:Client:SetDuty', src, player.PlayerData.job.onduty);
@@ -370,11 +388,16 @@ export function installEvents(QBCore: QBCoreShape): void {
   // exactly so downstream resources still loading these handlers
   // produce identical console output.
 
-  onNet('QBCore:Server:UseItem', () => {
+  onNet('QBCore:Server:UseItem', (item: unknown) => {
     const src = (global as any).source as number;
     console.log(
-      `${GetInvokingResource()} triggered QBCore:Server:UseItem by ID ${src}. This event is deprecated due to exploitation, and will be removed soon. Check qb-inventory for the right use on this event.`
+      `${GetInvokingResource()} triggered QBCore:Server:UseItem by ID ${src} with the following data. This event is deprecated due to exploitation, and will be removed soon. Check qb-inventory for the right use on this event.`
     );
+    // Match upstream: also dump the item payload via QBCore.Debug.
+    // Upstream's deprecation pass prints the message AND the item so
+    // server admins can see what's being attempted; the earlier
+    // draft dropped the item payload, hiding exploit attempts.
+    (QBCore as any).Debug?.(item);
   });
 
   onNet('QBCore:Server:RemoveItem', (itemName: string, amount: number) => {
@@ -411,12 +434,17 @@ export function installEvents(QBCore: QBCoreShape): void {
         cmd.arguments.length !== 0 &&
         !(args as any)[cmd.arguments.length - 1]
       ) {
-        emitNet('QBCore:Notify', src, 'Missing arguments', 'error');
+        emitNet(
+          'QBCore:Notify',
+          src,
+          Lang.t('error.missing_args2'),
+          'error'
+        );
       } else {
         cmd.callback(src, args);
       }
     } else {
-      emitNet('QBCore:Notify', src, 'No access', 'error');
+      emitNet('QBCore:Notify', src, Lang.t('error.no_access'), 'error');
     }
   });
 

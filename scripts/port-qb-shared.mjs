@@ -322,7 +322,7 @@ function generateTsFile(body, header, footer, opts = {}) {
     '  label: string;',
     '  weight: number;',
     "  type: 'weapon' | 'item';",
-    '  ammotype: string | null;',
+    '  ammotype?: string | null;',
     '  image: string;',
     '  unique: boolean;',
     '  useable: boolean;',

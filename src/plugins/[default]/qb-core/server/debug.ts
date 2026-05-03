@@ -21,9 +21,15 @@ function tPrint(tbl: unknown, indent = 0): void {
       } else if (typeof v === 'boolean') {
         console.log(`${formatting}\x1b[31m ${v} \x1b[0m`);
       } else if (typeof v === 'function') {
-        console.log(`${formatting}\x1b[39m ${v} \x1b[0m`);
+        // upstream uses ^9 (white in FXServer color table) → ANSI 37.
+        // The earlier draft used \x1b[39m (default fg) which renders
+        // identically on most terminals but diverges from upstream's
+        // intent.
+        console.log(`${formatting}\x1b[37m ${v} \x1b[0m`);
       } else if (typeof v === 'number') {
-        console.log(`${formatting}\x1b[35m ${v} \x1b[0m`);
+        // upstream uses ^5 (cyan) → ANSI 36. The earlier draft had
+        // \x1b[35m (magenta) — visibly wrong color.
+        console.log(`${formatting}\x1b[36m ${v} \x1b[0m`);
       } else if (typeof v === 'string') {
         console.log(`${formatting} \x1b[32m'${v}' \x1b[0m`);
       } else {

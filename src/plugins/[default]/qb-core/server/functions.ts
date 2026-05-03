@@ -21,6 +21,7 @@
 // real entries and these getters become effectful.
 
 import type { QBCoreShape } from './qbcore';
+import { Lang } from '../shared/lang';
 
 const oxmysql = (exports as any).oxmysql;
 
@@ -216,11 +217,70 @@ export function installFunctions(QBCore: QBCoreShape): void {
     return [closestPlayer, closestDist];
   };
 
-  // The other Closest* helpers (Object/Vehicle/Ped) rely on
-  // GetAllObjects / GetAllVehicles / GetAllPeds which are client-only
-  // natives. Server-side QBCore exposes them but they no-op without
-  // those natives — leave them as not-yet-ported stubs. Most callers
-  // are client-side anyway and Phase 3 will provide the client port.
+  // GetAllObjects/GetAllVehicles/GetAllPeds are server-side natives
+  // (added to FXServer around v5562). The original audit-pre comment
+  // claiming they were client-only was wrong — that mistake left
+  // these three Closest* helpers unported, breaking any downstream
+  // resource that called them.
+  Functions.GetClosestObject = (
+    source: number,
+    coords?: XYZ
+  ): [number, number] => {
+    const target = resolveCoords(source, coords);
+    const objects = (GetAllObjects as () => number[])();
+    let closestObject = -1;
+    let closestDist = -1;
+    for (const obj of objects) {
+      const oc = GetEntityCoords(obj) as unknown as number[];
+      const d = distance(oc, target);
+      if (closestDist === -1 || d < closestDist) {
+        closestObject = obj;
+        closestDist = d;
+      }
+    }
+    return [closestObject, closestDist];
+  };
+
+  Functions.GetClosestVehicle = (
+    source: number,
+    coords?: XYZ
+  ): [number, number] => {
+    const target = resolveCoords(source, coords);
+    const vehicles = (GetAllVehicles as () => number[])();
+    let closestVehicle = -1;
+    let closestDist = -1;
+    for (const veh of vehicles) {
+      const vc = GetEntityCoords(veh) as unknown as number[];
+      const d = distance(vc, target);
+      if (closestDist === -1 || d < closestDist) {
+        closestVehicle = veh;
+        closestDist = d;
+      }
+    }
+    return [closestVehicle, closestDist];
+  };
+
+  Functions.GetClosestPed = (
+    source: number,
+    coords?: XYZ
+  ): [number, number] => {
+    const ped = GetPlayerPed(String(source));
+    const target = resolveCoords(source, coords);
+    const peds = (GetAllPeds as () => number[])();
+    let closestPed = -1;
+    let closestDist = -1;
+    for (const p of peds) {
+      if (p !== ped) {
+        const pc = GetEntityCoords(p) as unknown as number[];
+        const d = distance(pc, target);
+        if (closestDist === -1 || d < closestDist) {
+          closestPed = p;
+          closestDist = d;
+        }
+      }
+    }
+    return [closestPed, closestDist];
+  };
 
   // ---------- Routing buckets ----------
 
@@ -310,6 +370,49 @@ export function installFunctions(QBCore: QBCoreShape): void {
     return veh;
   };
 
+  // Legacy spawn API — calls the older CREATE_AUTOMOBILE native via
+  // Citizen.InvokeNative. Kept for backwards compat with downstream
+  // resources that still call CreateAutomobile (qb-vehicleshop's
+  // older code paths, some community forks); upstream CreateVehicle
+  // is the recommended path because it works for boats/heli/etc too.
+  Functions.CreateAutomobile = async (
+    source: number,
+    model: string | number,
+    coords?: XYZW,
+    warp?: boolean
+  ): Promise<number> => {
+    const m = modelHash(model);
+    const c = coords ?? {
+      ...(GetEntityCoords(GetPlayerPed(String(source))) as unknown as {
+        x: number;
+        y: number;
+        z: number;
+      }),
+      w: 0,
+    };
+    const heading = c.w ?? 0;
+    // CREATE_AUTOMOBILE native hash. Equivalent to upstream's
+    // backtick-hashed `\`CREATE_AUTOMOBILE\``.
+    const CREATE_AUTOMOBILE = GetHashKey('CREATE_AUTOMOBILE');
+    const veh = (
+      Citizen as unknown as {
+        invokeNative<T>(hash: number, ...args: unknown[]): T;
+      }
+    ).invokeNative<number>(
+      CREATE_AUTOMOBILE,
+      m,
+      c.x,
+      c.y,
+      c.z,
+      heading,
+      true,
+      true
+    );
+    while (!DoesEntityExist(veh)) await sleep(0);
+    if (warp) TaskWarpPedIntoVehicle(GetPlayerPed(String(source)), veh, -1);
+    return veh;
+  };
+
   Functions.CreateVehicle = async (
     source: number,
     model: string | number,
@@ -342,17 +445,152 @@ export function installFunctions(QBCore: QBCoreShape): void {
 
   // ---------- Callbacks ----------
 
+  // ---------- Paycheck interval ----------
+  // Recurring timer that pays every online player every
+  // Config.Money.PayCheckTimeOut minutes. Direct port of upstream's
+  // PaycheckInterval module-local function. Critical: without this
+  // running, no player ever gets paid, jobs feel pointless.
+  //
+  // Society mode: if Config.Money.PayCheckSociety is true we debit
+  // the employer's qb-banking account first; if there's no balance we
+  // pay from thin air; if balance < payment we error and skip. If
+  // qb-banking isn't loaded (different resource order, partial
+  // deploy) we degrade to non-society mode for that tick rather than
+  // throwing — same as upstream's `exports['qb-banking']` returning
+  // nil in that case.
+  const paycheckTick = (): void => {
+    if (Object.keys(QBCore.Players).length === 0) {
+      setTimeout(
+        paycheckTick,
+        QBCore.Config.Money.PayCheckTimeOut * 60 * 1000
+      );
+      return;
+    }
+    void (async () => {
+      const banking = (exports as any)['qb-banking'];
+      for (const p of Object.values(Players) as QBPlayer[]) {
+        if (!p) continue;
+        const job = (p.PlayerData as any).job;
+        if (!job) {
+          await sleep(50);
+          continue;
+        }
+        const sharedJob = (
+          QBCore.Shared.Jobs as Record<string, any>
+        )[job.name];
+        const grade = sharedJob?.grades?.[String(job.grade.level)];
+        let payment: number = grade?.payment;
+        if (payment == null) payment = job.payment;
+        if (
+          payment > 0 &&
+          (sharedJob?.offDutyPay || job.onduty)
+        ) {
+          if (QBCore.Config.Money.PayCheckSociety && banking) {
+            try {
+              const account = banking.GetAccountBalance?.(job.name) as
+                | number
+                | undefined;
+              // u-core divergence: upstream treats `nil` account
+              // (qb-banking missing or returns nil) as "ne zero",
+              // entering the `< payment` branch and crashing on the
+              // numeric compare against nil. We treat null/undefined
+              // the same as 0 — pay from thin air. Functionally
+              // matches upstream's intent for the no-society-account
+              // case (qb-banking returns 0 in that path) and avoids
+              // crashing the paycheck tick if qb-banking is mis-
+              // configured. Documented divergence; not a regression.
+              if (account == null || account === 0) {
+                p.Functions.AddMoney('bank', payment, 'paycheck');
+                emitNet(
+                  'QBCore:Notify',
+                  p.PlayerData.source,
+                  Lang.t('info.received_paycheck', { value: payment })
+                );
+              } else if (account < payment) {
+                emitNet(
+                  'QBCore:Notify',
+                  p.PlayerData.source,
+                  Lang.t('error.company_too_poor'),
+                  'error'
+                );
+              } else {
+                p.Functions.AddMoney('bank', payment, 'paycheck');
+                banking.RemoveMoney?.(
+                  job.name,
+                  payment,
+                  'Employee Paycheck'
+                );
+                emitNet(
+                  'QBCore:Notify',
+                  p.PlayerData.source,
+                  Lang.t('info.received_paycheck', { value: payment })
+                );
+              }
+            } catch {
+              // qb-banking export threw — degrade to non-society mode.
+              p.Functions.AddMoney('bank', payment, 'paycheck');
+              emitNet(
+                'QBCore:Notify',
+                p.PlayerData.source,
+                Lang.t('info.received_paycheck', { value: payment })
+              );
+            }
+          } else {
+            p.Functions.AddMoney('bank', payment, 'paycheck');
+            emitNet(
+              'QBCore:Notify',
+              p.PlayerData.source,
+              Lang.t('info.received_paycheck', { value: payment })
+            );
+          }
+        }
+        await sleep(50);
+      }
+    })();
+    setTimeout(
+      paycheckTick,
+      QBCore.Config.Money.PayCheckTimeOut * 60 * 1000
+    );
+  };
+
+  setTimeout(
+    paycheckTick,
+    QBCore.Config.Money.PayCheckTimeOut * 60 * 1000
+  );
+
+  // Mirrors upstream's dual-mode signature: pass `cb` to receive the
+  // result via callback, OR omit `cb` and `await` the returned Promise
+  // for the value. Upstream's Lua version uses `Citizen.Await` on a
+  // `promise.new()`; the JS equivalent here resolves a stored Promise
+  // from the QBCore:Server:TriggerClientCallback response handler in
+  // events.ts.
   Functions.TriggerClientCallback = (
     name: string,
     source: number,
-    cb: (...args: unknown[]) => void,
-    ...args: unknown[]
-  ): void => {
+    cbOrFirstArg?: ((...args: unknown[]) => void) | unknown,
+    ...rest: unknown[]
+  ): Promise<unknown> | void => {
     if (!source) return;
+    let callback: ((...args: unknown[]) => void) | undefined;
+    let actualArgs: unknown[];
+    if (typeof cbOrFirstArg === 'function') {
+      callback = cbOrFirstArg as (...args: unknown[]) => void;
+      actualArgs = rest;
+    } else {
+      actualArgs = cbOrFirstArg === undefined ? rest : [cbOrFirstArg, ...rest];
+    }
     const key = name + source;
     const ClientCallbacks = QBCore.ClientCallbacks as Record<string, unknown>;
-    ClientCallbacks[key] = { callback: cb };
-    emitNet('QBCore:Client:TriggerClientCallback', source, name, ...args);
+    let resolveFn: (v: unknown) => void = () => {};
+    const p = new Promise<unknown>((resolve) => {
+      resolveFn = resolve;
+    });
+    ClientCallbacks[key] = {
+      callback,
+      promise: { resolve: resolveFn },
+    };
+    emitNet('QBCore:Client:TriggerClientCallback', source, name, ...actualArgs);
+    if (!callback) return p;
   };
 
   Functions.CreateCallback = (
@@ -382,8 +620,13 @@ export function installFunctions(QBCore: QBCoreShape): void {
           : (data as any).cb ?? (data as any).callback ?? null;
     }
     if (func) {
+      // Key MUST be `func` to match upstream — qb-inventory and other
+      // consumers reach into `QBCore.UsableItems[item].func(...)`.
+      // An earlier draft of this port stored under `cb` and silently
+      // broke item usage on every consumer that used the upstream
+      // contract.
       QBCore.UsableItems[item] = {
-        cb: func,
+        func,
         resource: GetInvokingResource() ?? undefined,
       };
     }
@@ -396,8 +639,16 @@ export function installFunctions(QBCore: QBCoreShape): void {
     (exports as any)['qb-inventory'].UseItem(source, item);
   };
 
-  Functions.HasItem = (source: number, items: string | string[], amount?: number): boolean => {
-    if (GetResourceState('qb-inventory') === 'missing') return false;
+  Functions.HasItem = (
+    source: number,
+    items: string | string[],
+    amount?: number
+  ): boolean | undefined => {
+    // Match upstream: return implicit nil (→ undefined) when
+    // qb-inventory is missing, not `false`. Downstream Lua callers
+    // pattern-matching on `== nil` need this, even though most do
+    // truthy-check (where false and nil are equivalent).
+    if (GetResourceState('qb-inventory') === 'missing') return undefined;
     return (exports as any)['qb-inventory'].HasItem(source, items, amount);
   };
 
@@ -562,6 +813,16 @@ export function installFunctions(QBCore: QBCoreShape): void {
     emitNet('QBCore:Notify', source, text, type, length);
   };
 
+  // u-core divergence from upstream Kick: upstream's retry loop reads
+  // as buggy — `if ping >= 0 then break` (give up while the player is
+  // still connected) and re-spawns DropPlayer threads when ping < 0
+  // (player already gone). Our port has the inverted (more sensible)
+  // semantics: keep dropping while the player is still connected,
+  // break when they're gone. Same end result (player kicked) for the
+  // common case; under unstable connections our version retries when
+  // it actually matters and stops retrying once the player is gone.
+  // Decision validated 2026-05-03 during the function-by-function
+  // audit pass.
   Functions.Kick = (
     source: number,
     reason: string,
@@ -576,9 +837,6 @@ export function installFunctions(QBCore: QBCoreShape): void {
         await sleep(2500);
       }
       if (source) DropPlayer(String(source), fullReason);
-      // Upstream loops 5 times trying to ensure the drop sticks. We
-      // mirror that — if the player is somehow still there with a
-      // valid ping, drop them again.
       for (let attempt = 0; attempt < 5; attempt++) {
         if (!source) break;
         if (GetPlayerPing(String(source)) >= 0) {
@@ -636,9 +894,11 @@ export function installFunctions(QBCore: QBCoreShape): void {
   };
 }
 
-/** Returns the live list of player source IDs (FXServer's `GetPlayers`
- *  global). Wrapped because the global signature is `() => string[]`
- *  and we want to keep call sites tidy. */
-function getPlayers(): string[] {
-  return (globalThis as any).GetPlayers() as string[];
-}
+// `getPlayers()` is provided by the FXServer Node host (lowercase, via
+// @citizenfx/server's `declare function getPlayers(): string[]`). The
+// two call sites above (`Functions.GetIdentifiers` and
+// `Functions.IsLicenseInUse`) call it directly. The earlier helper
+// here called `(globalThis as any).GetPlayers()` (uppercase), which
+// is a Lua-only helper — that's why server boot threw
+// `TypeError: globalThis.GetPlayers is not a function` whenever a
+// player connected.

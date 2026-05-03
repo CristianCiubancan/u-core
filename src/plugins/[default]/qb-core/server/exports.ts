@@ -15,6 +15,7 @@
 // directly.
 
 import type { QBCoreShape } from './qbcore';
+import { Lang } from '../shared/lang';
 
 const oxmysql = (exports as any).oxmysql;
 
@@ -228,7 +229,9 @@ export function installExtraExports(QBCore: QBCoreShape): void {
     );
     DropPlayer(
       String(playerId),
-      `You have been banned for exploiting. Discord: ${QBCore.Config.Server.Discord}`
+      Lang.t('info.exploit_banned', {
+        discord: QBCore.Config.Server.Discord,
+      })
     );
     emit(
       'qb-log:server:CreateLog',

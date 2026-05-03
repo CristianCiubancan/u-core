@@ -5,6 +5,7 @@
 // callback bridges, and Shared snapshot updates from the server.
 
 import type { QBCoreClient } from './qbcore';
+import { Lang } from '../shared/lang';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -52,7 +53,7 @@ export function installClientEvents(QBCore: QBCoreClient): void {
   onNet('QBCore:Command:GoToMarker', async () => {
     const blipMarker = GetFirstBlipInfoId(8);
     if (!DoesBlipExist(blipMarker)) {
-      Functions.Notify('No waypoint set', 'error', 5000);
+      Functions.Notify(Lang.t('error.no_waypoint'), 'error', 5000);
       return;
     }
     DoScreenFadeOut(650);
@@ -105,11 +106,11 @@ export function installClientEvents(QBCore: QBCoreClient): void {
 
     if (!found) {
       SetPedCoordsKeepVehicle(ped, oldCoords[0], oldCoords[1], oldCoords[2] - 1.0);
-      Functions.Notify("Couldn't teleport to that location", 'error', 5000);
+      Functions.Notify(Lang.t('error.tp_error'), 'error', 5000);
       return;
     }
     SetPedCoordsKeepVehicle(ped, x, y, groundZ);
-    Functions.Notify('Teleported to waypoint', 'success', 5000);
+    Functions.Notify(Lang.t('success.teleported_waypoint'), 'success', 5000);
   });
 
   // ---------- Vehicle commands (admin /car, /dv) ----------

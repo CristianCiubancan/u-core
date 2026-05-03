@@ -24,6 +24,7 @@
 // / `json.decode` pattern exactly.
 
 import type { QBCoreShape } from './qbcore';
+import { Lang } from '../shared/lang';
 
 const oxmysql = (exports as any).oxmysql;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -306,7 +307,7 @@ export function installPlayer(QBCore: QBCoreShape): void {
         decodeJsonColumns(row);
         await Player.CheckPlayerData(src, row);
       } else {
-        DropPlayer(String(src), 'You have been kicked for an exploit attempt');
+        DropPlayer(String(src), Lang.t('info.exploit_dropped'));
         emit(
           'qb-log:server:CreateLog',
           'anticheat',
@@ -981,7 +982,7 @@ export function installPlayer(QBCore: QBCoreShape): void {
         `**${GetPlayerName(String(source))}** ${license} deleted **${citizenid}**..`
       );
     } else {
-      DropPlayer(String(source), 'You have been kicked for an exploit attempt');
+      DropPlayer(String(source), Lang.t('info.exploit_dropped'));
       emit(
         'qb-log:server:CreateLog',
         'anticheat',

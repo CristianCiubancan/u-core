@@ -1,12 +1,20 @@
 {
-  "name": "qb-core-port-wip",
+  "name": "qb-core",
   "version": "1.3.0",
   "fx_version": "cerulean",
   "games": ["gta5"],
   "lua54": true,
   "author": "u-core (TS port of qbcore-framework/qb-core)",
-  "description": "WIP port of qb-core. Server side fully ported (Functions/Player/Events/Exports/Debug). Client side covers Functions/Events/Loops/DrawText with vehicle-properties getters/setters as core-fields-only stubs. The `-port-wip` suffix keeps this from claiming the `qb-core` resource name while upstream is still authoritative; we rename to plain `qb-core` and patch the txAdmin recipe once Phase 4 (locale) lands and we've verified end-to-end against the existing qb-multicharacter / qb-spawn flow.",
+  "description": "u-core TS port of qb-core. Server: Functions/Player/Events/Exports/Debug/Lang. Client: Functions/Events/Loops/DrawText/Lang. Vehicle-properties getters/setters cover the core fields only (model/plate/health/fuel/dirt/colors). Locale system ships the Locale class + the en.lua phrase tree; downstream consumers reach phrases via QBCore.Lang.t(key, subs) on either side. Replaces the upstream qbcore-framework/qb-core download in the txAdmin recipe — see txadmin/recipe.yaml.",
   "client_scripts": ["client/*.js"],
   "server_scripts": ["server/*.js"],
+  "shared_scripts": ["shared/locale.lua"],
+  "ui_page": "html/index.html",
+  "files": [
+    "html/index.html",
+    "html/css/style.css",
+    "html/css/drawtext.css",
+    "html/js/*.js"
+  ],
   "dependencies": ["oxmysql"]
 }

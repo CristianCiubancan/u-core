@@ -36,6 +36,13 @@ exportFn('GetSharedVehicles', () => QBCore.Shared.Vehicles);
 exportFn('GetSharedWeapons', () => QBCore.Shared.Weapons);
 exportFn('GetSharedJobs', () => QBCore.Shared.Jobs);
 exportFn('GetSharedGangs', () => QBCore.Shared.Gangs);
+// Mirror upstream's QBShared.GetShared export — keyed access into
+// QBCore.Shared by namespace+item.
+exportFn(
+  'GetShared',
+  (namespace: string, item: string) =>
+    (QBCore.Shared as Record<string, Record<string, unknown>>)[namespace]?.[item]
+);
 
 for (const [name, fn] of Object.entries(
   QBCore.Functions as Record<string, unknown>
@@ -48,5 +55,7 @@ for (const [name, fn] of Object.entries(
 console.log(
   `^2[qb-core]^7 client port loaded. Functions registered: ${
     Object.keys(QBCore.Functions).length
+  }, Lang phrases: ${
+    Object.keys((QBCore as any).Lang.phrases as Record<string, string>).length
   }.`
 );

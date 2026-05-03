@@ -95,3 +95,24 @@ export const FemaleNoGloves: Record<number, true> = {
   129: true, 130: true, 131: true, 135: true, 142: true, 149: true, 153: true,
   157: true, 161: true, 165: true,
 };
+
+/** Detects values that crossed the Lua/JS boundary as function refs.
+ *  Lua functions reach JS as objects with a `__cfx_functionReference`
+ *  string field; native JS functions just have `typeof === 'function'`.
+ *  Mirrors `QBShared.IsFunction`. */
+export function IsFunction(value: unknown): boolean {
+  if (typeof value === 'object' && value !== null) {
+    const ref = (value as { __cfx_functionReference?: unknown })
+      .__cfx_functionReference;
+    return typeof ref === 'string';
+  }
+  return typeof value === 'function';
+}
+
+// `ChangeVehicleExtra` and `SetDefaultVehicleExtras` use FiveM client
+// natives (DoesExtraExist / SetVehicleExtra / IsVehicleExtraTurnedOn)
+// that don't exist on the server — same as upstream, where calling
+// these from a server context errors. We expose them via the client
+// Shared namespace at boot (see client/qbcore.ts) rather than here so
+// the type isn't polluted with `declare const` ambient natives in a
+// shared module.

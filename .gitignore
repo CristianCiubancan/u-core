@@ -3,6 +3,14 @@
 .env.local
 *.local
 
+# ───────── Working scratch ─────────
+# `tmp/` is for one-off scratch work — upstream resource clones we
+# pull in for diffing during a port (e.g. `git clone qbcore-framework/qb-core
+# tmp/qb-core-upstream` for the function-by-function audit), test
+# fixtures, draft scripts. Anything inside is intentionally
+# ephemeral and re-creatable, never the source of truth.
+tmp/
+
 # ───────── Build output ─────────
 dist/
 dist-ssr/

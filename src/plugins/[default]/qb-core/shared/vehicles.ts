@@ -515,7 +515,11 @@ export const Vehicles: Record<string, Vehicle> = {
   handler: { model: 'handler', name: 'Dock Handler', brand: 'HVY', price: 30000, category: 'industrial', type: 'automobile', shop: 'truck' },
   cutter: { model: 'cutter', name: 'Cutter', brand: 'HVY', price: 30000, category: 'industrial', type: 'automobile', shop: 'truck' },
   slamtruck: { model: 'slamtruck', name: 'Slam Truck', brand: 'Vapid', price: 100000, category: 'utility', type: 'automobile', shop: 'truck' },
-  caddy3: { model: 'caddy3', name: 'Caddy (Bunker)', brand: 'Nagasaki', price: 30000, category: 'utility', type: 'automobile', shop: 'truck' },
+  // Upstream qb-core's vehicles.lua has TWO entries keyed by `caddy3`
+  // (Bunker variant on line 518, Golf variant on line 520 of upstream).
+  // Lua's table-literal semantics silently last-wins — the Golf entry
+  // overwrites the Bunker. We mirror by keeping only the Golf entry,
+  // matching the runtime state upstream actually exposes.
   caddy2: { model: 'caddy2', name: 'Caddy (Civilian)', brand: 'Nagasaki', price: 30000, category: 'utility', type: 'automobile', shop: 'truck' },
   caddy3: { model: 'caddy3', name: 'Caddy (Golf)', brand: 'Nagasaki', price: 30000, category: 'utility', type: 'automobile', shop: 'truck' },
   utillitruck: { model: 'utillitruck', name: 'Utility Truck (Cherry Picker)', brand: 'Brute', price: 30000, category: 'utility', type: 'automobile', shop: 'truck' },

@@ -28,7 +28,9 @@ import {
   Round,
   MaleNoGloves,
   FemaleNoGloves,
+  IsFunction,
 } from '../shared/main';
+import { Lang } from '../shared/lang';
 
 /** Build the QBShared namespace as upstream Lua does at module load:
  *  weapons keyed by GetHashKey(name) (matches the backtick-hash trick
@@ -77,6 +79,11 @@ function buildShared() {
     Trim,
     FirstToUpper,
     Round,
+    IsFunction,
+    // ChangeVehicleExtra/SetDefaultVehicleExtras live on the client
+    // Shared namespace only — they call FiveM client natives that
+    // don't exist on the server. Calling these from server-side code
+    // errors in upstream too.
   };
 }
 
@@ -101,6 +108,12 @@ export const ServerCallbacks: Record<string, unknown> = {};
 export const QBCore = {
   Config: QBConfig,
   Shared: buildShared(),
+  /** Locale instance with English phrases baked in. Downstream Lua
+   *  resources reach this via the global `Lang` after qb-core loads;
+   *  TypeScript consumers can either go through
+   *  `QBCore.Lang.t('error.no_waypoint')` or import from
+   *  `'../qb-core/shared/lang'` directly. */
+  Lang,
   Players,
   Player_Buckets,
   Entity_Buckets,

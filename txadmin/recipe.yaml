@@ -132,12 +132,16 @@ tasks:
   - action: waste_time # prevent github throttling
     seconds: 10
 
-  # Downloading QBCore resources
-  - action: download_github
-    dest: ./resources/[qb]/qb-core
-    ref: main
-    src: https://github.com/qbcore-framework/qb-core
+  # qb-core is rewritten as a u-core plugin; the build pipeline emits
+  # it to [GENERATED]/[default]/qb-core on `pnpm build`. The upstream
+  # qbcore-framework/qb-core download is intentionally absent so
+  # FXServer doesn't double-register the resource (the second
+  # `ensure qb-core` would otherwise win and load the upstream Lua
+  # framework instead of our TS port, which is a silent functional
+  # downgrade — our port emits OnPlayerUnload on hard disconnects,
+  # upstream doesn't).
 
+  # Downloading QBCore resources
   - action: download_github
     dest: ./resources/[qb]/qb-scoreboard
     ref: main
