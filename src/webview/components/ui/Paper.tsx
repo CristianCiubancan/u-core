@@ -4,6 +4,8 @@ interface PaperProps {
   children: React.ReactNode;
   className?: string;
   selected?: boolean;
+  /** Inline style overrides, mainly for animation-delay-style stagger. */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -18,9 +20,15 @@ interface PaperProps {
  * `selected` pairs the alternate `.dossier-paper-selected` for an
  * indigo-rail treatment.
  */
-const Paper = ({ children, className = '', selected = false }: PaperProps) => {
+const Paper = ({
+  children,
+  className = '',
+  selected = false,
+  style,
+}: PaperProps) => {
   return (
     <div
+      style={style}
       className={`dossier-paper ${
         selected ? 'dossier-paper-selected' : ''
       } ${className}`}

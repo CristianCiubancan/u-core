@@ -61,8 +61,18 @@ const SelectTrigger = React.forwardRef<
   React.useLayoutEffect(() => {
     const el = localRef.current;
     if (!el) return;
+    // Synchronous initial read — ResizeObserver's first callback fires
+    // asynchronously, so without this the dropdown can render once with
+    // the wrong width on first open. We use the border-box width
+    // (getBoundingClientRect.width) so Content matches the trigger's
+    // VISIBLE width, including its padding — not just its content box,
+    // which is what `entry.contentRect.width` reports.
+    setWidth(el.getBoundingClientRect().width);
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width;
+      const entry = entries[0];
+      if (!entry) return;
+      const borderBox = entry.borderBoxSize?.[0]?.inlineSize;
+      const w = borderBox ?? entry.contentRect.width;
       if (w) setWidth(w);
     });
     ro.observe(el);
@@ -73,13 +83,15 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={localRef}
     className={cn(
-      'flex w-full items-center justify-between',
+      'group flex w-full items-center justify-between',
       'bg-transparent border-0 border-b border-input/70 px-1 py-1.5 pr-6',
       'font-serif text-[14px] text-foreground placeholder:text-muted-foreground/70',
-      'transition-colors',
+      'hover:border-input transition-colors duration-150',
       'focus:outline-none focus:border-ring',
+      'data-[state=open]:border-ring',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'aria-[invalid=true]:border-destructive/60',
+      'aria-[invalid=true]:data-[state=open]:border-destructive',
       'data-[placeholder]:text-muted-foreground/70',
       '[&>span]:truncate text-left',
       className
@@ -88,7 +100,12 @@ const SelectTrigger = React.forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+      <ChevronDown
+        className={cn(
+          'h-3.5 w-3.5 opacity-50 shrink-0 transition-transform duration-150',
+          'group-data-[state=open]:rotate-180 group-data-[state=open]:opacity-80'
+        )}
+      />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
   );
@@ -139,16 +156,43 @@ const SelectContent = React.forwardRef<
   // empirically wasn't being honored at runtime regardless of how we
   // applied it (Tailwind class, inline style with var()).
   const triggerWidth = React.useContext(SelectWidthContext);
+
+  // Diagnostic: surfaces the measured trigger width so F8 / browser
+  // console can confirm context propagates and the value is sane. If
+  // the dropdown still appears wider than this number on screen, the
+  // bug is downstream of `width` (box-sizing, an inherited min-width,
+  // or a CSS rule we haven't found yet).
+  React.useEffect(() => {
+    if (typeof triggerWidth === 'number') {
+      // eslint-disable-next-line no-console
+      console.log('[Select] trigger width:', triggerWidth);
+    }
+  }, [triggerWidth]);
+
   return (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
       position={position}
       style={
-        position === 'popper' && triggerWidth
+        position === 'popper'
           ? {
-              width: `${triggerWidth}px`,
-              maxWidth: `${triggerWidth}px`,
+              // Force border-box so the inline width includes the 1px
+              // hairline border on each side instead of adding to it.
+              // Without this, content-box rendering would put the
+              // dropdown's visible edge ~2px past the trigger.
+              boxSizing: 'border-box',
+              // Belt-and-braces: prefer our measured pixel value, but
+              // fall back to Radix's own CSS variable (which it sets via
+              // a parent style) so the dropdown is never wider than the
+              // trigger even on the very first frame before the
+              // ResizeObserver settles.
+              width: triggerWidth
+                ? `${triggerWidth}px`
+                : 'var(--radix-select-trigger-width)',
+              maxWidth: triggerWidth
+                ? `${triggerWidth}px`
+                : 'var(--radix-select-trigger-width)',
               ...style,
             }
           : style
@@ -157,6 +201,7 @@ const SelectContent = React.forwardRef<
         'relative z-50 max-h-60 overflow-hidden',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
+        'data-[state=open]:animate-[fadeIn_140ms_ease-out_both]',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
         className
@@ -209,10 +254,11 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center',
+      'relative flex w-full cursor-pointer select-none items-center',
       'py-1.5 pl-2 pr-7 font-serif text-[13px] text-foreground/90 outline-none',
+      'transition-colors duration-100',
       'data-[highlighted]:bg-primary/15 data-[highlighted]:text-foreground',
-      'data-[state=checked]:text-primary',
+      'data-[state=checked]:text-primary data-[state=checked]:font-medium',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}

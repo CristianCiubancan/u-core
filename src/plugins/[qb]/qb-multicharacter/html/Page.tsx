@@ -66,6 +66,11 @@ for (const [lng, resources] of Object.entries(BUNDLES)) {
 
 type Screen = 'loading' | 'characters' | 'register';
 
+const NAME_MAX_LENGTH = 30;
+const NATIONALITY_MAX_LENGTH = 40;
+const MIN_AGE_YEARS = 18;
+const MAX_AGE_YEARS = 100;
+
 interface UiOpenMessage {
   action: 'ui';
   toggle: boolean;
@@ -110,6 +115,7 @@ const EMPTY_FORM: RegisterFormData = {
 };
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
+type FieldTouched = Partial<Record<keyof RegisterFormData, boolean>>;
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -118,6 +124,12 @@ function pad2(n: number): string {
 function formatIsoDate(d: Date | null): string {
   if (!d) return '';
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function shiftYears(base: Date, years: number): Date {
+  const next = new Date(base);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
 }
 
 export default function Page() {
@@ -134,7 +146,19 @@ export default function Page() {
   const [loadingStage, setLoadingStage] = useState<number>(0);
   const [registerData, setRegisterData] = useState<RegisterFormData>(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldTouched, setFieldTouched] = useState<FieldTouched>({});
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
+
+  // Bounds for the birthdate picker. Recomputed once per session — fine
+  // since the player is unlikely to keep this menu open across midnight.
+  const dateBounds = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      max: shiftYears(today, -MIN_AGE_YEARS),
+      min: shiftYears(today, -MAX_AGE_YEARS),
+    };
+  }, []);
 
   const timersRef = useRef<{ stage?: number; setup?: number; finish?: number }>(
     {}
@@ -153,6 +177,7 @@ export default function Page() {
     setNationalities(Array.isArray(data.countries) ? data.countries : []);
     setSelectedIndex(-1);
     setFieldErrors({});
+    setFieldTouched({});
     setRegisterData(EMPTY_FORM);
     setDeleteOpen(false);
 
@@ -230,6 +255,7 @@ export default function Page() {
     } else {
       setRegisterData(EMPTY_FORM);
       setFieldErrors({});
+      setFieldTouched({});
       void fetchNui('cDataPed', {});
       setScreen('register');
     }
@@ -274,25 +300,66 @@ export default function Page() {
     });
   };
 
-  const validateForm = (): FieldErrors => {
-    const errors: FieldErrors = {};
+  const validateField = (
+    key: keyof RegisterFormData,
+    snapshot: RegisterFormData = registerData
+  ): string | undefined => {
     const required = t('ui.forgotten_field');
-    if (!registerData.firstname.trim() || registerData.firstname.trim().length < 2) {
-      errors.firstname = required;
+    switch (key) {
+      case 'firstname':
+      case 'lastname': {
+        const v = snapshot[key]?.trim() ?? '';
+        return v.length < 2 ? required : undefined;
+      }
+      case 'nationality':
+        return snapshot.nationality.trim() ? undefined : required;
+      case 'gender':
+        return snapshot.gender ? undefined : required;
+      case 'date':
+        return snapshot.date ? undefined : required;
     }
-    if (!registerData.lastname.trim() || registerData.lastname.trim().length < 2) {
-      errors.lastname = required;
-    }
-    if (!registerData.nationality.trim()) errors.nationality = required;
-    if (!registerData.gender) errors.gender = required;
-    if (!registerData.date) errors.date = required;
+  };
+
+  const validateAll = (
+    snapshot: RegisterFormData = registerData
+  ): FieldErrors => {
+    const errors: FieldErrors = {};
+    (Object.keys(snapshot) as Array<keyof RegisterFormData>).forEach((k) => {
+      const msg = validateField(k, snapshot);
+      if (msg) errors[k] = msg;
+    });
     return errors;
   };
 
+  const handleFieldBlur = (key: keyof RegisterFormData) => {
+    setFieldTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+    const msg = validateField(key);
+    setFieldErrors((prev) => {
+      // If validation passes, drop the error. If it fails, set it.
+      if (!msg) {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      if (prev[key] === msg) return prev;
+      return { ...prev, [key]: msg };
+    });
+  };
+
   const onCreate = () => {
-    const errors = validateForm();
+    const errors = validateAll();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
+      // Mark every field touched so the errors stay visible even if the
+      // user blurs out without changing anything.
+      setFieldTouched({
+        firstname: true,
+        lastname: true,
+        nationality: true,
+        gender: true,
+        date: true,
+      });
       return;
     }
     const payload: NewCharacterPayload = {
@@ -306,6 +373,38 @@ export default function Page() {
     void fetchNui('createNewCharacter', payload);
     setScreen('loading');
   };
+
+  const onCancelRegister = () => {
+    setRegisterData(EMPTY_FORM);
+    setFieldErrors({});
+    setFieldTouched({});
+    // Drop the empty-slot highlight when bailing out — leaving the
+    // selected rail on a slot that no longer corresponds to anything
+    // actionable made the action bar's "Select a file" hint feel
+    // contradictory.
+    setSelectedIndex(-1);
+    setScreen('characters');
+  };
+
+  // Esc bails out of the register flow back to the slot grid. Scoped to
+  // the register screen so we don't fight Radix's Dialog/Popover Esc
+  // handlers (those stop propagation when open). Capture-phase listener
+  // so we react before any portal'd primitive's bubble handler.
+  useEffect(() => {
+    if (screen !== 'register') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Don't bail if a popover/dialog is open — Radix handles those.
+      const popoverOpen = document.querySelector(
+        '[data-radix-popper-content-wrapper]'
+      );
+      if (popoverOpen) return;
+      onCancelRegister();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   // ---------- Derived ----------
 
@@ -362,13 +461,17 @@ export default function Page() {
           <RegisterPanel
             data={registerData}
             fieldErrors={fieldErrors}
+            fieldTouched={fieldTouched}
             customNationality={customNationality}
             nationalityOptions={nationalityOptions}
             genderOptions={genderOptions}
             slotIndex={selectedIndex}
             totalSlots={characterAmount}
+            dateMin={dateBounds.min}
+            dateMax={dateBounds.max}
             onChange={updateRegister}
-            onCancel={() => setScreen('characters')}
+            onBlurField={handleFieldBlur}
+            onCancel={onCancelRegister}
             onCreate={onCreate}
             t={t}
           />
@@ -561,6 +664,7 @@ function SlotRow({
   return (
     <Paper
       selected={isSelected}
+      style={{ animationDelay: `${mountDelay}ms` }}
       className="group cursor-pointer transition-colors duration-200 hover:border-gray-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
     >
       <div
@@ -573,7 +677,6 @@ function SlotRow({
             onClick();
           }
         }}
-        style={{ animationDelay: `${mountDelay}ms` }}
         className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5 px-3 py-2.5 outline-none"
       >
         {/* file number (left) */}
@@ -597,7 +700,10 @@ function SlotRow({
             </span>
           )}
           {!data && (
-            <Plus className="text-lg text-gray-600 group-hover:text-brand-400 transition-colors" />
+            <Plus
+              className="h-4 w-4 text-gray-600 group-hover:text-brand-400 transition-colors duration-150"
+              strokeWidth={1.5}
+            />
           )}
         </div>
       </div>
@@ -647,12 +753,16 @@ function SlotEmpty({ t }: { t: (k: string) => string }) {
 interface RegisterPanelProps {
   data: RegisterFormData;
   fieldErrors: FieldErrors;
+  fieldTouched: FieldTouched;
   customNationality: boolean;
   nationalityOptions: Array<{ label: string; value: string }>;
   genderOptions: Array<{ label: string; value: string }>;
   slotIndex: number;
   totalSlots: number;
+  dateMin: Date;
+  dateMax: Date;
   onChange: (patch: Partial<RegisterFormData>) => void;
+  onBlurField: (key: keyof RegisterFormData) => void;
   onCancel: () => void;
   onCreate: () => void;
   t: (k: string) => string;
@@ -661,22 +771,43 @@ interface RegisterPanelProps {
 function RegisterPanel({
   data,
   fieldErrors,
+  fieldTouched,
   customNationality,
   nationalityOptions,
   genderOptions,
   slotIndex,
   totalSlots,
+  dateMin,
+  dateMax,
   onChange,
+  onBlurField,
   onCancel,
   onCreate,
   t,
 }: RegisterPanelProps) {
+  // Only surface error captions for fields the user has touched (or that
+  // were force-touched on submit). Avoids screaming red on first paint.
+  const visibleError = (key: keyof RegisterFormData) =>
+    fieldTouched[key] ? fieldErrors[key] : undefined;
+
   return (
-    <>
-      {/* Section header in its own paper — matches the letterhead's
-          padding and weight so the form has a clear visual root. */}
-      <Paper className="px-5 py-4 shrink-0">
-        <div className="flex items-start justify-between gap-3">
+    <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
+      <form
+        // display: contents lets the form participate in the Paper's
+        // flex layout without nesting an extra block element. Native
+        // submit semantics give us free Enter-to-submit.
+        className="contents"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onCreate();
+        }}
+        noValidate
+      >
+        {/* Section header. The hairline below it is the visual seam
+            between header and body — replaces the old "header paper +
+            fields paper + action paper" stack with a single cohesive
+            document. */}
+        <header className="flex items-start justify-between gap-3 pb-3 mb-4 border-b border-gray-800/60">
           <div className="min-w-0">
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
               Section II · Enrollment
@@ -689,65 +820,100 @@ function RegisterPanel({
             File&nbsp;{String(slotIndex).padStart(2, '0')}/
             {String(totalSlots).padStart(2, '0')}
           </span>
-        </div>
-      </Paper>
+        </header>
 
-      {/* Fields sit directly over the dossier scene without their own
-          paper backing — the section header above and the action bar
-          below carry the visual weight; piling another paper on the
-          fields just felt like an opaque slab over the wardrobe. */}
-      <div className="px-1">
         <div className="grid grid-cols-1 gap-3">
           <Field
             id="qbm-firstname"
             label={t('ui.firstname')}
-            error={fieldErrors.firstname}
+            error={visibleError('firstname')}
           >
             <Input
               id="qbm-firstname"
               value={data.firstname}
               onChange={(e) => onChange({ firstname: e.target.value })}
-              aria-invalid={!!fieldErrors.firstname}
+              onBlur={() => onBlurField('firstname')}
+              aria-invalid={!!visibleError('firstname')}
+              aria-describedby={
+                visibleError('firstname') ? 'qbm-firstname-error' : undefined
+              }
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={NAME_MAX_LENGTH}
             />
           </Field>
           <Field
             id="qbm-lastname"
             label={t('ui.lastname')}
-            error={fieldErrors.lastname}
+            error={visibleError('lastname')}
           >
             <Input
               id="qbm-lastname"
               value={data.lastname}
               onChange={(e) => onChange({ lastname: e.target.value })}
-              aria-invalid={!!fieldErrors.lastname}
+              onBlur={() => onBlurField('lastname')}
+              aria-invalid={!!visibleError('lastname')}
+              aria-describedby={
+                visibleError('lastname') ? 'qbm-lastname-error' : undefined
+              }
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={NAME_MAX_LENGTH}
             />
           </Field>
           {customNationality ? (
             <Field
               id="qbm-nationality"
               label={t('ui.nationality')}
-              error={fieldErrors.nationality}
+              error={visibleError('nationality')}
             >
               <Input
                 id="qbm-nationality"
                 value={data.nationality}
                 onChange={(e) => onChange({ nationality: e.target.value })}
-                aria-invalid={!!fieldErrors.nationality}
+                onBlur={() => onBlurField('nationality')}
+                aria-invalid={!!visibleError('nationality')}
+                aria-describedby={
+                  visibleError('nationality')
+                    ? 'qbm-nationality-error'
+                    : undefined
+                }
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={NATIONALITY_MAX_LENGTH}
               />
             </Field>
           ) : (
             <Field
               id="qbm-nationality"
               label={t('ui.nationality')}
-              error={fieldErrors.nationality}
+              error={visibleError('nationality')}
             >
               <Select
                 value={data.nationality}
-                onValueChange={(value) => onChange({ nationality: value })}
+                onValueChange={(value) => {
+                  onChange({ nationality: value });
+                  // Selects don't fire native blur the way Inputs do;
+                  // we mark the field touched on selection. We DON'T
+                  // attach onBlur to SelectTrigger — doing that triggers
+                  // a parent setState during Radix's pointer flow and
+                  // can leave a previously-open Select stuck open when
+                  // the user clicks a sibling Select's trigger.
+                  onBlurField('nationality');
+                }}
               >
                 <SelectTrigger
                   id="qbm-nationality"
-                  aria-invalid={!!fieldErrors.nationality}
+                  aria-invalid={!!visibleError('nationality')}
+                  aria-describedby={
+                    visibleError('nationality')
+                      ? 'qbm-nationality-error'
+                      : undefined
+                  }
                 >
                   <SelectValue placeholder={t('ui.nationality')} />
                 </SelectTrigger>
@@ -764,15 +930,21 @@ function RegisterPanel({
           <Field
             id="qbm-gender"
             label={t('ui.gender')}
-            error={fieldErrors.gender}
+            error={visibleError('gender')}
           >
             <Select
               value={data.gender}
-              onValueChange={(value) => onChange({ gender: value })}
+              onValueChange={(value) => {
+                onChange({ gender: value });
+                onBlurField('gender');
+              }}
             >
               <SelectTrigger
                 id="qbm-gender"
-                aria-invalid={!!fieldErrors.gender}
+                aria-invalid={!!visibleError('gender')}
+                aria-describedby={
+                  visibleError('gender') ? 'qbm-gender-error' : undefined
+                }
               >
                 <SelectValue placeholder={t('ui.gender')} />
               </SelectTrigger>
@@ -789,24 +961,32 @@ function RegisterPanel({
             id="qbm-birthdate"
             label={t('ui.birthdate')}
             selected={data.date}
-            onChange={(date) => onChange({ date: date ?? null })}
-            error={fieldErrors.date}
+            onChange={(date) => {
+              onChange({ date: date ?? null });
+              onBlurField('date');
+            }}
+            onBlur={() => onBlurField('date')}
+            error={visibleError('date')}
+            minDate={dateMin}
+            maxDate={dateMax}
+            defaultMonth={dateMax}
+            yearNav
+            placeholder={t('ui.birthdate')}
           />
         </div>
-      </div>
 
-      {/* Action bar paper */}
-      <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
-        <Button variant="secondary" onClick={onCancel}>
-          <X />
-          {t('ui.cancel')}
-        </Button>
-        <Button onClick={onCreate}>
-          <Play />
-          {t('ui.create_button')}
-        </Button>
-      </Paper>
-    </>
+        <footer className="flex items-center justify-end gap-2 pt-3 mt-4 border-t border-gray-800/60">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            <X />
+            {t('ui.cancel')}
+          </Button>
+          <Button type="submit">
+            <Play />
+            {t('ui.create_button')}
+          </Button>
+        </footer>
+      </form>
+    </Paper>
   );
 }
 
@@ -838,7 +1018,8 @@ function Field({
       {children}
       {error && (
         <p
-          className="font-mono text-[9px] tracking-[0.2em] uppercase text-destructive"
+          id={`${id}-error`}
+          className="font-mono text-[9px] tracking-[0.2em] uppercase text-destructive animate-[fadeIn_180ms_ease-out_both]"
           role="alert"
         >
           {error}

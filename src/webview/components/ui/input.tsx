@@ -22,7 +22,8 @@ const Input = React.forwardRef<
       className={cn(
         'flex w-full bg-transparent border-0 border-b border-input/70 px-1 py-1.5',
         'font-serif text-[14px] text-foreground placeholder:text-muted-foreground/70',
-        'focus-visible:outline-none focus-visible:border-ring transition-colors',
+        'hover:border-input',
+        'focus-visible:outline-none focus-visible:border-ring transition-colors duration-150',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'aria-[invalid=true]:border-destructive/60 aria-[invalid=true]:focus-visible:border-destructive',
         className
