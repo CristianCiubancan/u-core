@@ -610,31 +610,29 @@ function CharactersPanel({
       {/* Header — same hairline-seam treatment as RegisterPanel's
           Section II header, so both screens read as the same kind of
           dossier sheet. */}
-      {/* mb-3 deliberately omitted: keeping the header's border-b tight
-          against file 01's top edge gives every slot row the same
-          hairline-on-top treatment as the divide-y separators between
-          rows 02–05. With breathing space here, file 01 reads as
-          "free-floating" while 02–05 read as "boxed in" — same
-          structural code, different visual weight. */}
-      <header className="flex items-baseline justify-between gap-2 pb-3 border-b border-gray-800/60">
-        <div className="min-w-0">
-          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-            Section I · Roster
-          </p>
-          <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
-            {t('ui.characters_header')}
-          </h2>
-        </div>
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
-          {filledCount}/{slots.length} on record
-        </span>
-      </header>
-
-      {/* Slot rows — hairline separators between rows via divide-y so
-          the last row doesn't double-line into the footer's border-t.
-          No negative margin: the row's selected-rail aligns with the
-          Paper's content edge, matching the header/footer hairlines. */}
-      <div className="flex flex-col divide-y divide-gray-800/40">
+      {/* Header is the first child of the divide-y container, NOT a
+          separate sibling with its own border-b. Why: divide-y adds a
+          1px top border to every child after the first, so the line
+          between header and row 01 is owned by row 01. When row 01 is
+          selected, its `border-brand-500/70` recolors that line brand,
+          giving it the same "left rail + brand top hairline" frame
+          that selected rows 02–05 have. If the header had its own
+          border-b instead, row 01 selection would only recolor the
+          left rail and frame asymmetrically. */}
+      <div className="flex flex-col divide-y divide-gray-800/60">
+        <header className="flex items-baseline justify-between gap-2 pb-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
+              Section I · Roster
+            </p>
+            <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
+              {t('ui.characters_header')}
+            </h2>
+          </div>
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+            {filledCount}/{slots.length} on record
+          </span>
+        </header>
         {slots.map(({ index, data }, idx) => (
           <SlotRow
             key={index}
@@ -708,8 +706,15 @@ function SlotRow({
       }}
       style={{ animationDelay: `${mountDelay}ms` }}
       // border-l-2 always present (transparent → brand on selected) so
-      // selecting a row never shifts horizontal layout. Reserved 2px on
-      // the right keeps the grid visually balanced around the rail.
+      // selecting a row never shifts horizontal layout.
+      //
+      // `border-{color}` (no side suffix) on the selected state colors
+      // ALL sides — that's intentional. The parent's `divide-y` adds a
+      // 1px border-top to every row except the first; on selected
+      // rows, that top border picks up the brand color and frames the
+      // selection (left rail + top hairline). For row 01 to match,
+      // the section header is moved INTO the same divide-y container
+      // so divide-y also draws a brand-recolorable line above row 01.
       className={[
         'group cursor-pointer outline-none',
         'grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5',
