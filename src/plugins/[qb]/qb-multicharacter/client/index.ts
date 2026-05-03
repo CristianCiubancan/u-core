@@ -33,13 +33,32 @@ async function loadModel(model: number): Promise<void> {
   }
 }
 
+// Generation counter for ped-init operations. When the user flips the
+// gender dropdown rapidly, multiple cDataPed callbacks fire and each
+// awaits loadModel; without this, the first ped to finish loading
+// would still be alive in the world by the time the second's CreatePed
+// runs, leaving two peds standing in the interior. Each call captures
+// its generation, and only the LATEST one is allowed to commit a new
+// ped — earlier in-flight calls bail out.
+let pedInitGeneration = 0;
+
 async function initializePedModel(
   model: number | null,
   data: unknown
 ): Promise<void> {
+  const generation = ++pedInitGeneration;
   const resolvedModel =
     model ?? RANDOM_MODELS[Math.floor(Math.random() * RANDOM_MODELS.length)];
   await loadModel(resolvedModel);
+
+  // Stale init: a newer cDataPed call landed while we were awaiting.
+  // Drop our work; the newer one will own the ped from here on.
+  if (generation !== pedInitGeneration) return;
+
+  // Destroy any ped from a previous (now-stale) init that managed to
+  // commit before this one did.
+  destroyPed();
+
   charPed = CreatePed(
     2,
     resolvedModel,
