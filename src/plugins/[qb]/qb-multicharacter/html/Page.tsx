@@ -599,7 +599,7 @@ interface CharactersPanelProps {
   onSlotClick: (index: number) => void;
   onPlay: () => void;
   onPrepareDelete: () => void;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }
 
 function CharactersPanel({
@@ -696,7 +696,7 @@ interface SlotRowProps {
   data: CharacterRow | null;
   isSelected: boolean;
   onClick: () => void;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
   mountDelay: number;
 }
 
@@ -825,7 +825,7 @@ interface RegisterPanelProps {
   onChange: (patch: Partial<RegisterFormData>) => void;
   onCancel: () => void;
   onCreate: () => void;
-  t: (k: string) => string;
+  t: (k: string, options?: Record<string, unknown>) => string;
 }
 
 function RegisterPanel({
