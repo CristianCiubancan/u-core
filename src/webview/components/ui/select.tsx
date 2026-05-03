@@ -157,18 +157,6 @@ const SelectContent = React.forwardRef<
   // applied it (Tailwind class, inline style with var()).
   const triggerWidth = React.useContext(SelectWidthContext);
 
-  // Diagnostic: surfaces the measured trigger width so F8 / browser
-  // console can confirm context propagates and the value is sane. If
-  // the dropdown still appears wider than this number on screen, the
-  // bug is downstream of `width` (box-sizing, an inherited min-width,
-  // or a CSS rule we haven't found yet).
-  React.useEffect(() => {
-    if (typeof triggerWidth === 'number') {
-      // eslint-disable-next-line no-console
-      console.log('[Select] trigger width:', triggerWidth);
-    }
-  }, [triggerWidth]);
-
   return (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
@@ -199,7 +187,13 @@ const SelectContent = React.forwardRef<
       }
       className={cn(
         'relative z-50 max-h-60 overflow-hidden',
-        'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
+        // backdrop-blur-md (12px) was the dominant cost on first paint —
+        // each open re-rasterizes the live 3D scene under the dropdown
+        // through a 12px gaussian blur. backdrop-blur-sm (4px) plus a
+        // higher bg opacity gets near-identical separation for a
+        // fraction of the GPU work, which matters most for the
+        // 200-item nationality list.
+        'bg-popover/92 backdrop-blur-sm border border-border/60 text-popover-foreground',
         // No drop shadow — the previous shadow-[0_8px_32px_rgba(0,0,0,.45)]
         // painted a 32px-blur dark halo around the dropdown that read as
         // "background extends past the trigger" against a dark scene. The

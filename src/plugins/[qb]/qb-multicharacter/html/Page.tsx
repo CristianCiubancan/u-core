@@ -115,7 +115,6 @@ const EMPTY_FORM: RegisterFormData = {
 };
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
-type FieldTouched = Partial<Record<keyof RegisterFormData, boolean>>;
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -146,7 +145,6 @@ export default function Page() {
   const [loadingStage, setLoadingStage] = useState<number>(0);
   const [registerData, setRegisterData] = useState<RegisterFormData>(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [fieldTouched, setFieldTouched] = useState<FieldTouched>({});
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
 
   // Bounds for the birthdate picker. Recomputed once per session — fine
@@ -177,7 +175,6 @@ export default function Page() {
     setNationalities(Array.isArray(data.countries) ? data.countries : []);
     setSelectedIndex(-1);
     setFieldErrors({});
-    setFieldTouched({});
     setRegisterData(EMPTY_FORM);
     setDeleteOpen(false);
 
@@ -255,7 +252,6 @@ export default function Page() {
     } else {
       setRegisterData(EMPTY_FORM);
       setFieldErrors({});
-      setFieldTouched({});
       void fetchNui('cDataPed', {});
       setScreen('register');
     }
@@ -276,6 +272,13 @@ export default function Page() {
     const cData = characters[selectedIndex];
     if (!cData) return;
     void fetchNui('removeCharacter', { citizenid: cData.citizenid });
+    // Hide the panel immediately so the player doesn't stare at the
+    // stale roster (with the just-deleted row still visible) while the
+    // server processes the delete. The client's removeCharacter handler
+    // re-emits `chooseChar`, which fires the `ui` event handler above
+    // and brings the panel back through the loading sequence with the
+    // refreshed character list.
+    setVisible(false);
     setDeleteOpen(false);
     setScreen('characters');
   };
@@ -292,6 +295,17 @@ export default function Page() {
       return next;
     });
     setFieldErrors((prev) => {
+      // Bail out unchanged so we don't schedule a redundant re-render on
+      // every keystroke. fieldErrors is empty until the first failed
+      // submit, so this short-circuit covers the common typing path.
+      let touched = false;
+      for (const key of Object.keys(patch)) {
+        if (prev[key as keyof RegisterFormData] !== undefined) {
+          touched = true;
+          break;
+        }
+      }
+      if (!touched) return prev;
       const cleared = { ...prev };
       for (const key of Object.keys(patch)) {
         delete cleared[key as keyof RegisterFormData];
@@ -304,19 +318,44 @@ export default function Page() {
     key: keyof RegisterFormData,
     snapshot: RegisterFormData = registerData
   ): string | undefined => {
-    const required = t('ui.forgotten_field');
+    // Short, field-specific captions. `defaultValue` lets non-EN locales
+    // that haven't translated these new keys fall back to readable
+    // English instead of rendering the bare key.
+    const required = t('ui.error_required', { defaultValue: 'Required' });
+    const tooShort = t('ui.error_too_short', {
+      defaultValue: 'At least 2 characters',
+    });
+    const pickOption = t('ui.error_pick_option', {
+      defaultValue: 'Pick an option',
+    });
+    const pickDate = t('ui.error_pick_date', { defaultValue: 'Pick a date' });
+    const dateRange = t('ui.error_date_range', {
+      defaultValue: 'Out of allowed range',
+    });
+
     switch (key) {
       case 'firstname':
       case 'lastname': {
         const v = snapshot[key]?.trim() ?? '';
-        return v.length < 2 ? required : undefined;
+        if (v.length === 0) return required;
+        if (v.length < 2) return tooShort;
+        return undefined;
       }
       case 'nationality':
-        return snapshot.nationality.trim() ? undefined : required;
+        if (!snapshot.nationality.trim()) {
+          return customNationality ? required : pickOption;
+        }
+        return undefined;
       case 'gender':
-        return snapshot.gender ? undefined : required;
-      case 'date':
-        return snapshot.date ? undefined : required;
+        return snapshot.gender ? undefined : pickOption;
+      case 'date': {
+        if (!snapshot.date) return pickDate;
+        const time = snapshot.date.getTime();
+        if (time < dateBounds.min.getTime() || time > dateBounds.max.getTime()) {
+          return dateRange;
+        }
+        return undefined;
+      }
     }
   };
 
@@ -331,35 +370,10 @@ export default function Page() {
     return errors;
   };
 
-  const handleFieldBlur = (key: keyof RegisterFormData) => {
-    setFieldTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
-    const msg = validateField(key);
-    setFieldErrors((prev) => {
-      // If validation passes, drop the error. If it fails, set it.
-      if (!msg) {
-        if (!prev[key]) return prev;
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      }
-      if (prev[key] === msg) return prev;
-      return { ...prev, [key]: msg };
-    });
-  };
-
   const onCreate = () => {
     const errors = validateAll();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      // Mark every field touched so the errors stay visible even if the
-      // user blurs out without changing anything.
-      setFieldTouched({
-        firstname: true,
-        lastname: true,
-        nationality: true,
-        gender: true,
-        date: true,
-      });
       return;
     }
     const payload: NewCharacterPayload = {
@@ -377,7 +391,6 @@ export default function Page() {
   const onCancelRegister = () => {
     setRegisterData(EMPTY_FORM);
     setFieldErrors({});
-    setFieldTouched({});
     // Drop the empty-slot highlight when bailing out — leaving the
     // selected rail on a slot that no longer corresponds to anything
     // actionable made the action bar's "Select a file" hint feel
@@ -461,7 +474,6 @@ export default function Page() {
           <RegisterPanel
             data={registerData}
             fieldErrors={fieldErrors}
-            fieldTouched={fieldTouched}
             customNationality={customNationality}
             nationalityOptions={nationalityOptions}
             genderOptions={genderOptions}
@@ -470,7 +482,6 @@ export default function Page() {
             dateMin={dateBounds.min}
             dateMax={dateBounds.max}
             onChange={updateRegister}
-            onBlurField={handleFieldBlur}
             onCancel={onCancelRegister}
             onCreate={onCreate}
             t={t}
@@ -591,36 +602,46 @@ function CharactersPanel({
   const selected = slots.find((s) => s.index === selectedIndex);
   const showActions = selected?.data;
 
+  const filledCount = slots.filter((s) => s.data).length;
+
   return (
-    <>
-      {/* Section header gets its own paper so it has the same visual
-          weight as the letterhead above. Keeping headers as floating
-          text broke the rhythm — sections looked unfinished compared
-          to the rest of the stack. */}
-      <Paper className="px-5 py-3 shrink-0">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-display text-lg font-light leading-none text-gray-100 truncate">
+    <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
+      {/* Header — same hairline-seam treatment as RegisterPanel's
+          Section II header, so both screens read as the same kind of
+          dossier sheet. */}
+      <header className="flex items-baseline justify-between gap-2 pb-3 mb-3 border-b border-gray-800/60">
+        <div className="min-w-0">
+          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
+            Section I · Roster
+          </p>
+          <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
             {t('ui.characters_header')}
           </h2>
-          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
-            {slots.filter((s) => s.data).length}/{slots.length} on record
-          </span>
         </div>
-      </Paper>
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+          {filledCount}/{slots.length} on record
+        </span>
+      </header>
 
-      {slots.map(({ index, data }, idx) => (
-        <SlotRow
-          key={index}
-          index={index}
-          data={data}
-          isSelected={index === selectedIndex}
-          onClick={() => onSlotClick(index)}
-          t={t}
-          mountDelay={idx * 50}
-        />
-      ))}
+      {/* Slot rows — hairline separators between rows via divide-y so
+          the last row doesn't double-line into the footer's border-t.
+          No negative margin: the row's selected-rail aligns with the
+          Paper's content edge, matching the header/footer hairlines. */}
+      <div className="flex flex-col divide-y divide-gray-800/40">
+        {slots.map(({ index, data }, idx) => (
+          <SlotRow
+            key={index}
+            index={index}
+            data={data}
+            isSelected={index === selectedIndex}
+            onClick={() => onSlotClick(index)}
+            t={t}
+            mountDelay={idx * 50}
+          />
+        ))}
+      </div>
 
-      <Paper className="px-3.5 py-2.5 flex items-center justify-end gap-2 mt-auto">
+      <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
         {showActions ? (
           <>
             <Button onClick={onPlay}>
@@ -639,8 +660,8 @@ function CharactersPanel({
             Select a file
           </span>
         )}
-      </Paper>
-    </>
+      </footer>
+    </Paper>
   );
 }
 
@@ -662,52 +683,60 @@ function SlotRow({
   mountDelay,
 }: SlotRowProps) {
   return (
-    <Paper
-      selected={isSelected}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={{ animationDelay: `${mountDelay}ms` }}
-      className="group cursor-pointer transition-colors duration-200 hover:border-gray-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
+      // border-l-2 always present (transparent → brand on selected) so
+      // selecting a row never shifts horizontal layout. Reserved 2px on
+      // the right keeps the grid visually balanced around the rail.
+      className={[
+        'group cursor-pointer outline-none',
+        'grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5',
+        'px-3 py-2.5 border-l-2',
+        'transition-colors duration-150',
+        'animate-[fadeIn_300ms_ease-out_both]',
+        'focus-visible:ring-1 focus-visible:ring-brand-500/60',
+        isSelected
+          ? 'border-brand-500/70 bg-brand-500/[0.04]'
+          : 'border-transparent hover:bg-gray-100/[0.025]',
+      ].join(' ')}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClick();
-          }
-        }}
-        className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5 px-3 py-2.5 outline-none"
-      >
-        {/* file number (left) */}
-        <div className="font-mono text-[8.5px] tracking-[0.25em] text-gray-500 uppercase leading-tight">
-          <div className="text-gray-600">File</div>
-          <div className="text-gray-200 text-[15px] font-display tracking-normal leading-tight">
-            {String(index).padStart(2, '0')}
-          </div>
-        </div>
-
-        {/* identity (center) */}
-        <div className="min-w-0">
-          {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
-        </div>
-
-        {/* status badge (right) */}
-        <div className="shrink-0">
-          {isSelected && data && (
-            <span className="font-mono text-[8.5px] tracking-[0.3em] text-brand-400 uppercase">
-              ▸&nbsp;Active
-            </span>
-          )}
-          {!data && (
-            <Plus
-              className="h-4 w-4 text-gray-600 group-hover:text-brand-400 transition-colors duration-150"
-              strokeWidth={1.5}
-            />
-          )}
+      {/* file number (left) */}
+      <div className="font-mono text-[8.5px] tracking-[0.25em] text-gray-500 uppercase leading-tight">
+        <div className="text-gray-600">File</div>
+        <div className="text-gray-200 text-[15px] font-display tracking-normal leading-tight">
+          {String(index).padStart(2, '0')}
         </div>
       </div>
-    </Paper>
+
+      {/* identity (center) */}
+      <div className="min-w-0">
+        {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
+      </div>
+
+      {/* status badge (right) */}
+      <div className="shrink-0">
+        {isSelected && data && (
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-brand-400 uppercase">
+            ▸&nbsp;Active
+          </span>
+        )}
+        {!data && (
+          <Plus
+            className="h-4 w-4 text-gray-600 group-hover:text-brand-400 transition-colors duration-150"
+            strokeWidth={1.5}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -753,7 +782,6 @@ function SlotEmpty({ t }: { t: (k: string) => string }) {
 interface RegisterPanelProps {
   data: RegisterFormData;
   fieldErrors: FieldErrors;
-  fieldTouched: FieldTouched;
   customNationality: boolean;
   nationalityOptions: Array<{ label: string; value: string }>;
   genderOptions: Array<{ label: string; value: string }>;
@@ -762,7 +790,6 @@ interface RegisterPanelProps {
   dateMin: Date;
   dateMax: Date;
   onChange: (patch: Partial<RegisterFormData>) => void;
-  onBlurField: (key: keyof RegisterFormData) => void;
   onCancel: () => void;
   onCreate: () => void;
   t: (k: string) => string;
@@ -771,7 +798,6 @@ interface RegisterPanelProps {
 function RegisterPanel({
   data,
   fieldErrors,
-  fieldTouched,
   customNationality,
   nationalityOptions,
   genderOptions,
@@ -780,15 +806,53 @@ function RegisterPanel({
   dateMin,
   dateMax,
   onChange,
-  onBlurField,
   onCancel,
   onCreate,
   t,
 }: RegisterPanelProps) {
-  // Only surface error captions for fields the user has touched (or that
-  // were force-touched on submit). Avoids screaming red on first paint.
-  const visibleError = (key: keyof RegisterFormData) =>
-    fieldTouched[key] ? fieldErrors[key] : undefined;
+  // Validation runs on submit only — errors live in `fieldErrors` and are
+  // cleared per-field by the parent's `updateRegister` as the user edits,
+  // so showing them directly is correct: nothing renders before the first
+  // failed submit, and individual errors disappear the moment the user
+  // touches that field.
+  const visibleError = (key: keyof RegisterFormData) => fieldErrors[key];
+
+  // Coordinated Select open state. Radix Select's DismissableLayer is
+  // supposed to close one Select when another is clicked, but in our
+  // CEF/portal/backdrop-filter stack it doesn't always fire — both
+  // dropdowns can sit open at the same time. We hoist `open` here and
+  // make opening a new Select implicitly close the previous one.
+  const [openSelect, setOpenSelect] = useState<
+    'nationality' | 'gender' | null
+  >(null);
+  const selectOpenChange =
+    (key: 'nationality' | 'gender') => (open: boolean) =>
+      setOpenSelect(open ? key : (cur) => (cur === key ? null : cur));
+
+  // Memoize the SelectItem element arrays. Without this, every keystroke
+  // re-renders RegisterPanel, which re-evaluates the JSX inside each
+  // <SelectContent>{...} — that's ~200 React.createElement calls for the
+  // nationality list per keystroke (even though Content is unmounted
+  // because the dropdown is closed). Cached arrays make typing snappy
+  // and let React skip per-item reconciliation when the dropdown opens.
+  const nationalityItems = useMemo(
+    () =>
+      nationalityOptions.map((opt) => (
+        <SelectItem key={opt.value} value={opt.value}>
+          {opt.label}
+        </SelectItem>
+      )),
+    [nationalityOptions]
+  );
+  const genderItems = useMemo(
+    () =>
+      genderOptions.map((opt) => (
+        <SelectItem key={opt.value} value={opt.value}>
+          {opt.label}
+        </SelectItem>
+      )),
+    [genderOptions]
+  );
 
   return (
     <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
@@ -832,7 +896,6 @@ function RegisterPanel({
               id="qbm-firstname"
               value={data.firstname}
               onChange={(e) => onChange({ firstname: e.target.value })}
-              onBlur={() => onBlurField('firstname')}
               aria-invalid={!!visibleError('firstname')}
               aria-describedby={
                 visibleError('firstname') ? 'qbm-firstname-error' : undefined
@@ -853,7 +916,6 @@ function RegisterPanel({
               id="qbm-lastname"
               value={data.lastname}
               onChange={(e) => onChange({ lastname: e.target.value })}
-              onBlur={() => onBlurField('lastname')}
               aria-invalid={!!visibleError('lastname')}
               aria-describedby={
                 visibleError('lastname') ? 'qbm-lastname-error' : undefined
@@ -874,7 +936,6 @@ function RegisterPanel({
                 id="qbm-nationality"
                 value={data.nationality}
                 onChange={(e) => onChange({ nationality: e.target.value })}
-                onBlur={() => onBlurField('nationality')}
                 aria-invalid={!!visibleError('nationality')}
                 aria-describedby={
                   visibleError('nationality')
@@ -895,16 +956,9 @@ function RegisterPanel({
             >
               <Select
                 value={data.nationality}
-                onValueChange={(value) => {
-                  onChange({ nationality: value });
-                  // Selects don't fire native blur the way Inputs do;
-                  // we mark the field touched on selection. We DON'T
-                  // attach onBlur to SelectTrigger — doing that triggers
-                  // a parent setState during Radix's pointer flow and
-                  // can leave a previously-open Select stuck open when
-                  // the user clicks a sibling Select's trigger.
-                  onBlurField('nationality');
-                }}
+                open={openSelect === 'nationality'}
+                onOpenChange={selectOpenChange('nationality')}
+                onValueChange={(value) => onChange({ nationality: value })}
               >
                 <SelectTrigger
                   id="qbm-nationality"
@@ -917,13 +971,7 @@ function RegisterPanel({
                 >
                   <SelectValue placeholder={t('ui.nationality')} />
                 </SelectTrigger>
-                <SelectContent>
-                  {nationalityOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectContent>{nationalityItems}</SelectContent>
               </Select>
             </Field>
           )}
@@ -934,10 +982,9 @@ function RegisterPanel({
           >
             <Select
               value={data.gender}
-              onValueChange={(value) => {
-                onChange({ gender: value });
-                onBlurField('gender');
-              }}
+              open={openSelect === 'gender'}
+              onOpenChange={selectOpenChange('gender')}
+              onValueChange={(value) => onChange({ gender: value })}
             >
               <SelectTrigger
                 id="qbm-gender"
@@ -948,24 +995,14 @@ function RegisterPanel({
               >
                 <SelectValue placeholder={t('ui.gender')} />
               </SelectTrigger>
-              <SelectContent>
-                {genderOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectContent>{genderItems}</SelectContent>
             </Select>
           </Field>
           <DatePicker
             id="qbm-birthdate"
             label={t('ui.birthdate')}
             selected={data.date}
-            onChange={(date) => {
-              onChange({ date: date ?? null });
-              onBlurField('date');
-            }}
-            onBlur={() => onBlurField('date')}
+            onChange={(date) => onChange({ date: date ?? null })}
             error={visibleError('date')}
             minDate={dateMin}
             maxDate={dateMax}
@@ -976,7 +1013,18 @@ function RegisterPanel({
         </div>
 
         <footer className="flex items-center justify-end gap-2 pt-3 mt-4 border-t border-gray-800/60">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="secondary"
+            // preventDefault on mousedown stops the focused Input from
+            // blurring when this button is pressed. Without it, blur fires
+            // first → validation runs → an error caption renders below the
+            // input → layout shifts down → the click's mouseup lands on a
+            // different element, so onClick never fires, and the user has
+            // to click Cancel a second time.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onCancel}
+          >
             <X />
             {t('ui.cancel')}
           </Button>
