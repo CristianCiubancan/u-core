@@ -1,4 +1,5 @@
 import React from 'react';
+import ActionLink from './ActionLink';
 
 interface ButtonProps {
   children?: React.ReactNode;
@@ -9,40 +10,43 @@ interface ButtonProps {
   className?: string;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'accent' | 'danger';
 }
 
+/**
+ * Button — kept for backwards compatibility with older plugins. Now a
+ * thin wrapper over ActionLink so the dossier aesthetic is the only
+ * default. Pass `variant="accent"` or `variant="danger"` for tone, or
+ * import ActionLink directly for new code.
+ *
+ * `size` and `fullWidth` are honored but most existing usages map to
+ * the dossier action's compact mono size — only fullWidth changes the
+ * layout meaningfully.
+ */
 const Button = ({
   children,
-  type,
+  type = 'button',
   text,
   fullWidth,
   onClick,
   disabled,
-  size,
   className,
+  variant = 'default',
 }: ButtonProps) => {
-  // Size classes
-  const sizeClasses = {
-    sm: 'px-2 py-1 text-sm',
-    md: 'px-4 py-2',
-    lg: 'px-6 py-3 text-lg',
-  };
-
-  const sizeClass = size ? sizeClasses[size] : sizeClasses.md;
-
+  const label =
+    typeof children === 'string'
+      ? children
+      : (text ?? (children as string) ?? '');
   return (
-    <button
-      type={type}
-      disabled={disabled}
-      className={`${
-        fullWidth ? 'w-full' : ''
-      } ${sizeClass} glass-gray-dark hover:bg-brand-600/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 active:scale-95 transition-all-fast border border-brand-500/30 rounded-lg shadow-sm hover:shadow text-shadow-sm scale-100 hover:scale-105 ${
-        disabled ? 'opacity-50 cursor-not-allowed' : ''
-      } ${className || ''}`}
+    <ActionLink
+      type={type === 'reset' ? 'button' : type}
+      label={label}
       onClick={onClick}
-    >
-      {children || text}
-    </button>
+      disabled={disabled}
+      accent={variant === 'accent'}
+      danger={variant === 'danger'}
+      className={`${fullWidth ? 'w-full justify-center' : ''} ${className || ''}`}
+    />
   );
 };
 

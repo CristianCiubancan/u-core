@@ -12,6 +12,7 @@ import { generateMergedGlassClasses } from './utils/glassUtils';
 import { generateAccessibleTextUtilities } from './utils/accessibleTextUtils';
 import { generateThemedScrollbarStyles } from './utils/scrollbarThemeUtils';
 import { generateSafelist } from './utils/safelistUtils';
+import { generateDossierComponents } from './utils/dossierUtils';
 import { hexToRgb, getContrastRatio } from '../utils/colorUtils';
 
 const tailwindConfig: Config = {
@@ -90,6 +91,19 @@ const tailwindConfig: Config = {
       // Use double assertion to satisfy the type checker
       addUtilities(
         generateMergedGlassClasses(
+          grayPalette,
+          brandPalette
+        ) as unknown as CSSRuleObject
+      );
+    },
+
+    // Dossier design language — translucent papers, hairline inputs,
+    // mono labels, action-link buttons. Lives as `addComponents` (lower
+    // specificity than utilities) so a plugin can still override e.g.
+    // .dossier-paper's bg with a `bg-…` utility on the same element.
+    function ({ addComponents }: PluginAPI) {
+      addComponents(
+        generateDossierComponents(
           grayPalette,
           brandPalette
         ) as unknown as CSSRuleObject

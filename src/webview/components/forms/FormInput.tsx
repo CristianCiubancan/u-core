@@ -81,7 +81,7 @@ const FormInput = ({
               onClick={handleDecrement}
               disabled={disabled}
               aria-label="Decrement"
-              className="px-1.5 text-zinc-500 hover:text-zinc-200 transition-colors font-mono text-[10px]"
+              className="px-1.5 text-gray-500 hover:text-gray-200 transition-colors font-mono text-[10px]"
             >
               −
             </button>
@@ -90,7 +90,7 @@ const FormInput = ({
               onClick={handleIncrement}
               disabled={disabled}
               aria-label="Increment"
-              className="px-1.5 text-zinc-500 hover:text-zinc-200 transition-colors font-mono text-[10px]"
+              className="px-1.5 text-gray-500 hover:text-gray-200 transition-colors font-mono text-[10px]"
             >
               +
             </button>

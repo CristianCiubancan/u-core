@@ -1,5 +1,4 @@
 import { ReactNode } from 'react';
-import Button from './Button';
 import IconWrapper from './IconWrapper';
 
 interface TabButtonProps<T extends string> {
@@ -11,7 +10,9 @@ interface TabButtonProps<T extends string> {
 }
 
 /**
- * Reusable tab button component with consistent styling
+ * Dossier-style tab button — flat segment with a hairline underline
+ * that turns indigo on the active tab. No glass-pill backgrounds.
+ * Pair siblings inside a flex container for a horizontal tab row.
  */
 const TabButton = <T extends string>({
   tab,
@@ -20,21 +21,24 @@ const TabButton = <T extends string>({
   icon,
   onClick,
 }: TabButtonProps<T>) => {
+  const isActive = activeTab === tab;
   return (
-    <Button
+    <button
+      type="button"
       onClick={() => onClick(tab)}
-      fullWidth
-      className={`${
-        activeTab === tab ? 'glass-brand' : 'glass-brand-dark'
-      } flex flex-col items-center justify-center py-2`}
+      className={`flex-1 flex flex-col items-center justify-center gap-1 px-3 py-2 transition-colors border-b ${
+        isActive
+          ? 'text-brand-200 border-brand-400'
+          : 'text-gray-400 border-gray-800 hover:text-gray-200 hover:border-gray-600'
+      } font-mono text-[9.5px] tracking-[0.25em] uppercase`}
     >
       {icon && (
-        <IconWrapper className="mb-1" size="1.5em">
+        <IconWrapper className="text-base" size="1.25em">
           {icon}
         </IconWrapper>
       )}
-      <span className="text-xs">{label}</span>
-    </Button>
+      <span>{label}</span>
+    </button>
   );
 };
 

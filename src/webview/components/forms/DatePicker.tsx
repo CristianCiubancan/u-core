@@ -581,7 +581,7 @@ const DatePicker = ({
         />
         <span
           aria-hidden="true"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 text-[10px] font-mono"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] font-mono"
         >
           ▾
         </span>
@@ -602,7 +602,7 @@ const DatePicker = ({
           {isOpen && (
             <div className="p-3">
               {/* Header: Month/Year Navigation */}
-              <div className="flex justify-between items-center pb-2 mb-2 border-b border-zinc-800/70">
+              <div className="flex justify-between items-center pb-2 mb-2 border-b border-gray-800/70">
                 <button
                   ref={prevMonthRef}
                   type="button"
@@ -615,7 +615,7 @@ const DatePicker = ({
                   }
                   onClick={handlePrev}
                   disabled={disabled}
-                  className={`p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors focus:outline-none ${
+                  className={`p-1.5 text-gray-400 hover:text-gray-100 transition-colors focus:outline-none ${
                     disabled ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -626,7 +626,7 @@ const DatePicker = ({
                   id={headingId}
                   onClick={handleHeaderClick}
                   disabled={disabled || calendarView === 'years'}
-                  className={`font-mono text-[10px] tracking-[0.25em] uppercase text-zinc-200 px-2 py-1 transition-colors focus:outline-none ${
+                  className={`font-mono text-[10px] tracking-[0.25em] uppercase text-gray-200 px-2 py-1 transition-colors focus:outline-none ${
                     calendarView !== 'years' && !disabled
                       ? 'hover:text-brand-300'
                       : 'cursor-default'
@@ -656,7 +656,7 @@ const DatePicker = ({
                   }
                   onClick={handleNext}
                   disabled={disabled}
-                  className={`p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors focus:outline-none ${
+                  className={`p-1.5 text-gray-400 hover:text-gray-100 transition-colors focus:outline-none ${
                     disabled ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -680,7 +680,7 @@ const DatePicker = ({
                           key={day}
                           role="columnheader"
                           aria-label={day}
-                          className="text-center font-mono text-[9px] tracking-[0.15em] uppercase text-zinc-500"
+                          className="text-center font-mono text-[9px] tracking-[0.15em] uppercase text-gray-500"
                         >
                           {day}
                         </div>
@@ -715,10 +715,10 @@ const DatePicker = ({
                                   : 'border border-transparent'
                             } ${
                               isDisabled || disabled
-                                ? 'text-zinc-700 cursor-default'
+                                ? 'text-gray-700 cursor-default'
                                 : isSel
                                   ? 'cursor-pointer'
-                                  : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
+                                  : 'text-gray-300 hover:bg-gray-800/40 cursor-pointer'
                             } ${
                               isFocused && !disabled && !isSel
                                 ? 'ring-1 ring-brand-500/60'
@@ -757,10 +757,10 @@ const DatePicker = ({
                                 : 'border border-transparent'
                           } ${
                             disabled
-                              ? 'text-zinc-700 cursor-default'
+                              ? 'text-gray-700 cursor-default'
                               : isSelectedMonth
                                 ? 'cursor-pointer'
-                                : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
+                                : 'text-gray-300 hover:bg-gray-800/40 cursor-pointer'
                           }`}
                         >
                           {month.slice(0, 3)}
@@ -791,10 +791,10 @@ const DatePicker = ({
                                 : 'border border-transparent'
                           } ${
                             disabled || isOutsideDecade
-                              ? 'text-zinc-700 cursor-default'
+                              ? 'text-gray-700 cursor-default'
                               : isSelectedYear
                                 ? 'cursor-pointer'
-                                : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
+                                : 'text-gray-300 hover:bg-gray-800/40 cursor-pointer'
                           }`}
                         >
                           {year}

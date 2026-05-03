@@ -34,83 +34,11 @@ body {
   }
 }
 
-/* ============================================================
-   Dossier design language — translucent papers, hairline borders,
-   mono meta-text, minimalist forms. Established by the qb-multicharacter
-   rewrite; exposed here as reusable utilities so the rest of the plugin
-   suite stays visually coherent as the rewrite continues.
-
-   Apply directly: <div class="dossier-paper px-5 py-4">…</div>
-   ============================================================ */
-
-@layer components {
-  /* Translucent paper card — base building block for floating panels. */
-  .dossier-paper {
-    @apply relative bg-zinc-950/65 backdrop-blur-md border border-zinc-800/60
-           shadow-[0_8px_32px_rgba(0,0,0,0.4)];
-  }
-
-  /* Selected variant — indigo accent rail + slightly stronger fill. */
-  .dossier-paper-selected {
-    @apply border-brand-500/60 bg-zinc-900/70
-           shadow-[inset_2px_0_0_0_rgba(99,102,241,0.9),0_8px_32px_rgba(0,0,0,0.4)];
-  }
-
-  /* Field label — small mono uppercase, matches section meta-text. */
-  .dossier-label {
-    @apply block font-mono text-[9px] tracking-[0.35em] text-zinc-400 uppercase;
-  }
-
-  /* Field input — hairline bottom border, no fill, indigo on focus. */
-  .dossier-input {
-    @apply w-full bg-transparent border-0 border-b border-zinc-700/70
-           px-1 py-1.5 text-zinc-100 placeholder-zinc-600
-           font-serif text-[14px] leading-snug
-           focus:outline-none focus:border-brand-400 transition-colors;
-  }
-
-  .dossier-input-error {
-    @apply border-red-500/60 focus:border-red-400;
-  }
-
-  /* Inline error caption shown beneath a field. */
-  .dossier-error {
-    @apply mt-1 font-mono text-[9px] tracking-[0.2em] text-red-400 uppercase;
-  }
-
-  /* Text + icon action button. Dossier "actions" never look like glass
-     pills — they're a hairline-underlined affordance. Pair with one of
-     the accent / danger modifiers for tone. */
-  .dossier-action {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5
-           border-b border-l-0 border-r-0 border-t-0 border-zinc-700
-           text-zinc-300 hover:text-zinc-100 hover:border-zinc-500
-           transition-colors font-mono text-[9.5px]
-           tracking-[0.25em] uppercase whitespace-nowrap;
-  }
-
-  .dossier-action-accent {
-    @apply text-brand-300 hover:text-brand-200
-           border-brand-500/50 hover:border-brand-400;
-  }
-
-  .dossier-action-danger {
-    @apply text-red-300 hover:text-red-200
-           border-red-500/40 hover:border-red-400;
-  }
-
-  /* Floating-text section header — used above paper stacks. The text
-     shadow keeps it legible if a bright in-game surface is behind. */
-  .dossier-section-meta {
-    @apply font-mono text-[9px] tracking-[0.35em] text-zinc-300 uppercase
-           [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)];
-  }
-
-  .dossier-section-title {
-    @apply font-display text-lg font-light text-zinc-100
-           [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)];
-  }
-}
+/* The dossier design language (.dossier-paper, .dossier-input, etc.)
+ * was previously declared here via @layer components, but graduated to
+ * a Tailwind plugin in src/webview/theme/tailwind.config.ts so it can
+ * pull from the active grayPalette / brandPalette and flex with the
+ * theming system. See src/webview/theme/utils/dossierUtils.ts. */
 
 @layer components {
   input[type='number'] {

@@ -186,7 +186,7 @@ const FormSelect = ({
         {/* Caret */}
         <span
           aria-hidden="true"
-          className={`absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 text-[10px] font-mono transition-transform ${
+          className={`absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] font-mono transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
         >
@@ -218,14 +218,14 @@ const FormSelect = ({
                     ? () => handleOptionSelect(option)
                     : undefined
                 }
-                className={`px-3 py-1.5 font-serif text-[13px] transition-colors border-b border-zinc-800/50 last:border-b-0 ${
-                  isHighlighted ? 'bg-brand-500/15 text-zinc-50' : 'text-zinc-300'
+                className={`px-3 py-1.5 font-serif text-[13px] transition-colors border-b border-gray-800/50 last:border-b-0 ${
+                  isHighlighted ? 'bg-brand-500/15 text-gray-50' : 'text-gray-300'
                 } ${
                   isActive
                     ? 'text-brand-300 cursor-default'
                     : disabled
                       ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer hover:bg-zinc-800/40'
+                      : 'cursor-pointer hover:bg-gray-800/40'
                 }`}
               >
                 {option.label}

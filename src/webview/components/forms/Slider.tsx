@@ -15,7 +15,9 @@ interface SliderProps {
 }
 
 /**
- * Reusable slider component with consistent styling
+ * Dossier-style slider — thin track, indigo thumb, mono value readout.
+ * Pulls track / thumb colors from the active gray + brand palettes via
+ * the standard utilities so theme switching works.
  */
 const Slider: React.FC<SliderProps> = ({
   id,
@@ -30,17 +32,21 @@ const Slider: React.FC<SliderProps> = ({
   disabled = false,
   error,
 }) => {
-  // Combine aria-describedby for error if it exists
   const describedBy = error ? `${id}-error` : undefined;
 
   return (
-    <div className="mb-4">
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-white text-shadow mb-2"
-      >
-        {label}
-      </label>
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-baseline">
+        <label htmlFor={id} className="dossier-label">
+          {label}
+        </label>
+        {showValue && (
+          <span className="font-mono text-[9.5px] tracking-[0.2em] text-gray-300 uppercase">
+            {valueLabel ? `${valueLabel}: ` : ''}
+            {value}
+          </span>
+        )}
+      </div>
       <input
         id={id}
         type="range"
@@ -51,28 +57,18 @@ const Slider: React.FC<SliderProps> = ({
         disabled={disabled}
         aria-invalid={!!error}
         aria-describedby={describedBy}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-          onChange(parseFloat(event.target.value))
-        }
-        className={`w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer 
-          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-          [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-sm 
-          [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 
-          [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-sm
-          ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
-          ${error ? 'border-red-500/50' : ''}`}
+        onChange={(event) => onChange(parseFloat(event.target.value))}
+        className={`w-full h-px bg-gray-700/70 appearance-none cursor-pointer
+          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+          [&::-webkit-slider-thumb]:bg-brand-400 [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-brand-300
+          [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3
+          [&::-moz-range-thumb]:bg-brand-400 [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-brand-300
+          focus:outline-none focus:bg-gray-600/70
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+          ${error ? 'bg-red-500/40' : ''}`}
       />
-      {showValue && (
-        <div className="text-right text-xs text-white text-shadow mt-1">
-          {valueLabel || label}: {value}
-        </div>
-      )}
       {error && (
-        <p
-          id={`${id}-error`}
-          className="mt-1 text-sm text-red-400"
-          role="alert"
-        >
+        <p id={`${id}-error`} className="dossier-error" role="alert">
           {error}
         </p>
       )}

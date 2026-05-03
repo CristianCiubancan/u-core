@@ -381,18 +381,18 @@ function Letterhead() {
     <Paper className="px-5 py-4 shrink-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[8.5px] tracking-[0.35em] text-zinc-500 uppercase truncate">
+          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
             Department of Citizen Affairs
           </p>
-          <h1 className="font-display text-[1.6rem] font-light leading-tight mt-1.5 text-zinc-50">
+          <h1 className="font-display text-[1.6rem] font-light leading-tight mt-1.5 text-gray-50">
             Identity Registry
           </h1>
         </div>
         <div className="text-right shrink-0">
-          <p className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-500 uppercase">
+          <p className="font-mono text-[8.5px] tracking-[0.3em] text-gray-500 uppercase">
             Form&nbsp;C–07
           </p>
-          <p className="font-mono text-[8.5px] text-zinc-600 mt-0.5">
+          <p className="font-mono text-[8.5px] text-gray-600 mt-0.5">
             rev.&nbsp;{new Date().getFullYear()}
           </p>
         </div>
@@ -414,13 +414,13 @@ function LoadingPanel({ text }: { text: string }) {
   return (
     <Paper className="px-6 py-12 flex flex-col items-center justify-center gap-5">
       <div className="flex items-center gap-3">
-        <span className="block h-px w-10 bg-zinc-700" />
-        <span className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+        <span className="block h-px w-10 bg-gray-700" />
+        <span className="font-mono text-[10px] tracking-[0.4em] text-gray-500 uppercase">
           processing
         </span>
-        <span className="block h-px w-10 bg-zinc-700" />
+        <span className="block h-px w-10 bg-gray-700" />
       </div>
-      <p className="font-display text-xl text-zinc-100 italic font-light text-center">
+      <p className="font-display text-xl text-gray-100 italic font-light text-center">
         {text}
         <span className="text-brand-400">{'.'.repeat(dots)}</span>
       </p>
@@ -460,10 +460,10 @@ function CharactersPanel({
           keeps it legible if the camera framing ever puts a bright
           surface behind the column. */}
       <div className="flex items-baseline justify-between gap-2 px-0.5 pt-1 pointer-events-none [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)]">
-        <h2 className="font-display text-lg font-light text-zinc-100 truncate">
+        <h2 className="font-display text-lg font-light text-gray-100 truncate">
           {t('ui.characters_header')}
         </h2>
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-300 uppercase shrink-0">
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-300 uppercase shrink-0">
           {slots.filter((s) => s.data).length}/{slots.length} on record
         </span>
       </div>
@@ -499,7 +499,7 @@ function CharactersPanel({
             )}
           </>
         ) : (
-          <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-500 uppercase">
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-500 uppercase">
             Select a file
           </span>
         )}
@@ -528,7 +528,7 @@ function SlotRow({
   return (
     <Paper
       selected={isSelected}
-      className="group cursor-pointer transition-colors duration-200 hover:border-zinc-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
+      className="group cursor-pointer transition-colors duration-200 hover:border-gray-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
     >
       <div
         role="button"
@@ -544,9 +544,9 @@ function SlotRow({
         className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5 px-3 py-2.5 outline-none"
       >
         {/* file number (left) */}
-        <div className="font-mono text-[8.5px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
-          <div className="text-zinc-600">File</div>
-          <div className="text-zinc-200 text-[15px] font-display tracking-normal leading-tight">
+        <div className="font-mono text-[8.5px] tracking-[0.25em] text-gray-500 uppercase leading-tight">
+          <div className="text-gray-600">File</div>
+          <div className="text-gray-200 text-[15px] font-display tracking-normal leading-tight">
             {String(index).padStart(2, '0')}
           </div>
         </div>
@@ -564,7 +564,7 @@ function SlotRow({
             </span>
           )}
           {!data && (
-            <PiPlusLight className="text-lg text-zinc-600 group-hover:text-brand-400 transition-colors" />
+            <PiPlusLight className="text-lg text-gray-600 group-hover:text-brand-400 transition-colors" />
           )}
         </div>
       </div>
@@ -576,22 +576,22 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
   const fullName = `${data.charinfo.firstname} ${data.charinfo.lastname}`.trim();
   return (
     <>
-      <p className="font-display text-[15px] font-light text-zinc-50 leading-tight truncate">
+      <p className="font-display text-[15px] font-light text-gray-50 leading-tight truncate">
         {fullName || '—'}
       </p>
       {/* Stats wrap to a second row when the column is too narrow rather
           than truncating to "..." or pushing the active badge off-screen. */}
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1 font-mono text-[9.5px] text-zinc-400">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1 font-mono text-[9.5px] text-gray-400">
         <span className="inline-flex items-center gap-1 truncate max-w-full">
-          <PiBriefcaseLight className="text-zinc-500 shrink-0" />
+          <PiBriefcaseLight className="text-gray-500 shrink-0" />
           <span className="truncate">{data.job?.label ?? '—'}</span>
         </span>
         <span className="inline-flex items-center gap-1 shrink-0">
-          <PiMoneyLight className="text-zinc-500" />
+          <PiMoneyLight className="text-gray-500" />
           ${dollar.format(data.money?.cash ?? 0)}
         </span>
         <span className="inline-flex items-center gap-1 shrink-0">
-          <PiBankLight className="text-zinc-500" />
+          <PiBankLight className="text-gray-500" />
           ${dollar.format(data.money?.bank ?? 0)}
         </span>
       </div>
@@ -601,7 +601,7 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
 
 function SlotEmpty({ t }: { t: (k: string) => string }) {
   return (
-    <div className="font-mono text-[9.5px] tracking-[0.25em] text-zinc-500 uppercase group-hover:text-zinc-300 transition-colors truncate">
+    <div className="font-mono text-[9.5px] tracking-[0.25em] text-gray-500 uppercase group-hover:text-gray-300 transition-colors truncate">
       {t('ui.create_button')}
     </div>
   );
@@ -643,14 +643,14 @@ function RegisterPanel({
       {/* Floating section header */}
       <div className="flex items-end justify-between gap-2 px-0.5 pt-1 [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)] pointer-events-none">
         <div className="min-w-0">
-          <p className="font-mono text-[8.5px] tracking-[0.35em] text-zinc-300 uppercase truncate">
+          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-300 uppercase truncate">
             Section II · Enrollment
           </p>
-          <h2 className="font-display text-lg font-light text-zinc-100 mt-0.5 truncate">
+          <h2 className="font-display text-lg font-light text-gray-100 mt-0.5 truncate">
             {t('ui.chardel_header')}
           </h2>
         </div>
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-zinc-300 uppercase shrink-0">
+        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-300 uppercase shrink-0">
           File&nbsp;{String(slotIndex).padStart(2, '0')}/
           {String(totalSlots).padStart(2, '0')}
         </span>
@@ -752,7 +752,7 @@ function DeleteOverlay({
       onClick={onCancel}
     >
       <div
-        className="relative w-[400px] max-w-[90vw] bg-zinc-950 border border-zinc-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
+        className="relative w-[400px] max-w-[90vw] bg-gray-950 border border-gray-800 shadow-[0_30px_120px_rgba(0,0,0,0.7)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute -top-px -left-px w-10 h-px bg-red-500/80" />
@@ -762,12 +762,12 @@ function DeleteOverlay({
           <p className="font-mono text-[9px] tracking-[0.4em] text-red-400 uppercase">
             ✕ Void Record
           </p>
-          <h3 className="font-display text-xl font-light text-zinc-100 leading-tight">
+          <h3 className="font-display text-xl font-light text-gray-100 leading-tight">
             {character
               ? `${character.charinfo.firstname} ${character.charinfo.lastname}`
               : t('ui.deletechar_header')}
           </h3>
-          <p className="text-sm text-zinc-400 font-serif italic leading-snug">
+          <p className="text-sm text-gray-400 font-serif italic leading-snug">
             {t('ui.deletechar_description')}
           </p>
 
