@@ -114,8 +114,39 @@ async function flyToLocation(target: CamCoords): Promise<void> {
 }
 
 // ---------- Event handlers ----------
+//
+// Why both `on` AND `onNet` for these events:
+//
+// Upstream qb-spawn registers handlers via Lua's `RegisterNetEvent`,
+// which marks the event as net-allowed AND fires for LOCAL
+// TriggerEvent calls. The CFX V8 runtime splits these into two
+// separate registrations: `onNet(name, fn)` fires only for net events
+// arriving from the server (or other clients), and `on(name, fn)`
+// fires only for local `emit(name, ...)` / Lua `TriggerEvent(...)`.
+//
+// qb-apartments' client/main.lua fires `qb-spawn:client:openUI` and
+// `qb-spawn:client:setupSpawns` via LOCAL `TriggerEvent` (lines 576-
+// 586). Without the local-event registration here, those handlers
+// never fire — the spawn UI never opens after createCharacter, and
+// the player is stuck on the loading screen indefinitely. Symptom:
+// "create char → stuck at loading, qb-spawn never appears."
+//
+// The `qb-houses:client:setHouseConfig` event is fired only by our
+// own qb-multicharacter SERVER via `emitNet`, so `onNet` alone is
+// sufficient there — kept that way to avoid noise. If a future
+// downstream resource adds a local TriggerEvent for it, this will
+// need the same dual-registration treatment.
 
-onNet('qb-spawn:client:openUI', (value: boolean) => {
+const dualEvent = (
+  name: string,
+  handler: (...args: unknown[]) => void
+): void => {
+  on(name, handler);
+  onNet(name, handler);
+};
+
+dualEvent('qb-spawn:client:openUI', ((...args: unknown[]) => {
+  const value = args[0] as boolean;
   SetEntityVisible(PlayerPedId(), false, false);
   DoScreenFadeOut(250);
   // try/catch around the IIFE: a thrown error in a detached `void
@@ -169,7 +200,7 @@ onNet('qb-spawn:client:openUI', (value: boolean) => {
       console.error('[qb-spawn] openUI handler crashed:', e);
     }
   })();
-});
+}) as (...args: unknown[]) => void);
 
 onNet(
   'qb-houses:client:setHouseConfig',
@@ -178,13 +209,13 @@ onNet(
   }
 );
 
-onNet(
-  'qb-spawn:client:setupSpawns',
-  (
-    cData: { citizenid: string; _firstSpawn?: boolean } | null | undefined,
-    isNew: boolean,
-    apps: ApartmentOptionMap
-  ) => {
+dualEvent('qb-spawn:client:setupSpawns', ((...args: unknown[]) => {
+  const cData = args[0] as
+    | { citizenid: string; _firstSpawn?: boolean }
+    | null
+    | undefined;
+  const isNew = args[1] as boolean;
+  const apps = args[2] as ApartmentOptionMap;
     // u-core marker added by qb-multicharacter's createCharacter handler
     // — propagates through qb-apartments unchanged and reaches us here.
     // Tells the React UI to hide "Last Location" for this player's
@@ -260,8 +291,7 @@ onNet(
       };
       SendNUIMessage(message);
     }
-  }
-);
+}) as (...args: unknown[]) => void);
 
 // ---------- NUI callbacks ----------
 

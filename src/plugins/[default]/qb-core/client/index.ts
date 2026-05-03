@@ -30,7 +30,21 @@ const exportFn = (globalThis as any).exports as (
   fn: unknown
 ) => void;
 
-exportFn('GetCoreObject', GetCoreObject);
+// Functions whose upstream Lua signature returns multiple values
+// (`return a, b`). Our TS port returns `[a, b]` — a JS array — which
+// crosses the JS→Lua FFI as a single Lua table, NOT as multi-returns.
+// We expose these only under `_<Name>_Internal` from JS; the public
+// name is registered by `client/zz_compat.lua` with a wrapper that
+// unpacks the array into Lua multi-returns. Same shim also patches
+// `core.Functions[name]` inside `GetCoreObject`'s return.
+const MULTI_RETURN_FNS = new Set([
+  'GetClosestPlayer',
+  'GetClosestPed',
+  'GetClosestVehicle',
+  'GetClosestObject',
+]);
+
+exportFn('_GetCoreObject_Internal', GetCoreObject);
 exportFn('GetSharedItems', () => QBCore.Shared.Items);
 exportFn('GetSharedVehicles', () => QBCore.Shared.Vehicles);
 exportFn('GetSharedWeapons', () => QBCore.Shared.Weapons);
@@ -47,7 +61,10 @@ exportFn(
 for (const [name, fn] of Object.entries(
   QBCore.Functions as Record<string, unknown>
 )) {
-  if (typeof fn === 'function') {
+  if (typeof fn !== 'function') continue;
+  if (MULTI_RETURN_FNS.has(name)) {
+    exportFn(`_${name}_Internal`, fn);
+  } else {
     exportFn(name, fn);
   }
 }
