@@ -1248,14 +1248,16 @@ class BuildManager {
       `Running Vite build (JS API, mode=${mode}, style=${style}) → outDir=${outputDir}, page=${pluginPagePath}`
     );
 
-    // Vite's `virtual:plugin-page` resolver in vite.config.ts reads
-    // `process.env.U_CORE_PLUGIN_PAGE` at module-load time, so we set
-    // the variable on the parent process for the duration of this
-    // build and restore the previous value afterwards. Same pattern
-    // for NODE_ENV, which Vite + downstream plugins inspect.
-    const previousPage = process.env.U_CORE_PLUGIN_PAGE;
+    // The page path used to be carried via `process.env.U_CORE_PLUGIN_PAGE`,
+    // but `process.env` is process-global — when consumer Vite builds run
+    // in parallel they both overwrite it and end up resolving the
+    // `virtual:plugin-page` module to whichever was last written, silently
+    // shipping one plugin's React bundle inside another's resource dir.
+    // The path now travels as a closure argument to `pluginPageEntry()`,
+    // race-free and per-build. NODE_ENV stays on `process.env` because
+    // Vite + downstream plugins inspect it via the global directly; that
+    // value is consistent across all builds in a single `pnpm build` run.
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.U_CORE_PLUGIN_PAGE = pluginPagePath;
     if (this.production) {
       process.env.NODE_ENV = 'production';
     }
@@ -1295,7 +1297,7 @@ class BuildManager {
               configFile: false,
               mode,
               logLevel: 'warn',
-              plugins: [pluginPageEntry(), react()],
+              plugins: [pluginPageEntry(pluginPagePath), react()],
               define,
               resolve: { alias: resolveAlias },
               build: {
@@ -1325,7 +1327,7 @@ class BuildManager {
               configFile: false,
               mode,
               logLevel: 'warn',
-              plugins: [pluginPageEntry(), react()],
+              plugins: [pluginPageEntry(pluginPagePath), react()],
               root: path.resolve('src'),
               define,
               resolve: { alias: resolveAlias },
@@ -1336,11 +1338,6 @@ class BuildManager {
             };
       await viteBuild(config);
     } finally {
-      if (previousPage === undefined) {
-        delete process.env.U_CORE_PLUGIN_PAGE;
-      } else {
-        process.env.U_CORE_PLUGIN_PAGE = previousPage;
-      }
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;
       } else {

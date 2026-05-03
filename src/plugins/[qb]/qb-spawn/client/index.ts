@@ -107,31 +107,46 @@ async function flyToLocation(target: CamCoords): Promise<void> {
 onNet('qb-spawn:client:openUI', (value: boolean) => {
   SetEntityVisible(PlayerPedId(), false, false);
   DoScreenFadeOut(250);
+  // try/catch around the IIFE: a thrown error in a detached `void
+  // (async () => {...})()` silently rejects the Promise, the UI
+  // never shows, and the handler appears to have "succeeded" — that
+  // bug class swallowed a parallel-build symptom for a while. Cheap
+  // safety net for any future regression.
   void (async () => {
-    await wait(1000);
-    DoScreenFadeIn(250);
+    try {
+      await wait(1000);
+      DoScreenFadeIn(250);
 
-    const playerData = QBCore.Functions.GetPlayerData();
-    const pos = playerData?.position;
-    if (pos) {
-      cam = CreateCamWithParams(
-        'DEFAULT_SCRIPTED_CAMERA',
-        pos.x,
-        pos.y,
-        pos.z + CAM_Z_PLUS_1,
-        -85.0,
-        0.0,
-        0.0,
-        100.0,
-        false,
-        0
-      );
-      SetCamActive(cam, true);
-      RenderScriptCams(true, false, 1, true, true);
+      let pos: { x: number; y: number; z: number } | undefined;
+      try {
+        const playerData = QBCore.Functions.GetPlayerData();
+        pos = playerData?.position;
+      } catch {
+        // GetPlayerData isn't ready — skip the cam and just show the
+        // UI. No cam is better than no UI.
+      }
+      if (pos) {
+        cam = CreateCamWithParams(
+          'DEFAULT_SCRIPTED_CAMERA',
+          pos.x,
+          pos.y,
+          pos.z + CAM_Z_PLUS_1,
+          -85.0,
+          0.0,
+          0.0,
+          100.0,
+          false,
+          0
+        );
+        SetCamActive(cam, true);
+        RenderScriptCams(true, false, 1, true, true);
+      }
+
+      await wait(500);
+      setDisplay(value);
+    } catch (e) {
+      console.error('[qb-spawn] openUI handler crashed:', e);
     }
-
-    await wait(500);
-    setDisplay(value);
   })();
 });
 

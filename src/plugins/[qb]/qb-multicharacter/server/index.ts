@@ -23,7 +23,41 @@ const Countries: string[] = JSON.parse(
 // scripts (qb-clothing, qb-houses, …) see a fully-initialized player.
 const hasDonePreloading = new Map<number, boolean>();
 
+// Hard ceiling on how long we'll block waiting for the
+// `QBCore:Server:PlayerLoaded` hook to flip `hasDonePreloading`. If
+// QBCore (or anything wired to that event) never fires it, we still
+// proceed with the spawn handoff — otherwise the qb-multicharacter
+// React stays at its loading screen forever with no recovery, since
+// the player never receives `closeNUI`.
+const PRELOAD_TIMEOUT_MS = 10_000;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function waitForPreloading(src: number): Promise<void> {
+  const start = Date.now();
+  while (!hasDonePreloading.get(src)) {
+    if (Date.now() - start > PRELOAD_TIMEOUT_MS) {
+      console.warn(
+        `^3[qb-multicharacter]^7 preload timeout for src=${src} after ${PRELOAD_TIMEOUT_MS}ms; proceeding anyway`
+      );
+      return;
+    }
+    await sleep(10);
+  }
+}
+
+async function safeLoadHouseData(src: number): Promise<void> {
+  // qb-houses might not be installed (table missing) or oxmysql might
+  // be slow. Either case shouldn't block the spawn handoff — that's a
+  // worse outcome than skipping the house cache.
+  try {
+    await loadHouseData(src);
+  } catch (err) {
+    console.warn(
+      `^3[qb-multicharacter]^7 loadHouseData failed for src=${src}: ${err}`
+    );
+  }
+}
 
 async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   return (await oxmysql.query_async(sql, params)) as T[];
@@ -179,24 +213,36 @@ onNet('qb-multicharacter:server:loadUserData', async (cData: any) => {
   const src = (global as any).source as number;
   if (!QBCore.Player.Login(src, cData.citizenid)) return;
 
-  while (!hasDonePreloading.get(src)) {
-    await sleep(10);
-  }
+  await waitForPreloading(src);
 
   console.log(
     `^2[qb-core]^7 ${GetPlayerName(String(src))} (Citizen ID: ${cData.citizenid}) has successfully loaded!`
   );
   QBCore.Commands.Refresh(src);
-  await loadHouseData(src);
+  await safeLoadHouseData(src);
 
   if (Config.SkipSelection) {
     const coords = JSON.parse(cData.position);
     emitNet('qb-multicharacter:client:spawnLastLocation', src, coords, cData);
-  } else if (GetResourceState('qb-apartments') === 'started') {
-    emitNet('apartments:client:setupSpawnUI', src, cData);
   } else {
-    emitNet('qb-spawn:client:setupSpawns', src, cData, false, null);
-    emitNet('qb-spawn:client:openUI', src, true);
+    // Close qb-multicharacter's NUI BEFORE handing off to apartments/
+    // spawn. Our React webview occupies the same right-column region
+    // as qb-spawn's; if qb-multi stays mounted in its 'loading' state
+    // it overlays qb-spawn and the player sees nothing happen even
+    // though the spawn flow fires correctly.
+    //
+    // The upstream Lua qb-multicharacter doesn't do this — its Vue UI
+    // is small enough not to overlap qb-spawn's top-left panel — but
+    // the upstream-vs-port layout difference means we need the
+    // explicit close here. The createCharacter+apartments path
+    // already fires closeNUI for the same reason.
+    emitNet('qb-multicharacter:client:closeNUI', src);
+    if (GetResourceState('qb-apartments') === 'started') {
+      emitNet('apartments:client:setupSpawnUI', src, cData);
+    } else {
+      emitNet('qb-spawn:client:setupSpawns', src, cData, false, null);
+      emitNet('qb-spawn:client:openUI', src, true);
+    }
   }
 
   const discord =
@@ -218,9 +264,7 @@ onNet('qb-multicharacter:server:createCharacter', async (data: any) => {
   const newData = { cid: data.cid, charinfo: data };
   if (!QBCore.Player.Login(src, false, newData)) return;
 
-  while (!hasDonePreloading.get(src)) {
-    await sleep(10);
-  }
+  await waitForPreloading(src);
 
   // qb-apartments exposes `Apartments.Starting` via a shared script. We
   // can't `@qb-apartments/config.lua` from a JS bundle, so default to
@@ -231,14 +275,14 @@ onNet('qb-multicharacter:server:createCharacter', async (data: any) => {
     SetPlayerRoutingBucket(String(src), Number(randbucket));
     console.log(`^2[qb-core]^7 ${GetPlayerName(String(src))} has successfully loaded!`);
     QBCore.Commands.Refresh(src);
-    await loadHouseData(src);
+    await safeLoadHouseData(src);
     emitNet('qb-multicharacter:client:closeNUI', src);
     emitNet('apartments:client:setupSpawnUI', src, newData);
     await giveStarterItems(src);
   } else {
     console.log(`^2[qb-core]^7 ${GetPlayerName(String(src))} has successfully loaded!`);
     QBCore.Commands.Refresh(src);
-    await loadHouseData(src);
+    await safeLoadHouseData(src);
     emitNet('qb-multicharacter:client:closeNUIdefault', src);
     await giveStarterItems(src);
     emit('apartments:client:SetHomeBlip', null);

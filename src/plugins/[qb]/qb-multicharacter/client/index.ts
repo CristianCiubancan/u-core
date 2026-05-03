@@ -154,9 +154,20 @@ function openCharMenu(visible: boolean): void {
 // — it registers a second one, leaving the first to fire chooseChar on
 // every frame for the lifetime of the session. Capture the tick id and
 // clearTick it once the session has started.
+//
+// Restart-safety: only fire `chooseChar` if the player is NOT already
+// logged in. Without this guard, restarting `qb-multicharacter` while
+// the player is sitting at qb-spawn (or already in-world) re-opens the
+// character menu on top of whatever's currently showing — producing
+// the qb-multi/qb-spawn overlap. We use `QBCore.Functions.GetPlayerData()`
+// as the "are we past character selection?" check; once `Player.Login`
+// has run server-side, citizenid is populated client-side too.
 const sessionPollTick = setTick(() => {
   if (NetworkIsSessionStarted()) {
-    emit('qb-multicharacter:client:chooseChar');
+    const playerData = QBCore.Functions.GetPlayerData?.();
+    if (!playerData?.citizenid) {
+      emit('qb-multicharacter:client:chooseChar');
+    }
     clearTick(sessionPollTick);
   }
 });

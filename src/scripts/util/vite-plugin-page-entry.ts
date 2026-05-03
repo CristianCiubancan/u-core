@@ -2,21 +2,25 @@ import * as path from 'path';
 import type { Plugin } from 'vite';
 
 /**
- * Resolves `import Page from 'virtual:plugin-page'` to the Page.tsx file
- * pointed at by `process.env.U_CORE_PLUGIN_PAGE`. BuildManager sets that
- * env var per plugin before invoking `vite build`, which removes the need
- * to mutate `src/webview/App.tsx` between builds and lets cross-plugin
- * webview builds run in parallel.
+ * Resolves `import Page from 'virtual:plugin-page'` to the per-plugin
+ * Page.tsx file. BuildManager passes the path directly so multiple
+ * consumer Vite builds can run in parallel without racing — using
+ * `process.env.U_CORE_PLUGIN_PAGE` as the carrier was a foot-gun: the
+ * env var is process-global, so when two `vite build` calls overlap
+ * they both end up resolving the virtual module to whichever path was
+ * last written, silently shipping one plugin's bundle inside another's
+ * resource directory. Standalone mode (auto-discovered via the root
+ * `vite.config.ts`) still falls back to the env var since it builds
+ * one plugin at a time and has no other channel to receive the path.
  *
- * Lives in `src/scripts/util/` so both `vite.config.ts` (the standalone
- * mode auto-discovers it) and `BuildManager` (consumer/shared lib-mode
- * builds bypass auto-discovery and pass plugins explicitly) can share the
- * exact same resolver.
+ * Lives in `src/scripts/util/` so both `vite.config.ts` and
+ * `BuildManager` (consumer/shared lib-mode builds bypass auto-discovery
+ * and pass plugins explicitly) can share the exact same resolver.
  */
 export const VIRTUAL_PAGE_ID = 'virtual:plugin-page';
 const RESOLVED_VIRTUAL_PAGE_ID = '\0' + VIRTUAL_PAGE_ID;
 
-export function pluginPageEntry(): Plugin {
+export function pluginPageEntry(pagePath?: string): Plugin {
   return {
     name: 'u-core:plugin-page-entry',
     enforce: 'pre',
@@ -26,10 +30,10 @@ export function pluginPageEntry(): Plugin {
     },
     load(id) {
       if (id !== RESOLVED_VIRTUAL_PAGE_ID) return null;
-      const target = process.env.U_CORE_PLUGIN_PAGE;
+      const target = pagePath ?? process.env.U_CORE_PLUGIN_PAGE;
       if (!target) {
         throw new Error(
-          'U_CORE_PLUGIN_PAGE is not set. The webview build must be invoked through BuildManager so the per-plugin Page.tsx entry is provided.'
+          'pluginPageEntry needs a pagePath argument or U_CORE_PLUGIN_PAGE env var. The webview build must be invoked through BuildManager so the per-plugin Page.tsx entry is provided.'
         );
       }
       const abs = path.resolve(target).replace(/\\/g, '/');
