@@ -742,7 +742,7 @@ function RegisterPanel({
               error={fieldErrors.nationality}
             >
               <Select
-                value={data.nationality || undefined}
+                value={data.nationality}
                 onValueChange={(value) => onChange({ nationality: value })}
               >
                 <SelectTrigger
@@ -767,7 +767,7 @@ function RegisterPanel({
             error={fieldErrors.gender}
           >
             <Select
-              value={data.gender || undefined}
+              value={data.gender}
               onValueChange={(value) => onChange({ gender: value })}
             >
               <SelectTrigger
