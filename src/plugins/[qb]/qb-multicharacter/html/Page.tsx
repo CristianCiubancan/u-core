@@ -662,8 +662,13 @@ function RegisterPanel({
         </div>
       </Paper>
 
-      {/* Form fields paper */}
-      <Paper className="px-5 py-4">
+      {/* Form fields paper. z-10 lifts this above the action-bar Paper
+          below — both have backdrop-filter (=> independent stacking
+          contexts), so the FormSelect / DatePicker popups inside this
+          paper would otherwise render *behind* the action bar wherever
+          they overflow downward. The popup's own z-20 only stacks
+          within this paper's context, not against siblings. */}
+      <Paper className="px-5 py-4 z-10">
         <div className="grid grid-cols-1 gap-3">
           <FormInput
             id="qbm-firstname"
