@@ -1,0 +1,19 @@
+{
+  "name": "qb-multicharacter",
+  "version": "2.0.0",
+  "fx_version": "cerulean",
+  "games": ["gta5"],
+  "lua54": true,
+  "author": "u-core (rewrite of Kakarot's qb-multicharacter)",
+  "description": "Multicharacter selection — u-core React rewrite preserving the QBCore event/callback contract.",
+  "client_scripts": ["client/*.js"],
+  "server_scripts": ["server/*.js"],
+  "ui_page": "html/index.html",
+  "files": [
+    "html/index.html",
+    "html/main.js",
+    "html/style.css",
+    "countries.json"
+  ],
+  "dependencies": ["qb-core", "qb-spawn"]
+}
