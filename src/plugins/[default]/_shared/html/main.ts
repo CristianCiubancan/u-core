@@ -21,6 +21,22 @@ import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 import * as ReactI18Next from 'react-i18next';
 import * as I18Next from 'i18next';
+import i18nextInstance from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+// Initialize the global i18next instance once for the runtime. Plugins
+// register their own translations via
+// `i18n.addResourceBundle(lng, 'plugin-name', json)` at startup and use
+// `useTranslation('plugin-name')` so namespaces stay scoped per plugin.
+// The `resources` map starts empty for the same reason — anything global
+// would create a coupling between unrelated plugins.
+void i18nextInstance.use(initReactI18next).init({
+  lng: 'en',
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
+  react: { useSuspense: false },
+  resources: {},
+});
 
 declare global {
   interface Window {

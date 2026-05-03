@@ -5,51 +5,39 @@ declare global {
 }
 
 import { isEnvBrowser } from './misc';
-import type {
-  NuiAction,
-  NuiCallbackMap,
-} from '../../plugins/[character]/[auth]/character-create/shared/types';
-
-// Mock responses for browser development environment. Keyed by NUI action
-// string; loosely typed because the dev-mode mock doesn't have to match
-// the real wire format perfectly — only enough for the UI to behave.
-const mockResponses: Partial<Record<NuiAction | string, unknown>> = {
-  'character-create:toggle-ui': { status: 'ok' },
-  'character-create:update-model': { status: 'ok' },
-  'character-create:update-face': { status: 'ok' },
-  'character-create:update-hair': { status: 'ok' },
-  'character-create:update-appearance': { status: 'ok' },
-  'character-create:update-clothing': { status: 'ok' },
-  'character-create:rotate-camera': { status: 'ok' },
-  'character-create:zoom-camera': { status: 'ok' },
-  'character-create:focus-camera': { status: 'ok' },
-  'character-create:rotate-player': { status: 'ok' },
-  'character-create:drag-camera': { status: 'ok' },
-  'character-create:drag-end': { status: 'ok' },
-};
 
 /**
- * Typed wrapper around the CEF/NUI `fetch` bridge. The action string must
- * be a known key of `NuiCallbackMap`; the request and response types are
- * inferred from that map at the call site. In browser dev mode the call
- * is intercepted and a mock response is returned after a short delay; in
- * the FiveM runtime the request is POSTed to `https://${resource}/${action}`.
+ * Typed wrapper around the CEF/NUI `fetch` bridge. The action string is
+ * a free-form identifier — each plugin declares its own typed surface at
+ * the call site:
+ *
+ *   const data = await fetchNui<MyReq, MyRes>('my-action', payload);
+ *
+ * No central action-map registry: per-plugin types stay scoped to the
+ * plugin that owns them, and a deleted plugin can't break this shared
+ * helper. Both type parameters default to `unknown` so untyped call
+ * sites still work — the cost is a cast at the call site.
+ *
+ * In browser dev mode (`!window.invokeNative`) the call short-circuits
+ * to `mockResponse` after a short delay so UIs are exercisable outside
+ * FXServer. The default mock is `{ status: 'ok' }`; pass a third arg to
+ * override per call.
  */
-export async function fetchNui<K extends NuiAction>(
-  eventName: K,
-  data?: NuiCallbackMap[K]['request']
-): Promise<NuiCallbackMap[K]['response']> {
+export async function fetchNui<TReq = unknown, TRes = unknown>(
+  eventName: string,
+  data?: TReq,
+  mockResponse?: TRes
+): Promise<TRes> {
   if (isEnvBrowser()) {
     console.groupCollapsed(`📡 NUI Call: ${eventName}`);
     console.log('Request Data:', data);
 
     return new Promise((resolve) => {
       setTimeout(() => {
-        const response =
-          mockResponses[eventName] ?? ({ status: 'ok' } as const);
+        const response = (mockResponse ?? ({ status: 'ok' } as unknown)) as TRes;
         console.log('Response:', response);
         console.groupEnd();
-        resolve(response as NuiCallbackMap[K]['response']);
+        resolve(response);
       }, 500);
     });
   }
@@ -69,7 +57,7 @@ export async function fetchNui<K extends NuiAction>(
 
   try {
     const resp = await fetch(`https://${resourceName}/${eventName}`, options);
-    return (await resp.json()) as NuiCallbackMap[K]['response'];
+    return (await resp.json()) as TRes;
   } catch (error) {
     console.error(`Error in fetchNui for event ${eventName}:`, error);
     throw error;
