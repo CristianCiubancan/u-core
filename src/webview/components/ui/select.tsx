@@ -79,20 +79,28 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => (
+>(({ className, children, position = 'popper', style, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
       position={position}
+      // Inline style for the trigger-width pin — Radix sets several
+      // inline styles on this element via its positioning logic, and
+      // empirically a Tailwind class (`w-[var(...)]`) was being beaten
+      // by them at runtime even though the rule existed in the
+      // compiled CSS. Inline `style` has the same specificity as
+      // Radix's, but our value resolves first because we set it last.
+      style={
+        position === 'popper'
+          ? {
+              width: 'var(--radix-select-trigger-width)',
+              maxWidth: 'var(--radix-select-trigger-width)',
+              ...style,
+            }
+          : style
+      }
       className={cn(
         'relative z-50 max-h-60 overflow-hidden',
-        // Lock the content width to the trigger width so the dropdown
-        // never overhangs the right side of the form column. Both
-        // width AND max-width — the Viewport's `min-w` (in shadcn's
-        // default config) would otherwise let the inner content
-        // expand the visual content box past the trigger.
-        position === 'popper' &&
-          'w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
         position === 'popper' &&
