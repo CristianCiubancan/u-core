@@ -10,6 +10,7 @@
     "available_apartments": "Saatavilla olevat asunnot",
     "letterhead_title": "Aluetoimisto",
     "letterhead_subtitle": "Aloituskohdan koordinaattori",
-    "form_id": "LOMAKE S-08"
+    "form_id": "LOMAKE S-08",
+    "back": "Takaisin"
   }
 }

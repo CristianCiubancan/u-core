@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
 import {
+  ArrowLeft,
   Building2,
   Home,
   MapPin,
@@ -149,6 +150,10 @@ export default function Page() {
     }
   };
 
+  const onBack = () => {
+    void fetchNui('backToSelect');
+  };
+
   // ---------- Memoized row groups ----------
 
   const lastLocationOption: SpawnOption | null = useMemo(
@@ -171,18 +176,24 @@ export default function Page() {
 
         <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
           <div className="flex flex-col divide-y divide-gray-800/60">
-            <header className="flex items-baseline justify-between gap-2 pb-3">
-              <div className="min-w-0">
-                <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-                  {t('ui.section_header', { defaultValue: 'Section I · Departure' })}
-                </p>
-                <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
-                  {t('ui.page_title', { defaultValue: 'Spawn Selector' })}
-                </h2>
-              </div>
-              <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+            {/* Header: stack eyebrow + title + prompt vertically. The
+                prompt used to be a right-side badge, but its full text
+                is the page's primary call-to-action — putting it in a
+                shrink-0 sibling stole all the horizontal space and
+                forced the h2 to truncate to "Spawn Sele…" even at the
+                460px clamp upper bound. As a subtitle under the h2 it
+                gets to wrap if needed and the title finally renders
+                in full. */}
+            <header className="pb-3">
+              <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
+                {t('ui.section_header', { defaultValue: 'Section I · Departure' })}
+              </p>
+              <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5">
+                {t('ui.page_title', { defaultValue: 'Spawn Selector' })}
+              </h2>
+              <p className="font-mono text-[9px] tracking-[0.25em] text-gray-400 uppercase mt-2 leading-snug">
                 {t('ui.where_would_you_like_to_start')}
-              </span>
+              </p>
             </header>
 
             {lastLocationOption && (
@@ -227,10 +238,15 @@ export default function Page() {
             )}
           </div>
 
-          {/* Footer matches qb-multicharacter's action bar — same
-              hairline + min-height pattern so a Confirm button that
-              only appears when something is picked doesn't reflow. */}
-          <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
+          {/* Back is always visible (left); Confirm only renders once
+              the player picks a spawn (right). Both use the same
+              <Button> primitive so footer height is constant whether
+              one or two buttons are shown — no reflow on selection. */}
+          <footer className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-800/60">
+            <Button variant="secondary" onClick={onBack}>
+              <ArrowLeft />
+              {t('ui.back', { defaultValue: 'Back' })}
+            </Button>
             {selected ? (
               <Button onClick={onConfirm}>
                 <Play />
@@ -238,7 +254,7 @@ export default function Page() {
               </Button>
             ) : (
               <span className="inline-flex items-center px-3 py-1.5 border-b border-transparent font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground/70">
-                {hasOptions ? t('ui.where_would_you_like_to_start') : '—'}
+                {hasOptions ? '' : '—'}
               </span>
             )}
           </footer>

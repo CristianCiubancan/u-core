@@ -216,6 +216,30 @@ RegisterNuiCallback('exit', (_data: unknown, cb: NuiCb) => {
   cb('ok');
 });
 
+/**
+ * Tear down the spawn UI and re-open qb-multicharacter's character
+ * selection menu. Used by the "Back" button on the spawn screen so
+ * the player can change their mind without committing to a spawn.
+ *
+ * Note: at this point the player has already been logged in via
+ * `qb-multicharacter:server:loadUserData` (existing char) or
+ * `:createCharacter` (new char). Re-picking a different character
+ * triggers `Player.Login` again server-side; QBCore handles the
+ * swap, but server-side side effects (commands refresh, house data
+ * load, routing bucket assignment for new chars) are NOT undone.
+ * In practice this only matters if the player creates a NEW char,
+ * goes back, then creates ANOTHER NEW char — they accumulate
+ * orphaned routing buckets. Acceptable trade-off for the UX win;
+ * revisit if it bites.
+ */
+RegisterNuiCallback('backToSelect', (_data: unknown, cb: NuiCb) => {
+  setDisplay(false);
+  destroyCams();
+  RenderScriptCams(false, false, 0, true, true);
+  emit('qb-multicharacter:client:chooseChar');
+  cb('ok');
+});
+
 RegisterNuiCallback(
   'setCam',
   async (data: { posname: string; type: string }, cb: NuiCb) => {

@@ -10,6 +10,7 @@
     "available_apartments": "Appartamenti disponibili",
     "letterhead_title": "Ufficio Periferico",
     "letterhead_subtitle": "Coordinatore Spawn",
-    "form_id": "MODULO S-08"
+    "form_id": "MODULO S-08",
+    "back": "Indietro"
   }
 }
