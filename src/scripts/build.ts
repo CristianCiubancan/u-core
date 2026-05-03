@@ -373,6 +373,22 @@ class PluginBuilder {
         }
 
         if (plugins.length > 0) {
+          // _shared MUST build and reload before any consumer that
+          // referenced new Tailwind classes or vendor globals. Otherwise
+          // the consumer's NUI fetches its index.html (which loads the
+          // OLD cfx-nui-_shared/_shared.js still in CEF), and only later
+          // is _shared restarted — leaving consumer and vendor out of
+          // sync until the next consumer reload happens to coincide with
+          // an up-to-date _shared. Sorting the plugins array fixes both
+          // the build order and the reload-iteration order below.
+          plugins.sort((a, b) => {
+            if (a.pluginName === '_shared' && b.pluginName !== '_shared')
+              return -1;
+            if (b.pluginName === '_shared' && a.pluginName !== '_shared')
+              return 1;
+            return 0;
+          });
+
           for (const plugin of plugins) {
             const intent = intentByPlugin.get(plugin.pluginName);
             await this.buildSinglePlugin(plugin, {
