@@ -29,7 +29,7 @@ const PopoverContent = React.forwardRef<
       sideOffset={sideOffset}
       className={cn(
         'z-50 w-72 outline-none',
-        'bg-popover/90 backdrop-blur-md border border-border/60 text-popover-foreground',
+        'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)]',
         'p-3',
         className

@@ -86,7 +86,7 @@ const SelectContent = React.forwardRef<
       position={position}
       className={cn(
         'relative z-50 min-w-[8rem] max-h-60 overflow-hidden',
-        'bg-popover/95 backdrop-blur-md border border-border/60 text-popover-foreground',
+        'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',

@@ -70,14 +70,17 @@ const DatePicker = ({
             <CalendarIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
+        <PopoverContent className="w-auto p-2" align="end">
+          {/* captionLayout left as default ("label") because the dropdown
+              variant overlays month/year <select>s on top of the static
+              caption — looked like duplicated text. Users navigate via
+              the prev/next chevrons. defaultMonth keeps the calendar
+              centered on the selected date when reopening. */}
           <Calendar
             mode="single"
             selected={selected ?? undefined}
             onSelect={onChange}
-            captionLayout="dropdown"
-            startMonth={new Date(1900, 0)}
-            endMonth={new Date(new Date().getFullYear() + 5, 11)}
+            defaultMonth={selected ?? undefined}
           />
         </PopoverContent>
       </Popover>
