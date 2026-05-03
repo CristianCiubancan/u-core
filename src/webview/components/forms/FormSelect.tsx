@@ -35,11 +35,26 @@ const FormSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchString, setSearchString] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  // Same flip-above-when-cramped rule as DatePicker. List is capped at
+  // max-h-56 (~224px) so we use that as the threshold.
+  const [placeAbove, setPlaceAbove] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listboxId = `${id}-listbox`;
   const getOptionId = (index: number) => `${id}-option-${index}`;
+
+  useEffect(() => {
+    if (!isOpen || !inputRef.current) return;
+    const POPUP_HEIGHT_ESTIMATE = 230;
+    const rect = inputRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setPlaceAbove(
+      spaceBelow < POPUP_HEIGHT_ESTIMATE && spaceAbove > spaceBelow
+    );
+  }, [isOpen]);
 
   const selectedOption = options.find((o) => o.value === value) || null;
 
@@ -160,6 +175,7 @@ const FormSelect = ({
       </label>
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
           id={id}
           readOnly
@@ -198,7 +214,9 @@ const FormSelect = ({
           role="listbox"
           ref={optionsRef}
           tabIndex={-1}
-          className={`dossier-paper absolute z-20 mt-1 w-full max-h-56 overflow-y-auto transition-all duration-150 ease-out transform ${
+          className={`dossier-paper absolute z-20 w-full max-h-56 overflow-y-auto transition-all duration-150 ease-out transform ${
+            placeAbove ? 'bottom-full mb-1' : 'top-full mt-1'
+          } ${
             isOpen
               ? 'opacity-100 scale-100'
               : 'opacity-0 scale-95 pointer-events-none'

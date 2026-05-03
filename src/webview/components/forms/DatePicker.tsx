@@ -38,6 +38,12 @@ const DatePicker = ({
   disabled = false,
 }: DatePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  // The calendar prefers to open below the input but flips above when
+  // there isn't enough room — measured against the viewport on open.
+  // Reusable component, so we don't hardcode the side; for the current
+  // qb-multicharacter use the birthdate field sits at the bottom of a
+  // narrow column and ends up flipping above ~always.
+  const [placeAbove, setPlaceAbove] = useState(false);
   const today = useMemo(() => new Date(), []);
   const [viewDate, setViewDate] = useState(selected || today); // Date controlling the calendar view
   const [focusedDate, setFocusedDate] = useState(selected || today); // Date that has keyboard focus
@@ -48,6 +54,21 @@ const DatePicker = ({
   const gridRef = useRef<HTMLDivElement>(null);
   const prevMonthRef = useRef<HTMLButtonElement>(null);
   const nextMonthRef = useRef<HTMLButtonElement>(null);
+
+  // Measure on open to decide which side has more room. The popup's
+  // intrinsic height is ~280px (header + 6 weeks + paddings); use that
+  // as the threshold rather than reading scrollHeight, which would only
+  // be accurate AFTER the popup has rendered visibly.
+  useEffect(() => {
+    if (!isOpen || !inputRef.current) return;
+    const POPUP_HEIGHT_ESTIMATE = 290;
+    const rect = inputRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setPlaceAbove(
+      spaceBelow < POPUP_HEIGHT_ESTIMATE && spaceAbove > spaceBelow
+    );
+  }, [isOpen]);
 
   const popupId = `${id}-popup`;
   const headingId = `${id}-heading`;
@@ -593,7 +614,9 @@ const DatePicker = ({
           aria-modal="true"
           aria-labelledby={headingId}
           tabIndex={-1}
-          className={`dossier-paper absolute z-20 mt-1 w-72 transition-all duration-150 ease-out transform ${
+          className={`dossier-paper absolute z-20 w-72 transition-all duration-150 ease-out transform ${
+            placeAbove ? 'bottom-full mb-1' : 'top-full mt-1'
+          } ${
             isOpen
               ? 'opacity-100 scale-100'
               : 'opacity-0 scale-95 pointer-events-none'
