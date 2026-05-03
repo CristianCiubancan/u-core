@@ -548,12 +548,11 @@ const DatePicker = ({
   ]); // Added 'getDayId'
 
   return (
-    <div className="space-y-2" ref={containerRef}>
-      <label htmlFor={id} className="block font-medium">
+    <div className="space-y-1.5" ref={containerRef}>
+      <label htmlFor={id} className="dossier-label">
         {label}
       </label>
       <div className="relative">
-        {/* Input acts as the dropdown trigger */}
         <input
           ref={inputRef}
           type="text"
@@ -566,47 +565,44 @@ const DatePicker = ({
                   day: 'numeric',
                   year: 'numeric',
                 })
-              : placeholder
+              : ''
           }
+          placeholder={placeholder}
           onClick={openPopup}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           aria-controls={popupId}
           aria-invalid={!!error}
           aria-describedby={error ? `${id}-error` : undefined}
-          disabled={disabled} // Add disabled attribute
-          className={`w-full px-4 py-2 glass-brand-dark rounded-lg focus:outline-none transition shadow-sm border hover:border-brand-500/40 active:scale-[0.98] ${
-            error
-              ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/50' // Error styles
-              : 'border-brand-500/20 focus:ring-2 focus:ring-brand-700/50 focus:border-transparent' // Default styles
-          } ${
-            disabled
-              ? 'opacity-60 cursor-not-allowed bg-brand-900/30' // Disabled styles
-              : 'cursor-pointer'
+          disabled={disabled}
+          className={`dossier-input pr-6 ${error ? 'dossier-input-error' : ''} ${
+            disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           }`}
         />
-        {/* Popup Dialog */}
+        <span
+          aria-hidden="true"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 text-[10px] font-mono"
+        >
+          ▾
+        </span>
+
         <div
           ref={popupRef}
           id={popupId}
           role="dialog"
           aria-modal="true"
           aria-labelledby={headingId}
-          tabIndex={-1} // Make popup focusable programmatically
-          className={`absolute z-10 mt-1 w-72 glass-brand-dark border border-brand-500/20 rounded-lg shadow-lg transition-all duration-200 ${
-            // Changed bg-white to glass-brand-dark, added border
-            // Changed w-auto to w-72
+          tabIndex={-1}
+          className={`dossier-paper absolute z-20 mt-1 w-72 transition-all duration-150 ease-out transform ${
             isOpen
               ? 'opacity-100 scale-100'
               : 'opacity-0 scale-95 pointer-events-none'
-          } scrollbar-brand-dark focus:outline-none`}
+          } focus:outline-none`}
         >
-          {isOpen && ( // Conditionally render content to ensure refs are available
-            <div className="p-2">
-              {' '}
-              {/* Added padding around the whole calendar */}
+          {isOpen && (
+            <div className="p-3">
               {/* Header: Month/Year Navigation */}
-              <div className="flex justify-between items-center pb-2 mb-2 border-b">
+              <div className="flex justify-between items-center pb-2 mb-2 border-b border-zinc-800/70">
                 <button
                   ref={prevMonthRef}
                   type="button"
@@ -614,28 +610,25 @@ const DatePicker = ({
                     calendarView === 'days'
                       ? 'Previous month'
                       : calendarView === 'months'
-                      ? 'Previous year'
-                      : 'Previous decade'
+                        ? 'Previous year'
+                        : 'Previous decade'
                   }
                   onClick={handlePrev}
-                  disabled={disabled} // Disable button if component is disabled
-                  className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-500 ${
-                    disabled
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-white/10'
-                  }`} // Adjusted hover/focus colors & disabled style
+                  disabled={disabled}
+                  className={`p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors focus:outline-none ${
+                    disabled ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <FaChevronLeft className="w-4 h-4 text-brand-300" />
+                  <FaChevronLeft className="w-3 h-3" />
                 </button>
-                {/* Header Button */}
                 <button
                   type="button"
                   id={headingId}
                   onClick={handleHeaderClick}
-                  disabled={disabled || calendarView === 'years'} // Disable click in year view
-                  className={`font-semibold text-brand-100 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-500 ${
+                  disabled={disabled || calendarView === 'years'}
+                  className={`font-mono text-[10px] tracking-[0.25em] uppercase text-zinc-200 px-2 py-1 transition-colors focus:outline-none ${
                     calendarView !== 'years' && !disabled
-                      ? 'hover:bg-white/10'
+                      ? 'hover:text-brand-300'
                       : 'cursor-default'
                   }`}
                 >
@@ -649,9 +642,8 @@ const DatePicker = ({
                       year: 'numeric',
                     })}
                   {calendarView === 'years' &&
-                    `${yearGrid[1]} - ${yearGrid[10]}`}
+                    `${yearGrid[1]} – ${yearGrid[10]}`}
                 </button>
-                {/* Next Button */}
                 <button
                   ref={nextMonthRef}
                   type="button"
@@ -659,47 +651,42 @@ const DatePicker = ({
                     calendarView === 'days'
                       ? 'Next month'
                       : calendarView === 'months'
-                      ? 'Next year'
-                      : 'Next decade'
+                        ? 'Next year'
+                        : 'Next decade'
                   }
                   onClick={handleNext}
-                  disabled={disabled} // Disable button if component is disabled
-                  className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-500 ${
-                    disabled
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-white/10'
-                  }`} // Adjusted hover/focus colors & disabled style
+                  disabled={disabled}
+                  className={`p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors focus:outline-none ${
+                    disabled ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <FaChevronRight className="w-4 h-4 text-brand-300" />
+                  <FaChevronRight className="w-3 h-3" />
                 </button>
               </div>
-              {/* Conditional Calendar Grid */}
+
               <div
                 ref={gridRef}
                 role="grid"
                 aria-labelledby={headingId}
-                // tabIndex={0} // Make grid container focusable if managing focus via aria-activedescendant
-                onKeyDown={handleGridKeyDown} // Handle keydown events on the grid container
-                className="focus:outline-none" // Remove outline from grid container itself
+                onKeyDown={handleGridKeyDown}
+                className="focus:outline-none"
               >
                 {/* Days View */}
                 {calendarView === 'days' && (
                   <>
-                    {/* Day Headers */}
                     <div role="row" className="grid grid-cols-7 gap-1 mb-1">
                       {daysOfWeek.map((day) => (
                         <div
                           key={day}
                           role="columnheader"
-                          aria-label={day} // Full day name might be better here
-                          className="text-center text-xs font-medium text-brand-300"
+                          aria-label={day}
+                          className="text-center font-mono text-[9px] tracking-[0.15em] uppercase text-zinc-500"
                         >
                           {day}
                         </div>
                       ))}
                     </div>
-                    {/* Date Cells */}
-                    <div className="grid grid-cols-7 gap-1">
+                    <div className="grid grid-cols-7 gap-0.5">
                       {gridDates.map((date) => {
                         const isCurrentMonth =
                           date.getMonth() === viewDate.getMonth();
@@ -720,19 +707,21 @@ const DatePicker = ({
                             disabled={isDisabled || disabled}
                             tabIndex={-1}
                             onClick={() => !disabled && handleDateSelect(date)}
-                            className={`p-1.5 text-sm text-center rounded transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-brand-500 ${
+                            className={`p-1.5 font-serif text-[12px] text-center transition-colors focus:outline-none ${
                               isSel
-                                ? 'bg-brand-500 text-accessible-on-brand font-semibold hover:bg-brand-600' // Use text-accessible-on-brand
+                                ? 'bg-brand-500/20 text-brand-200 border border-brand-400/60'
                                 : isToday
-                                ? 'text-brand-300 font-semibold border border-brand-400/50'
-                                : ''
+                                  ? 'text-brand-300 border border-brand-400/30'
+                                  : 'border border-transparent'
                             } ${
                               isDisabled || disabled
-                                ? 'text-brand-100/30 cursor-default'
-                                : 'text-brand-100 hover:bg-white/10 cursor-pointer'
+                                ? 'text-zinc-700 cursor-default'
+                                : isSel
+                                  ? 'cursor-pointer'
+                                  : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
                             } ${
-                              isFocused && !disabled
-                                ? 'ring-2 ring-brand-500 ring-offset-0'
+                              isFocused && !disabled && !isSel
+                                ? 'ring-1 ring-brand-500/60'
                                 : ''
                             }`}
                           >
@@ -746,7 +735,7 @@ const DatePicker = ({
 
                 {/* Months View */}
                 {calendarView === 'months' && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1">
                     {months.map((month, index) => {
                       const isCurrentMonth =
                         index === today.getMonth() &&
@@ -760,19 +749,21 @@ const DatePicker = ({
                           type="button"
                           disabled={disabled}
                           onClick={() => !disabled && handleMonthSelect(index)}
-                          className={`p-2 text-sm text-center rounded transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-brand-500 ${
+                          className={`p-2 font-serif text-[12px] text-center transition-colors focus:outline-none ${
                             isSelectedMonth
-                              ? 'bg-brand-500 text-accessible-on-brand font-semibold hover:bg-brand-600' // Use text-accessible-on-brand
+                              ? 'bg-brand-500/20 text-brand-200 border border-brand-400/60'
                               : isCurrentMonth
-                              ? 'text-brand-300 font-semibold border border-brand-400/50'
-                              : ''
+                                ? 'text-brand-300 border border-brand-400/30'
+                                : 'border border-transparent'
                           } ${
                             disabled
-                              ? 'text-brand-100/30 cursor-default'
-                              : 'text-brand-100 hover:bg-white/10 cursor-pointer'
+                              ? 'text-zinc-700 cursor-default'
+                              : isSelectedMonth
+                                ? 'cursor-pointer'
+                                : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
                           }`}
                         >
-                          {month}
+                          {month.slice(0, 3)}
                         </button>
                       );
                     })}
@@ -781,11 +772,10 @@ const DatePicker = ({
 
                 {/* Years View */}
                 {calendarView === 'years' && (
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-4 gap-1">
                     {yearGrid.map((year, index) => {
                       const isCurrentYear = year === today.getFullYear();
                       const isSelectedYear = year === selected?.getFullYear();
-                      // Dim years outside the current decade (first and last)
                       const isOutsideDecade = index === 0 || index === 11;
                       return (
                         <button
@@ -793,16 +783,18 @@ const DatePicker = ({
                           type="button"
                           disabled={disabled}
                           onClick={() => !disabled && handleYearSelect(year)}
-                          className={`p-2 text-sm text-center rounded transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-brand-500 ${
+                          className={`p-2 font-mono text-[11px] text-center transition-colors focus:outline-none ${
                             isSelectedYear
-                              ? 'bg-brand-500 text-accessible-on-brand font-semibold hover:bg-brand-600' // Use text-accessible-on-brand
+                              ? 'bg-brand-500/20 text-brand-200 border border-brand-400/60'
                               : isCurrentYear
-                              ? 'text-brand-300 font-semibold border border-brand-400/50'
-                              : ''
+                                ? 'text-brand-300 border border-brand-400/30'
+                                : 'border border-transparent'
                           } ${
                             disabled || isOutsideDecade
-                              ? 'text-brand-100/30 cursor-default'
-                              : 'text-brand-100 hover:bg-white/10 cursor-pointer'
+                              ? 'text-zinc-700 cursor-default'
+                              : isSelectedYear
+                                ? 'cursor-pointer'
+                                : 'text-zinc-300 hover:bg-zinc-800/40 cursor-pointer'
                           }`}
                         >
                           {year}
@@ -817,11 +809,7 @@ const DatePicker = ({
         </div>
       </div>
       {error && (
-        <p
-          id={`${id}-error`}
-          className="mt-1 text-sm text-red-400"
-          role="alert"
-        >
+        <p id={`${id}-error`} className="dossier-error" role="alert">
           {error}
         </p>
       )}

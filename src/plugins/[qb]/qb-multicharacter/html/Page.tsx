@@ -17,6 +17,8 @@ import { isEnvBrowser } from '../../../../webview/utils/misc';
 import FormInput from '../../../../webview/components/forms/FormInput';
 import FormSelect from '../../../../webview/components/forms/FormSelect';
 import DatePicker from '../../../../webview/components/forms/DatePicker';
+import Paper from '../../../../webview/components/ui/Paper';
+import ActionLink from '../../../../webview/components/ui/ActionLink';
 
 import type {
   CharacterRow,
@@ -317,12 +319,14 @@ export default function Page() {
 
   return (
     <div className="fixed inset-0 font-serif text-gray-100 pointer-events-none">
-      {/* The right-side column is intentionally NOT a solid panel —
-          individual "papers" stack with breathing room between them so
-          the game world shows through the gaps. pointer-events-none on
-          the column itself plus pointer-events-auto per paper means
-          clicks fall through the gaps to FiveM. */}
-      <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-none pr-1">
+      {/* Right column. The outer fixed wrapper stays pointer-events-none
+          so the empty area doesn't eat unrelated UI hits, but the column
+          itself takes pointer-events-auto — overflow-y-auto only scrolls
+          when the element receives wheel events, and pointer-events-none
+          would silently swallow them. The "gaps between papers" effect
+          is purely visual; click-through doesn't matter because
+          SetNuiFocus is on while the menu is up. */}
+      <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-auto pr-1">
         <Letterhead />
 
         {screen === 'loading' && (
@@ -364,41 +368,6 @@ export default function Page() {
           />
         )}
       </div>
-    </div>
-  );
-}
-
-// ============================================================
-// Paper — base translucent tile with backdrop blur
-// ============================================================
-
-interface PaperProps {
-  children: React.ReactNode;
-  className?: string;
-  selected?: boolean;
-  interactive?: boolean;
-}
-
-function Paper({
-  children,
-  className = '',
-  selected = false,
-  interactive = false,
-}: PaperProps) {
-  return (
-    <div
-      className={[
-        'relative bg-zinc-950/65 backdrop-blur-md border border-zinc-800/60',
-        'shadow-[0_8px_32px_rgba(0,0,0,0.4)]',
-        'pointer-events-auto',
-        interactive ? 'transition-colors duration-200' : '',
-        selected
-          ? 'border-brand-500/60 bg-zinc-900/70 shadow-[inset_2px_0_0_0_rgba(99,102,241,0.9),0_8px_32px_rgba(0,0,0,0.4)]'
-          : '',
-        className,
-      ].join(' ')}
-    >
-      {children}
     </div>
   );
 }
@@ -559,8 +528,7 @@ function SlotRow({
   return (
     <Paper
       selected={isSelected}
-      interactive
-      className="group cursor-pointer hover:border-zinc-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
+      className="group cursor-pointer transition-colors duration-200 hover:border-zinc-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
     >
       <div
         role="button"
@@ -636,36 +604,6 @@ function SlotEmpty({ t }: { t: (k: string) => string }) {
     <div className="font-mono text-[9.5px] tracking-[0.25em] text-zinc-500 uppercase group-hover:text-zinc-300 transition-colors truncate">
       {t('ui.create_button')}
     </div>
-  );
-}
-
-// ============================================================
-// Inline action link (text + icon, hairline border, no rounded glass pill)
-// ============================================================
-
-interface ActionLinkProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  accent?: boolean;
-  danger?: boolean;
-}
-
-function ActionLink({ icon, label, onClick, accent, danger }: ActionLinkProps) {
-  const tone = danger
-    ? 'text-red-300 hover:text-red-200 border-red-500/40 hover:border-red-400'
-    : accent
-      ? 'text-brand-300 hover:text-brand-200 border-brand-500/50 hover:border-brand-400'
-      : 'text-zinc-300 hover:text-zinc-100 border-zinc-700 hover:border-zinc-500';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border-b border-l-0 border-r-0 border-t-0 ${tone} transition-colors font-mono text-[9.5px] tracking-[0.25em] uppercase whitespace-nowrap`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   );
 }
 
