@@ -454,7 +454,7 @@ export default function Page() {
           would silently swallow them. The "gaps between papers" effect
           is purely visual; click-through doesn't matter because
           SetNuiFocus is on while the menu is up. */}
-      <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-auto pr-1">
+      <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-auto">
         <Letterhead />
 
         {screen === 'loading' && (
@@ -610,7 +610,13 @@ function CharactersPanel({
       {/* Header — same hairline-seam treatment as RegisterPanel's
           Section II header, so both screens read as the same kind of
           dossier sheet. */}
-      <header className="flex items-baseline justify-between gap-2 pb-3 mb-3 border-b border-gray-800/60">
+      {/* mb-3 deliberately omitted: keeping the header's border-b tight
+          against file 01's top edge gives every slot row the same
+          hairline-on-top treatment as the divide-y separators between
+          rows 02–05. With breathing space here, file 01 reads as
+          "free-floating" while 02–05 read as "boxed in" — same
+          structural code, different visual weight. */}
+      <header className="flex items-baseline justify-between gap-2 pb-3 border-b border-gray-800/60">
         <div className="min-w-0">
           <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
             Section I · Roster
@@ -642,7 +648,11 @@ function CharactersPanel({
         ))}
       </div>
 
-      <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
+      {/* min-h-10 keeps the footer at button-height even when only the
+          "Select a file" hint is shown. Without it, the footer collapses
+          to ~text-height when no slot is selected and grows by ~15px
+          when a slot becomes selected, jumping the rest of the panel. */}
+      <footer className="flex items-center justify-end gap-2 pt-3 mt-3 min-h-10 border-t border-gray-800/60">
         {showActions ? (
           <>
             <Button onClick={onPlay}>

@@ -44,22 +44,32 @@ export function generateDossierComponents(
 
   return {
     // Translucent paper card — base building block.
+    // No drop shadow: the dossier vocabulary deliberately avoids them.
+    // A 32px-blur shadow extends ~40px past the element's box on every
+    // side, which the eye reads as ghost padding around the paper —
+    // most visible on the *last* paper in a column where there's no
+    // sibling to absorb the halo. The hairline border + backdrop-blur
+    // already give enough separation from the live game scene.
     '.dossier-paper': {
       position: 'relative',
-      backgroundColor: `rgba(${grayRgb(950)}, 0.65)`,
+      // 0.3 alpha (not 0.5) because zinc-950 is near-black; 50% blend
+      // with a dark game scene still reads as mostly opaque. 0.3 lets
+      // the scene show through enough to register as translucent.
+      backgroundColor: `rgba(${grayRgb(950)}, 0.3)`,
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       borderWidth: '1px',
       borderStyle: 'solid',
       borderColor: `rgba(${grayRgb(800)}, 0.6)`,
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
     },
 
     // Selected variant — indigo accent rail + slightly stronger fill.
+    // Drop shadow removed for the same reason as `.dossier-paper`; the
+    // inset rail alone carries the "selected" cue.
     '.dossier-paper-selected': {
       borderColor: `rgba(${brandRgb(500)}, 0.6)`,
       backgroundColor: `rgba(${grayRgb(900)}, 0.7)`,
-      boxShadow: `inset 2px 0 0 0 rgba(${brandRgb(500)}, 0.9), 0 8px 32px rgba(0, 0, 0, 0.4)`,
+      boxShadow: `inset 2px 0 0 0 rgba(${brandRgb(500)}, 0.9)`,
     },
 
     // Field label — small mono uppercase, matches section meta-text.

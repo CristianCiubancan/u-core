@@ -136,7 +136,9 @@ function generateSafelist(
     'tracking-tight',
     'tracking-normal',
     'tracking-wide',
-    // Added for dynamic use in Layout.tsx
+    // Justification utilities — kept safelisted because some plugins
+    // build the className string at runtime (e.g. via cva variants
+    // resolved per-plugin) and Tailwind can't statically detect them.
     'justify-start',
     'justify-end',
     'justify-center',
