@@ -11,6 +11,11 @@
 // loud failure is preferable to silent misbehavior.
 
 import { QBCore } from './qbcore';
+import { installFunctions } from './functions';
+
+// Replace the throw-on-call Functions stubs from qbcore.ts with the
+// real implementations from functions.ts.
+installFunctions(QBCore);
 
 /**
  * Mirror of upstream main.lua's `GetCoreObject(filters)`. With no
@@ -30,12 +35,26 @@ function GetCoreObject(filters?: string[]): unknown {
   return result;
 }
 
-(globalThis as any).exports('GetCoreObject', GetCoreObject);
-(globalThis as any).exports('GetSharedItems', () => QBCore.Shared.Items);
-(globalThis as any).exports('GetSharedVehicles', () => QBCore.Shared.Vehicles);
-(globalThis as any).exports('GetSharedWeapons', () => QBCore.Shared.Weapons);
-(globalThis as any).exports('GetSharedJobs', () => QBCore.Shared.Jobs);
-(globalThis as any).exports('GetSharedGangs', () => QBCore.Shared.Gangs);
+const exportFn = (globalThis as any).exports as (name: string, fn: unknown) => void;
+
+exportFn('GetCoreObject', GetCoreObject);
+exportFn('GetSharedItems', () => QBCore.Shared.Items);
+exportFn('GetSharedVehicles', () => QBCore.Shared.Vehicles);
+exportFn('GetSharedWeapons', () => QBCore.Shared.Weapons);
+exportFn('GetSharedJobs', () => QBCore.Shared.Jobs);
+exportFn('GetSharedGangs', () => QBCore.Shared.Gangs);
+
+// Mirror upstream's pattern of re-exporting every QBCore.Functions
+// member as a top-level export, so callers can do
+// `exports['qb-core']:Notify(src, msg)` directly without going
+// through `GetCoreObject().Functions.Notify`.
+for (const [name, fn] of Object.entries(
+  QBCore.Functions as Record<string, unknown>
+)) {
+  if (typeof fn === 'function') {
+    exportFn(name, fn);
+  }
+}
 
 console.log(
   `^2[qb-core]^7 u-core port loaded — Shared.Items=${
@@ -47,5 +66,5 @@ console.log(
   }, Locations=${Object.keys(QBCore.Shared.Locations).length}.`
 );
 console.log(
-  '^3[qb-core]^7 Phase 2a (scaffold) running. Functions/Player/Commands stubs throw if called — Phase 2b/c will land the runtime code.'
+  '^3[qb-core]^7 Phase 2b running. Functions wired; Player/Commands still stubbed pending Phase 2c/d.'
 );
