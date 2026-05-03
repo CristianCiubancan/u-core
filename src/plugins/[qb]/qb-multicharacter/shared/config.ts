@@ -36,7 +36,10 @@ export const Config: MultiCharacterConfig = {
   DefaultSpawn: { x: -1035.71, y: -2731.87, z: 12.86 },
   PedCoords: { x: -763.2816, y: 330.0418, z: 199.4865, w: 177.7942 },
   HiddenCoords: { x: -779.0154, y: 326.1801, z: 196.086, w: 91.0454 },
-  CamCoords: { x: -763.1219, y: 326.8112, z: 200, w: 357.0954 },
+  // Original w was 357 (camera dead-center on ped). Rotated ~20° clockwise
+  // (yaw 337) so the ped renders on the left third of the viewport, leaving
+  // the right side clear for the dossier card. Position kept the same.
+  CamCoords: { x: -763.1219, y: 326.8112, z: 200, w: 337.0954 },
   EnableDeleteButton: true,
   customNationality: false,
   SkipSelection: false,

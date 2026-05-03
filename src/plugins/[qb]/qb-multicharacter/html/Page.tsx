@@ -316,8 +316,13 @@ export default function Page() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center font-serif text-gray-100">
-      <div className="w-[min(1080px,94vw)] max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 font-serif text-gray-100 pointer-events-none">
+      {/* Pinned to the right edge: leaves the left two-thirds of the
+          viewport clear for the in-game preview ped (Config.CamCoords is
+          rotated to frame the ped left-of-center). pointer-events-auto on
+          the card ensures only the card area swallows clicks; the rest of
+          the viewport stays interactive for the game itself. */}
+      <div className="absolute right-6 top-6 bottom-6 w-[min(440px,40vw)] flex flex-col pointer-events-auto">
         <DossierShell>
           {screen === 'loading' && (
             <LoadingPanel text={t(LOADING_STAGES[loadingStage])} />
@@ -369,32 +374,34 @@ export default function Page() {
 
 function DossierShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative bg-zinc-950/85 backdrop-blur-md border border-zinc-800/80 shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden">
+    <div className="relative flex flex-col h-full bg-zinc-950/90 backdrop-blur-md border border-zinc-800/80 shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden">
       {/* indigo accent rail on the left edge */}
       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand-500" />
       <Letterhead />
-      <div className="px-10 pb-10 pt-2">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-7 pb-7 pt-2">
+        {children}
+      </div>
     </div>
   );
 }
 
 function Letterhead() {
   return (
-    <div className="flex items-end justify-between px-10 pt-8 pb-5 border-b border-zinc-800/70">
+    <div className="flex items-end justify-between gap-3 px-7 pt-6 pb-4 border-b border-zinc-800/70">
       <div>
-        <p className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+        <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-500 uppercase">
           Department of Citizen Affairs
         </p>
-        <h1 className="font-display text-4xl font-light leading-none mt-2 text-zinc-50">
+        <h1 className="font-display text-3xl font-light leading-none mt-2 text-zinc-50">
           Identity Registry
         </h1>
       </div>
-      <div className="text-right">
-        <p className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
-          Form&nbsp;C–07&nbsp;/&nbsp;rev.&nbsp;{new Date().getFullYear()}
+      <div className="text-right shrink-0">
+        <p className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
+          Form C–07
         </p>
-        <p className="font-mono text-[10px] text-zinc-600 mt-1">
-          ref&nbsp;{Math.random().toString(16).slice(2, 8).toUpperCase()}
+        <p className="font-mono text-[9px] text-zinc-600 mt-1">
+          rev.&nbsp;{new Date().getFullYear()}
         </p>
       </div>
     </div>
@@ -455,24 +462,19 @@ function CharactersPanel({
   const showActions = selected?.data;
 
   return (
-    <div className="space-y-8 pt-6">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-2xl font-light text-zinc-200">
+    <div className="flex flex-col h-full pt-5">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl font-light text-zinc-200">
           {t('ui.characters_header')}
         </h2>
-        <span className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
-          {slots.filter((s) => s.data).length} / {slots.length} on record
+        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
+          {slots.filter((s) => s.data).length}/{slots.length} on record
         </span>
       </div>
 
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(slots.length, 5)}, minmax(0, 1fr))`,
-        }}
-      >
+      <div className="flex flex-col gap-2">
         {slots.map(({ index, data }, idx) => (
-          <SlotCard
+          <SlotRow
             key={index}
             index={index}
             data={data}
@@ -484,8 +486,8 @@ function CharactersPanel({
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2 pt-4 min-h-[2.5rem]">
-        {showActions && (
+      <div className="flex items-center justify-end gap-3 pt-6 mt-auto border-t border-zinc-800/70 mt-6">
+        {showActions ? (
           <>
             <ActionLink
               icon={<PiPlayFill className="text-[15px]" />}
@@ -502,13 +504,17 @@ function CharactersPanel({
               />
             )}
           </>
+        ) : (
+          <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-600 uppercase">
+            Select a file
+          </span>
         )}
       </div>
     </div>
   );
 }
 
-interface SlotCardProps {
+interface SlotRowProps {
   index: number;
   data: CharacterRow | null;
   isSelected: boolean;
@@ -517,14 +523,14 @@ interface SlotCardProps {
   mountDelay: number;
 }
 
-function SlotCard({
+function SlotRow({
   index,
   data,
   isSelected,
   onClick,
   t,
   mountDelay,
-}: SlotCardProps) {
+}: SlotRowProps) {
   return (
     <div
       role="button"
@@ -538,81 +544,73 @@ function SlotCard({
       }}
       style={{ animationDelay: `${mountDelay}ms` }}
       className={[
-        'group relative aspect-[3/4] cursor-pointer',
-        'border border-zinc-800/80',
-        'bg-gradient-to-b from-zinc-900/80 to-zinc-950/80',
-        'transition-all duration-300 ease-out',
-        'animate-[fadeIn_400ms_ease-out_both]',
-        'hover:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-brand-500/60',
+        'group relative grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 px-3 py-3 cursor-pointer',
+        'border border-zinc-800/80 bg-zinc-900/30',
+        'transition-all duration-200 ease-out',
+        'animate-[fadeIn_300ms_ease-out_both]',
+        'hover:border-zinc-700 hover:bg-zinc-900/60 focus:outline-none focus:ring-1 focus:ring-brand-500/60',
         isSelected
-          ? 'border-brand-500/60 shadow-[inset_3px_0_0_0_rgba(99,102,241,0.9),0_8px_30px_rgba(99,102,241,0.18)]'
+          ? 'border-brand-500/60 bg-zinc-900/70 shadow-[inset_2px_0_0_0_rgba(99,102,241,0.9)]'
           : '',
       ].join(' ')}
     >
-      {/* corner case file number */}
-      <span className="absolute top-3 left-3 font-mono text-[9px] tracking-[0.3em] text-zinc-600 uppercase">
-        File&nbsp;{String(index).padStart(2, '0')}
-      </span>
-      {isSelected && (
-        <span className="absolute top-3 right-3 font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
-          ▸ Active
-        </span>
-      )}
+      {/* file number (left) */}
+      <div className="font-mono text-[9px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
+        <div className="text-zinc-600">File</div>
+        <div className="text-zinc-300 text-base font-display tracking-normal">
+          {String(index).padStart(2, '0')}
+        </div>
+      </div>
 
-      {data ? <SlotContent data={data} /> : <SlotEmpty t={t} />}
+      {/* identity (center) */}
+      <div className="min-w-0">
+        {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
+      </div>
+
+      {/* status badge (right) */}
+      <div className="shrink-0">
+        {isSelected && data && (
+          <span className="font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
+            ▸ Active
+          </span>
+        )}
+        {!data && (
+          <PiPlusLight className="text-xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
+        )}
+      </div>
     </div>
   );
 }
 
-function SlotContent({ data }: { data: CharacterRow }) {
+function SlotIdentity({ data }: { data: CharacterRow }) {
+  const fullName = `${data.charinfo.firstname} ${data.charinfo.lastname}`.trim();
   return (
-    <div className="absolute inset-0 flex flex-col justify-between p-4 pt-10">
-      <div className="flex flex-col gap-2 font-mono text-[11px] text-zinc-400">
-        <StatRow icon={<PiBriefcaseLight />} value={data.job?.label ?? '—'} />
-        <StatRow
-          icon={<PiMoneyLight />}
-          value={`$${dollar.format(data.money?.cash ?? 0)}`}
-        />
-        <StatRow
-          icon={<PiBankLight />}
-          value={`$${dollar.format(data.money?.bank ?? 0)}`}
-        />
+    <>
+      <p className="font-display text-base font-light text-zinc-50 leading-tight truncate">
+        {fullName || '—'}
+      </p>
+      <div className="flex items-center gap-3 mt-1 font-mono text-[10px] text-zinc-400">
+        <span className="inline-flex items-center gap-1 truncate">
+          <PiBriefcaseLight className="text-zinc-500 shrink-0" />
+          <span className="truncate">{data.job?.label ?? '—'}</span>
+        </span>
+        <span className="inline-flex items-center gap-1 shrink-0">
+          <PiMoneyLight className="text-zinc-500" />
+          ${dollar.format(data.money?.cash ?? 0)}
+        </span>
+        <span className="inline-flex items-center gap-1 shrink-0">
+          <PiBankLight className="text-zinc-500" />
+          ${dollar.format(data.money?.bank ?? 0)}
+        </span>
       </div>
-      <div className="space-y-1">
-        <span className="block h-px bg-zinc-700/60" />
-        <p className="font-display text-lg font-light text-zinc-50 leading-tight truncate">
-          {data.charinfo.firstname}
-        </p>
-        <p className="font-display text-lg font-light text-zinc-300 leading-tight truncate -mt-1">
-          {data.charinfo.lastname}
-        </p>
-      </div>
-    </div>
+    </>
   );
 }
 
 function SlotEmpty({ t }: { t: (k: string) => string }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-zinc-500 group-hover:text-zinc-300 transition-colors">
-      <PiPlusLight className="text-3xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
-      <p className="font-mono text-[9px] tracking-[0.3em] uppercase">
-        {t('ui.create_button')}
-      </p>
-    </div>
-  );
-}
-
-function StatRow({
-  icon,
-  value,
-}: {
-  icon: React.ReactNode;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-zinc-600 text-[14px] shrink-0">{icon}</span>
-      <span className="truncate text-zinc-300">{value}</span>
+    <div className="font-mono text-[10px] tracking-[0.25em] text-zinc-500 uppercase group-hover:text-zinc-300 transition-colors">
+      {t('ui.create_button')}
     </div>
   );
 }
