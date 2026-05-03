@@ -85,7 +85,12 @@ const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'relative z-50 min-w-[8rem] max-h-60 overflow-hidden',
+        'relative z-50 max-h-60 overflow-hidden',
+        // Lock the content width to the trigger width so the dropdown
+        // never overhangs the right side of the form column. Without
+        // this, content auto-sizes against item width + paddings and
+        // can grow wider than the trigger.
+        position === 'popper' && 'w-[var(--radix-select-trigger-width)]',
         'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
         'shadow-[0_8px_32px_rgba(0,0,0,0.45)] outline-none',
         position === 'popper' &&

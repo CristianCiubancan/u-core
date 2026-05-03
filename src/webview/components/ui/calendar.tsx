@@ -39,10 +39,10 @@ function Calendar({
         weekdays: 'flex',
         weekday:
           'flex-1 text-center font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground py-1',
-        week: 'flex w-full mt-0.5',
+        week: 'flex w-full mt-1',
         day: 'flex-1 text-center p-0.5 relative',
         day_button: cn(
-          'h-7 w-full font-serif text-[12px] text-foreground/80',
+          'h-8 w-full font-serif text-[13px] text-foreground/80',
           'hover:bg-accent/40 transition-colors',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
           'border border-transparent'
