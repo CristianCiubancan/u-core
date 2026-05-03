@@ -456,17 +456,20 @@ function CharactersPanel({
 
   return (
     <>
-      {/* Section header floats above the cards — no paper. text-shadow
-          keeps it legible if the camera framing ever puts a bright
-          surface behind the column. */}
-      <div className="flex items-baseline justify-between gap-2 px-0.5 pt-1 pointer-events-none [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)]">
-        <h2 className="font-display text-lg font-light text-gray-100 truncate">
-          {t('ui.characters_header')}
-        </h2>
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-300 uppercase shrink-0">
-          {slots.filter((s) => s.data).length}/{slots.length} on record
-        </span>
-      </div>
+      {/* Section header gets its own paper so it has the same visual
+          weight as the letterhead above. Keeping headers as floating
+          text broke the rhythm — sections looked unfinished compared
+          to the rest of the stack. */}
+      <Paper className="px-5 py-3 shrink-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="font-display text-lg font-light leading-none text-gray-100 truncate">
+            {t('ui.characters_header')}
+          </h2>
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+            {slots.filter((s) => s.data).length}/{slots.length} on record
+          </span>
+        </div>
+      </Paper>
 
       {slots.map(({ index, data }, idx) => (
         <SlotRow
@@ -640,24 +643,27 @@ function RegisterPanel({
 }: RegisterPanelProps) {
   return (
     <>
-      {/* Floating section header */}
-      <div className="flex items-end justify-between gap-2 px-0.5 pt-1 [text-shadow:_0_1px_4px_rgba(0,0,0,0.85)] pointer-events-none">
-        <div className="min-w-0">
-          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-300 uppercase truncate">
-            Section II · Enrollment
-          </p>
-          <h2 className="font-display text-lg font-light text-gray-100 mt-0.5 truncate">
-            {t('ui.chardel_header')}
-          </h2>
+      {/* Section header in its own paper — matches the letterhead's
+          padding and weight so the form has a clear visual root. */}
+      <Paper className="px-5 py-4 shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
+              Section II · Enrollment
+            </p>
+            <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
+              {t('ui.chardel_header')}
+            </h2>
+          </div>
+          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+            File&nbsp;{String(slotIndex).padStart(2, '0')}/
+            {String(totalSlots).padStart(2, '0')}
+          </span>
         </div>
-        <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-300 uppercase shrink-0">
-          File&nbsp;{String(slotIndex).padStart(2, '0')}/
-          {String(totalSlots).padStart(2, '0')}
-        </span>
-      </div>
+      </Paper>
 
       {/* Form fields paper */}
-      <Paper className="px-4 py-4">
+      <Paper className="px-5 py-4">
         <div className="grid grid-cols-1 gap-3">
           <FormInput
             id="qbm-firstname"
