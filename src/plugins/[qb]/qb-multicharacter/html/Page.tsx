@@ -317,43 +317,43 @@ export default function Page() {
 
   return (
     <div className="fixed inset-0 font-serif text-gray-100 pointer-events-none">
-      {/* Pinned to the right edge: leaves the left two-thirds of the
-          viewport clear for the in-game preview ped (Config.CamCoords is
-          rotated to frame the ped left-of-center). pointer-events-auto on
-          the card ensures only the card area swallows clicks; the rest of
-          the viewport stays interactive for the game itself. */}
-      <div className="absolute right-6 top-6 bottom-6 w-[min(440px,40vw)] flex flex-col pointer-events-auto">
-        <DossierShell>
-          {screen === 'loading' && (
-            <LoadingPanel text={t(LOADING_STAGES[loadingStage])} />
-          )}
-          {screen === 'characters' && (
-            <CharactersPanel
-              slots={slots}
-              selectedIndex={selectedIndex}
-              allowDelete={allowDelete}
-              onSlotClick={onSlotClick}
-              onPlay={onPlay}
-              onPrepareDelete={() => setDeleteOpen(true)}
-              t={t}
-            />
-          )}
-          {screen === 'register' && (
-            <RegisterPanel
-              data={registerData}
-              fieldErrors={fieldErrors}
-              customNationality={customNationality}
-              nationalityOptions={nationalityOptions}
-              genderOptions={genderOptions}
-              slotIndex={selectedIndex}
-              totalSlots={characterAmount}
-              onChange={updateRegister}
-              onCancel={() => setScreen('characters')}
-              onCreate={onCreate}
-              t={t}
-            />
-          )}
-        </DossierShell>
+      {/* The right-side column is intentionally NOT a solid panel —
+          individual "papers" stack with breathing room between them so
+          the game world shows through the gaps. pointer-events-none on
+          the column itself plus pointer-events-auto per paper means
+          clicks fall through the gaps to FiveM. */}
+      <div className="absolute right-6 top-6 bottom-6 w-[min(440px,40vw)] flex flex-col gap-3 overflow-y-auto pointer-events-none">
+        <Letterhead />
+
+        {screen === 'loading' && (
+          <LoadingPanel text={t(LOADING_STAGES[loadingStage])} />
+        )}
+        {screen === 'characters' && (
+          <CharactersPanel
+            slots={slots}
+            selectedIndex={selectedIndex}
+            allowDelete={allowDelete}
+            onSlotClick={onSlotClick}
+            onPlay={onPlay}
+            onPrepareDelete={() => setDeleteOpen(true)}
+            t={t}
+          />
+        )}
+        {screen === 'register' && (
+          <RegisterPanel
+            data={registerData}
+            fieldErrors={fieldErrors}
+            customNationality={customNationality}
+            nationalityOptions={nationalityOptions}
+            genderOptions={genderOptions}
+            slotIndex={selectedIndex}
+            totalSlots={characterAmount}
+            onChange={updateRegister}
+            onCancel={() => setScreen('characters')}
+            onCreate={onCreate}
+            t={t}
+          />
+        )}
 
         {deleteOpen && screen === 'characters' && (
           <DeleteOverlay
@@ -369,42 +369,66 @@ export default function Page() {
 }
 
 // ============================================================
-// Layout shell
+// Paper — base translucent tile with backdrop blur
 // ============================================================
 
-function DossierShell({ children }: { children: React.ReactNode }) {
+interface PaperProps {
+  children: React.ReactNode;
+  className?: string;
+  selected?: boolean;
+  interactive?: boolean;
+}
+
+function Paper({
+  children,
+  className = '',
+  selected = false,
+  interactive = false,
+}: PaperProps) {
   return (
-    <div className="relative flex flex-col h-full bg-zinc-950/90 backdrop-blur-md border border-zinc-800/80 shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden">
-      {/* indigo accent rail on the left edge */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand-500" />
-      <Letterhead />
-      <div className="flex-1 min-h-0 overflow-y-auto px-7 pb-7 pt-2">
-        {children}
-      </div>
+    <div
+      className={[
+        'relative bg-zinc-950/65 backdrop-blur-md border border-zinc-800/60',
+        'shadow-[0_8px_32px_rgba(0,0,0,0.4)]',
+        'pointer-events-auto',
+        interactive ? 'transition-colors duration-200' : '',
+        selected
+          ? 'border-brand-500/60 bg-zinc-900/70 shadow-[inset_2px_0_0_0_rgba(99,102,241,0.9),0_8px_32px_rgba(0,0,0,0.4)]'
+          : '',
+        className,
+      ].join(' ')}
+    >
+      {children}
     </div>
   );
 }
 
+// ============================================================
+// Letterhead (its own paper, compact)
+// ============================================================
+
 function Letterhead() {
   return (
-    <div className="flex items-end justify-between gap-3 px-7 pt-6 pb-4 border-b border-zinc-800/70">
-      <div>
-        <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-500 uppercase">
-          Department of Citizen Affairs
-        </p>
-        <h1 className="font-display text-3xl font-light leading-none mt-2 text-zinc-50">
-          Identity Registry
-        </h1>
+    <Paper className="px-6 py-5 shrink-0">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-500 uppercase">
+            Department of Citizen Affairs
+          </p>
+          <h1 className="font-display text-3xl font-light leading-none mt-2 text-zinc-50">
+            Identity Registry
+          </h1>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
+            Form C–07
+          </p>
+          <p className="font-mono text-[9px] text-zinc-600 mt-1">
+            rev.&nbsp;{new Date().getFullYear()}
+          </p>
+        </div>
       </div>
-      <div className="text-right shrink-0">
-        <p className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
-          Form C–07
-        </p>
-        <p className="font-mono text-[9px] text-zinc-600 mt-1">
-          rev.&nbsp;{new Date().getFullYear()}
-        </p>
-      </div>
-    </div>
+    </Paper>
   );
 }
 
@@ -419,19 +443,19 @@ function LoadingPanel({ text }: { text: string }) {
     return () => window.clearInterval(id);
   }, []);
   return (
-    <div className="flex flex-col items-center justify-center gap-6 py-24">
+    <Paper className="px-6 py-12 flex flex-col items-center justify-center gap-5">
       <div className="flex items-center gap-3">
-        <span className="block h-px w-12 bg-zinc-700" />
+        <span className="block h-px w-10 bg-zinc-700" />
         <span className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
           processing
         </span>
-        <span className="block h-px w-12 bg-zinc-700" />
+        <span className="block h-px w-10 bg-zinc-700" />
       </div>
-      <p className="font-display text-2xl text-zinc-100 italic font-light">
+      <p className="font-display text-xl text-zinc-100 italic font-light text-center">
         {text}
         <span className="text-brand-400">{'.'.repeat(dots)}</span>
       </p>
-    </div>
+    </Paper>
   );
 }
 
@@ -462,31 +486,32 @@ function CharactersPanel({
   const showActions = selected?.data;
 
   return (
-    <div className="flex flex-col h-full pt-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-display text-xl font-light text-zinc-200">
+    <>
+      {/* Section header floats above the cards — no paper. text-shadow
+          keeps it legible if the camera framing ever puts a bright
+          surface behind the column. */}
+      <div className="flex items-baseline justify-between px-1 pointer-events-none [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)]">
+        <h2 className="font-display text-xl font-light text-zinc-100">
           {t('ui.characters_header')}
         </h2>
-        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
+        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-300 uppercase">
           {slots.filter((s) => s.data).length}/{slots.length} on record
         </span>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {slots.map(({ index, data }, idx) => (
-          <SlotRow
-            key={index}
-            index={index}
-            data={data}
-            isSelected={index === selectedIndex}
-            onClick={() => onSlotClick(index)}
-            t={t}
-            mountDelay={idx * 50}
-          />
-        ))}
-      </div>
+      {slots.map(({ index, data }, idx) => (
+        <SlotRow
+          key={index}
+          index={index}
+          data={data}
+          isSelected={index === selectedIndex}
+          onClick={() => onSlotClick(index)}
+          t={t}
+          mountDelay={idx * 50}
+        />
+      ))}
 
-      <div className="flex items-center justify-end gap-3 pt-6 mt-auto border-t border-zinc-800/70 mt-6">
+      <Paper className="px-4 py-3 flex items-center justify-end gap-2 mt-auto">
         {showActions ? (
           <>
             <ActionLink
@@ -505,12 +530,12 @@ function CharactersPanel({
             )}
           </>
         ) : (
-          <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-600 uppercase">
+          <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-500 uppercase">
             Select a file
           </span>
         )}
-      </div>
-    </div>
+      </Paper>
+    </>
   );
 }
 
@@ -532,53 +557,50 @@ function SlotRow({
   mountDelay,
 }: SlotRowProps) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      style={{ animationDelay: `${mountDelay}ms` }}
-      className={[
-        'group relative grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 px-3 py-3 cursor-pointer',
-        'border border-zinc-800/80 bg-zinc-900/30',
-        'transition-all duration-200 ease-out',
-        'animate-[fadeIn_300ms_ease-out_both]',
-        'hover:border-zinc-700 hover:bg-zinc-900/60 focus:outline-none focus:ring-1 focus:ring-brand-500/60',
-        isSelected
-          ? 'border-brand-500/60 bg-zinc-900/70 shadow-[inset_2px_0_0_0_rgba(99,102,241,0.9)]'
-          : '',
-      ].join(' ')}
+    <Paper
+      selected={isSelected}
+      interactive
+      className="group cursor-pointer hover:border-zinc-700 focus-within:ring-1 focus-within:ring-brand-500/60 animate-[fadeIn_300ms_ease-out_both]"
     >
-      {/* file number (left) */}
-      <div className="font-mono text-[9px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
-        <div className="text-zinc-600">File</div>
-        <div className="text-zinc-300 text-base font-display tracking-normal">
-          {String(index).padStart(2, '0')}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        style={{ animationDelay: `${mountDelay}ms` }}
+        className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 px-3 py-3 outline-none"
+      >
+        {/* file number (left) */}
+        <div className="font-mono text-[9px] tracking-[0.25em] text-zinc-500 uppercase leading-tight">
+          <div className="text-zinc-600">File</div>
+          <div className="text-zinc-200 text-base font-display tracking-normal">
+            {String(index).padStart(2, '0')}
+          </div>
+        </div>
+
+        {/* identity (center) */}
+        <div className="min-w-0">
+          {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
+        </div>
+
+        {/* status badge (right) */}
+        <div className="shrink-0">
+          {isSelected && data && (
+            <span className="font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
+              ▸ Active
+            </span>
+          )}
+          {!data && (
+            <PiPlusLight className="text-xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
+          )}
         </div>
       </div>
-
-      {/* identity (center) */}
-      <div className="min-w-0">
-        {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
-      </div>
-
-      {/* status badge (right) */}
-      <div className="shrink-0">
-        {isSelected && data && (
-          <span className="font-mono text-[9px] tracking-[0.3em] text-brand-400 uppercase">
-            ▸ Active
-          </span>
-        )}
-        {!data && (
-          <PiPlusLight className="text-xl text-zinc-600 group-hover:text-brand-400 transition-colors" />
-        )}
-      </div>
-    </div>
+    </Paper>
   );
 }
 
@@ -677,76 +699,68 @@ function RegisterPanel({
   t,
 }: RegisterPanelProps) {
   return (
-    <div className="space-y-8 pt-6">
-      <div className="flex items-end justify-between border-b border-zinc-800/70 pb-4">
+    <>
+      {/* Floating section header */}
+      <div className="flex items-end justify-between px-1 [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)] pointer-events-none">
         <div>
-          <p className="font-mono text-[10px] tracking-[0.4em] text-zinc-500 uppercase">
+          <p className="font-mono text-[9px] tracking-[0.4em] text-zinc-300 uppercase">
             Section II · Enrollment
           </p>
-          <h2 className="font-display text-2xl font-light text-zinc-100 mt-1">
+          <h2 className="font-display text-xl font-light text-zinc-100 mt-1">
             {t('ui.chardel_header')}
           </h2>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
-            File&nbsp;{String(slotIndex).padStart(2, '0')}&nbsp;/&nbsp;
-            {String(totalSlots).padStart(2, '0')}
-          </span>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label={t('ui.cancel')}
-            className="text-zinc-500 hover:text-zinc-200 transition-colors"
-          >
-            <PiXLight className="text-2xl" />
-          </button>
-        </div>
+        <span className="font-mono text-[9px] tracking-[0.3em] text-zinc-300 uppercase">
+          File&nbsp;{String(slotIndex).padStart(2, '0')}&nbsp;/&nbsp;
+          {String(totalSlots).padStart(2, '0')}
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <FormInput
-          id="qbm-firstname"
-          label={t('ui.firstname')}
-          value={data.firstname}
-          onChange={(e) => onChange({ firstname: e.target.value })}
-          error={fieldErrors.firstname}
-        />
-        <FormInput
-          id="qbm-lastname"
-          label={t('ui.lastname')}
-          value={data.lastname}
-          onChange={(e) => onChange({ lastname: e.target.value })}
-          error={fieldErrors.lastname}
-        />
-        {customNationality ? (
+      {/* Form fields paper */}
+      <Paper className="px-5 py-5">
+        <div className="grid grid-cols-1 gap-4">
           <FormInput
-            id="qbm-nationality"
-            label={t('ui.nationality')}
-            value={data.nationality}
-            onChange={(e) => onChange({ nationality: e.target.value })}
-            error={fieldErrors.nationality}
+            id="qbm-firstname"
+            label={t('ui.firstname')}
+            value={data.firstname}
+            onChange={(e) => onChange({ firstname: e.target.value })}
+            error={fieldErrors.firstname}
           />
-        ) : (
+          <FormInput
+            id="qbm-lastname"
+            label={t('ui.lastname')}
+            value={data.lastname}
+            onChange={(e) => onChange({ lastname: e.target.value })}
+            error={fieldErrors.lastname}
+          />
+          {customNationality ? (
+            <FormInput
+              id="qbm-nationality"
+              label={t('ui.nationality')}
+              value={data.nationality}
+              onChange={(e) => onChange({ nationality: e.target.value })}
+              error={fieldErrors.nationality}
+            />
+          ) : (
+            <FormSelect
+              id="qbm-nationality"
+              label={t('ui.nationality')}
+              options={nationalityOptions}
+              value={data.nationality}
+              onChange={(value) => onChange({ nationality: value })}
+              placeholder={t('ui.nationality')}
+              error={fieldErrors.nationality}
+            />
+          )}
           <FormSelect
-            id="qbm-nationality"
-            label={t('ui.nationality')}
-            options={nationalityOptions}
-            value={data.nationality}
-            onChange={(value) => onChange({ nationality: value })}
-            placeholder={t('ui.nationality')}
-            error={fieldErrors.nationality}
+            id="qbm-gender"
+            label={t('ui.gender')}
+            options={genderOptions}
+            value={data.gender}
+            onChange={(value) => onChange({ gender: value })}
+            placeholder={t('ui.gender')}
+            error={fieldErrors.gender}
           />
-        )}
-        <FormSelect
-          id="qbm-gender"
-          label={t('ui.gender')}
-          options={genderOptions}
-          value={data.gender}
-          onChange={(value) => onChange({ gender: value })}
-          placeholder={t('ui.gender')}
-          error={fieldErrors.gender}
-        />
-        <div className="sm:col-span-2">
           <DatePicker
             id="qbm-birthdate"
             label={t('ui.birthdate')}
@@ -755,9 +769,10 @@ function RegisterPanel({
             error={fieldErrors.date}
           />
         </div>
-      </div>
+      </Paper>
 
-      <div className="flex items-center justify-end gap-3 border-t border-zinc-800/70 pt-6">
+      {/* Action bar paper */}
+      <Paper className="px-4 py-3 flex items-center justify-end gap-2 mt-auto">
         <ActionLink
           icon={<PiXLight className="text-[15px]" />}
           label={t('ui.cancel')}
@@ -769,8 +784,8 @@ function RegisterPanel({
           onClick={onCreate}
           accent
         />
-      </div>
-    </div>
+      </Paper>
+    </>
   );
 }
 
