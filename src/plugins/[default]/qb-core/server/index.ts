@@ -13,11 +13,14 @@
 import { QBCore } from './qbcore';
 import { installFunctions } from './functions';
 import { installPlayer } from './player';
+import { installEvents } from './events';
 
 // Replace the throw-on-call Functions / Player stubs from qbcore.ts
-// with the real implementations.
+// with the real implementations, then wire up server-side event
+// handlers.
 installFunctions(QBCore);
 installPlayer(QBCore);
+installEvents(QBCore);
 
 /**
  * Mirror of upstream main.lua's `GetCoreObject(filters)`. With no
@@ -68,5 +71,5 @@ console.log(
   }, Locations=${Object.keys(QBCore.Shared.Locations).length}.`
 );
 console.log(
-  '^3[qb-core]^7 Phase 2c running. Functions + Player wired; Commands still stubbed pending Phase 2d.'
+  '^3[qb-core]^7 Phase 2d running. Functions + Player + Events wired (incl. disconnect-cleanup fix); Commands still stubbed pending Phase 2e.'
 );
