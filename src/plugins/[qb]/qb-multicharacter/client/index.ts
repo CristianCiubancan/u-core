@@ -131,11 +131,15 @@ function openCharMenu(visible: boolean): void {
 
 // ---------------- Auto-trigger on session join ----------------
 
-setTick(async () => {
+// The original Lua used `return` to exit the polling thread once the
+// session was up. `setTick(() => {})` does NOT replace the active tick
+// — it registers a second one, leaving the first to fire chooseChar on
+// every frame for the lifetime of the session. Capture the tick id and
+// clearTick it once the session has started.
+const sessionPollTick = setTick(() => {
   if (NetworkIsSessionStarted()) {
     emit('qb-multicharacter:client:chooseChar');
-    // Replace this tick with a no-op so the engine drops the loop.
-    setTick(() => {});
+    clearTick(sessionPollTick);
   }
 });
 
