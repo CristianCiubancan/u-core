@@ -47,6 +47,21 @@
     "validating_characters": "Đang xác minh thông tin",
     "ran_into_issue": "Chúng tôi gặp sự cố",
     "profanity": "Có vẻ như bạn đang cố gắng sử dụng một số từ ngữ tục tĩu/xấu xa trong tên hoặc quốc tịch của bạn!",
-    "forgotten_field": "Có vẻ như bạn đã quên nhập một hoặc nhiều trường!"
+    "forgotten_field": "Có vẻ như bạn đã quên nhập một hoặc nhiều trường!",
+    "letterhead_title": "Cục Hộ Tịch",
+    "letterhead_subtitle": "Đăng Ký Nhân Thân",
+    "form_id": "MẪU C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Mục I · Danh Sách",
+    "section_ii_enrollment": "Mục II · Đăng Ký",
+    "on_record": "{{filled}}/{{total}} đã ghi",
+    "select_a_file_hint": "Chọn một hồ sơ",
+    "active_badge": "Đang Hoạt Động",
+    "file_progress": "Hồ Sơ {{current}}/{{total}}",
+    "error_required": "Bắt Buộc",
+    "error_too_short": "Tối thiểu 2 ký tự",
+    "error_pick_option": "Chọn một mục",
+    "error_pick_date": "Chọn ngày",
+    "error_date_range": "Ngoài khoảng cho phép"
   }
 }

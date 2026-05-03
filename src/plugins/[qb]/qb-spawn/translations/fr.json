@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Où souhaiteriez-vous commencer?",
+    "last_location": "Dernière position",
+    "confirm": "Confirmer",
+    "section_header": "Section I · Départ",
+    "page_title": "Sélecteur de Point",
+    "preset_spawns": "Points prédéfinis",
+    "your_houses": "Vos maisons",
+    "available_apartments": "Appartements disponibles",
+    "letterhead_title": "Bureau Local",
+    "letterhead_subtitle": "Coordinateur de Spawn",
+    "form_id": "FORMULAIRE S-08"
+  }
+}

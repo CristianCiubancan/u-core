@@ -47,6 +47,21 @@
     "validating_characters": "Karakters valideren",
     "ran_into_issue": "We kwamen een probleem tegen (report dit aub)",
     "profanity": "Het lijkt erop dat u probeert een soort godslastering / slechte woorden in uw naam of nationaliteit te gebruiken!",
-    "forgotten_field": "Het lijkt erop dat je bent vergeten een of meerdere van de velden in te voeren!"
+    "forgotten_field": "Het lijkt erop dat je bent vergeten een of meerdere van de velden in te voeren!",
+    "letterhead_title": "Burgerzaken",
+    "letterhead_subtitle": "Identiteitsregister",
+    "form_id": "FORMULIER C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Sectie I · Overzicht",
+    "section_ii_enrollment": "Sectie II · Inschrijving",
+    "on_record": "{{filled}}/{{total}} geregistreerd",
+    "select_a_file_hint": "Selecteer een dossier",
+    "active_badge": "Actief",
+    "file_progress": "Dossier {{current}}/{{total}}",
+    "error_required": "Verplicht",
+    "error_too_short": "Minstens 2 tekens",
+    "error_pick_option": "Kies een optie",
+    "error_pick_date": "Kies een datum",
+    "error_date_range": "Buiten toegestaan bereik"
   }
 }

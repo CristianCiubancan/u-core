@@ -47,6 +47,21 @@
     "validating_characters": "Validando personagens",
     "ran_into_issue": "Encontramos um problema",
     "profanity": "Parece que você está tentando usar algum tipo de palavrão ou palavra inadequada em seu nome ou nacionalidade!",
-    "forgotten_field": "Parece que você esqueceu de inserir um ou vários campos!"
+    "forgotten_field": "Parece que você esqueceu de inserir um ou vários campos!",
+    "letterhead_title": "Departamento de Assuntos Civis",
+    "letterhead_subtitle": "Registro de Identidade",
+    "form_id": "FORMULÁRIO C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Seção I · Lista",
+    "section_ii_enrollment": "Seção II · Inscrição",
+    "on_record": "{{filled}}/{{total}} registrados",
+    "select_a_file_hint": "Selecione um arquivo",
+    "active_badge": "Ativo",
+    "file_progress": "Arquivo {{current}}/{{total}}",
+    "error_required": "Obrigatório",
+    "error_too_short": "Pelo menos 2 caracteres",
+    "error_pick_option": "Escolha uma opção",
+    "error_pick_date": "Escolha uma data",
+    "error_date_range": "Fora do intervalo permitido"
   }
 }

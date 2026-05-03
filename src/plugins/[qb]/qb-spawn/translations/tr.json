@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Nereden başlamak istersin?",
+    "last_location": "Son konum",
+    "confirm": "Onayla",
+    "section_header": "Bölüm I · Hareket",
+    "page_title": "Doğuş Seçici",
+    "preset_spawns": "Hazır Doğuş Noktaları",
+    "your_houses": "Evleriniz",
+    "available_apartments": "Müsait Daireler",
+    "letterhead_title": "Saha Ofisi",
+    "letterhead_subtitle": "Doğuş Koordinatörü",
+    "form_id": "FORM S-08"
+  }
+}

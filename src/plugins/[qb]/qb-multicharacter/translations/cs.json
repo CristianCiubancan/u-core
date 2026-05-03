@@ -47,6 +47,21 @@
     "validating_characters": "Ověřování znaků",
     "ran_into_issue": "Narazili jsme na problém",
     "profanity": "Zdá se, že se snažíte použít nějaký druh nadávek / sprostých slov ve svém jménu nebo národnosti!",
-    "forgotten_field": "Zdá se, že jste zapomněli zadat jedno nebo více polí!"
+    "forgotten_field": "Zdá se, že jste zapomněli zadat jedno nebo více polí!",
+    "letterhead_title": "Občanský úřad",
+    "letterhead_subtitle": "Matrika osob",
+    "form_id": "FORMULÁŘ C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Oddíl I · Soupis",
+    "section_ii_enrollment": "Oddíl II · Zápis",
+    "on_record": "{{filled}}/{{total}} v záznamu",
+    "select_a_file_hint": "Vyberte spis",
+    "active_badge": "Aktivní",
+    "file_progress": "Spis {{current}}/{{total}}",
+    "error_required": "Povinné",
+    "error_too_short": "Alespoň 2 znaky",
+    "error_pick_option": "Vyberte možnost",
+    "error_pick_date": "Vyberte datum",
+    "error_date_range": "Mimo povolený rozsah"
   }
 }

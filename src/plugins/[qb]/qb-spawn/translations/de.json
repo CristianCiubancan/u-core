@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Wo möchten Sie beginnen?",
+    "last_location": "Letzter Standort",
+    "confirm": "Bestätigen",
+    "section_header": "Abschnitt I · Abfahrt",
+    "page_title": "Spawn-Auswahl",
+    "preset_spawns": "Voreingestellte Spawns",
+    "your_houses": "Ihre Häuser",
+    "available_apartments": "Verfügbare Wohnungen",
+    "letterhead_title": "Außenstelle",
+    "letterhead_subtitle": "Spawn-Koordination",
+    "form_id": "FORMULAR S-08"
+  }
+}

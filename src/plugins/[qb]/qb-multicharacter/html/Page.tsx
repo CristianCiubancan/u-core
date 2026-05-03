@@ -526,23 +526,34 @@ export default function Page() {
 // ============================================================
 
 function Letterhead() {
+  // Local useTranslation: Letterhead is decoration, not part of the
+  // form data flow, so it doesn't take `t` as a prop. defaultValue on
+  // every key keeps it readable when locales don't translate the
+  // dossier-specific strings (which most won't, since they're our
+  // additions beyond upstream's phrase set).
+  const { t } = useTranslation(NAMESPACE);
   return (
     <Paper className="px-5 py-4 shrink-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-            Department of Citizen Affairs
+            {t('ui.letterhead_title', {
+              defaultValue: 'Department of Citizen Affairs',
+            })}
           </p>
           <h1 className="font-display text-[1.6rem] font-light leading-tight mt-1.5 text-gray-50">
-            Identity Registry
+            {t('ui.letterhead_subtitle', { defaultValue: 'Identity Registry' })}
           </h1>
         </div>
         <div className="text-right shrink-0">
           <p className="font-mono text-[8.5px] tracking-[0.3em] text-gray-500 uppercase">
-            Form&nbsp;C–07
+            {t('ui.form_id', { defaultValue: 'FORM C–07' })}
           </p>
           <p className="font-mono text-[8.5px] text-gray-600 mt-0.5">
-            rev.&nbsp;{new Date().getFullYear()}
+            {t('ui.rev', {
+              year: new Date().getFullYear(),
+              defaultValue: 'rev. {{year}}',
+            })}
           </p>
         </div>
       </div>
@@ -623,14 +634,18 @@ function CharactersPanel({
         <header className="flex items-baseline justify-between gap-2 pb-3">
           <div className="min-w-0">
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-              Section I · Roster
+              {t('ui.section_i_roster', { defaultValue: 'Section I · Roster' })}
             </p>
             <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
               {t('ui.characters_header')}
             </h2>
           </div>
           <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
-            {filledCount}/{slots.length} on record
+            {t('ui.on_record', {
+              filled: filledCount,
+              total: slots.length,
+              defaultValue: '{{filled}}/{{total}} on record',
+            })}
           </span>
         </header>
         {slots.map(({ index, data }, idx) => (
@@ -668,7 +683,7 @@ function CharactersPanel({
           </>
         ) : (
           <span className="inline-flex items-center px-3 py-1.5 border-b border-transparent font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground/70">
-            Select a file
+            {t('ui.select_a_file_hint', { defaultValue: 'Select a file' })}
           </span>
         )}
       </footer>
@@ -744,7 +759,7 @@ function SlotRow({
       <div className="shrink-0">
         {isSelected && data && (
           <span className="font-mono text-[8.5px] tracking-[0.3em] text-brand-400 uppercase">
-            ▸&nbsp;Active
+            ▸&nbsp;{t('ui.active_badge', { defaultValue: 'Active' })}
           </span>
         )}
         {!data && (
@@ -922,15 +937,20 @@ function RegisterPanel({
         <header className="flex items-start justify-between gap-3 pb-3 mb-4 border-b border-gray-800/60">
           <div className="min-w-0">
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-              Section II · Enrollment
+              {t('ui.section_ii_enrollment', {
+                defaultValue: 'Section II · Enrollment',
+              })}
             </p>
             <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
               {t('ui.chardel_header')}
             </h2>
           </div>
           <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
-            File&nbsp;{String(slotIndex).padStart(2, '0')}/
-            {String(totalSlots).padStart(2, '0')}
+            {t('ui.file_progress', {
+              current: String(slotIndex).padStart(2, '0'),
+              total: String(totalSlots).padStart(2, '0'),
+              defaultValue: 'File {{current}}/{{total}}',
+            })}
           </span>
         </header>
 

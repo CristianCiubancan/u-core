@@ -47,6 +47,21 @@
     "validating_characters": "Validation des personnages",
     "ran_into_issue": "Nous avons rencontré un problème",
     "profanity": "Il semblerait que vous essayez d'utiliser une profanité / gros mot dans votre nom / nationalité!",
-    "forgotten_field": "Il semblerait que vous avez oublié de remplir un ou plusieurs champ(s)!"
+    "forgotten_field": "Il semblerait que vous avez oublié de remplir un ou plusieurs champ(s)!",
+    "letterhead_title": "Bureau de l'État Civil",
+    "letterhead_subtitle": "Registre d'Identité",
+    "form_id": "FORMULAIRE C–07",
+    "rev": "rév. {{year}}",
+    "section_i_roster": "Section I · Effectifs",
+    "section_ii_enrollment": "Section II · Inscription",
+    "on_record": "{{filled}}/{{total}} enregistrés",
+    "select_a_file_hint": "Sélectionner un dossier",
+    "active_badge": "Actif",
+    "file_progress": "Dossier {{current}}/{{total}}",
+    "error_required": "Requis",
+    "error_too_short": "Au moins 2 caractères",
+    "error_pick_option": "Choisir une option",
+    "error_pick_date": "Choisir une date",
+    "error_date_range": "Hors plage autorisée"
   }
 }

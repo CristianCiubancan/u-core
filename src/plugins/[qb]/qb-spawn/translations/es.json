@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "¿Por dónde te gustaría empezar?",
+    "last_location": "Última ubicación",
+    "confirm": "Confirmar",
+    "section_header": "Sección I · Partida",
+    "page_title": "Selector de Spawn",
+    "preset_spawns": "Spawns predefinidos",
+    "your_houses": "Tus casas",
+    "available_apartments": "Apartamentos disponibles",
+    "letterhead_title": "Oficina de Campo",
+    "letterhead_subtitle": "Coordinador de Spawn",
+    "form_id": "FORMULARIO S-08"
+  }
+}

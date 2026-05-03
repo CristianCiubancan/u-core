@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Var vill du börja?",
+    "last_location": "Senaste plats",
+    "confirm": "Bekräfta",
+    "section_header": "Avsnitt I · Avgång",
+    "page_title": "Spawnväljare",
+    "preset_spawns": "Förvalda platser",
+    "your_houses": "Dina hus",
+    "available_apartments": "Lediga lägenheter",
+    "letterhead_title": "Lokalkontor",
+    "letterhead_subtitle": "Spawnsamordnare",
+    "form_id": "FORMULÄR S-08"
+  }
+}

@@ -297,10 +297,12 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-storerobbery
 
-  - action: download_github
-    dest: ./resources/[qb]/qb-spawn
-    ref: main
-    src: https://github.com/qbcore-framework/qb-spawn
+  # qb-spawn is rewritten as a u-core plugin; the build pipeline
+  # emits it to [GENERATED]/[qb]/qb-spawn on `pnpm build`. The
+  # upstream qbcore-framework/qb-spawn download is intentionally
+  # absent so FXServer doesn't double-register the resource (the
+  # second `ensure qb-spawn` would otherwise win and load the
+  # upstream Vue UI instead of our React port).
 
   - action: download_github
     dest: ./resources/[qb]/qb-smallresources

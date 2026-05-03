@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Dove vorresti iniziare?",
+    "last_location": "Ultima posizione",
+    "confirm": "Conferma",
+    "section_header": "Sezione I · Partenza",
+    "page_title": "Selettore Spawn",
+    "preset_spawns": "Spawn predefiniti",
+    "your_houses": "Le tue case",
+    "available_apartments": "Appartamenti disponibili",
+    "letterhead_title": "Ufficio Periferico",
+    "letterhead_subtitle": "Coordinatore Spawn",
+    "form_id": "MODULO S-08"
+  }
+}

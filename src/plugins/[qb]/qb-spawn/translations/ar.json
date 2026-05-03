@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "من أين تريد أن تبدأ؟",
+    "last_location": "آخر موقع",
+    "confirm": "تاكيد",
+    "section_header": "القسم الأول · المغادرة",
+    "page_title": "منتقي نقطة الظهور",
+    "preset_spawns": "نقاط جاهزة",
+    "your_houses": "منازلك",
+    "available_apartments": "الشقق المتاحة",
+    "letterhead_title": "المكتب الميداني",
+    "letterhead_subtitle": "منسق الظهور",
+    "form_id": "نموذج S-08"
+  }
+}

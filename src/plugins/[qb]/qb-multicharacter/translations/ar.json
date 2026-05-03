@@ -47,6 +47,21 @@
     "validating_characters": "تاكيد الشخصيات",
     "ran_into_issue": "واجهتنا مشكلة",
     "profanity": "يبدو انك تحاول استخدام اسم غير لائق في اسمك او جنسيتك حاول مرة اخرى!",
-    "forgotten_field": "يبدو أنك نسيت ادخال بعض المعلومات تحقق مرة اخرى!"
+    "forgotten_field": "يبدو أنك نسيت ادخال بعض المعلومات تحقق مرة اخرى!",
+    "letterhead_title": "شؤون المواطنين",
+    "letterhead_subtitle": "سجل الهوية",
+    "form_id": "نموذج C–07",
+    "rev": "مراجعة {{year}}",
+    "section_i_roster": "القسم الأول · القائمة",
+    "section_ii_enrollment": "القسم الثاني · التسجيل",
+    "on_record": "{{filled}}/{{total}} مسجلون",
+    "select_a_file_hint": "اختر ملفاً",
+    "active_badge": "نشط",
+    "file_progress": "ملف {{current}}/{{total}}",
+    "error_required": "مطلوب",
+    "error_too_short": "حرفان على الأقل",
+    "error_pick_option": "اختر خياراً",
+    "error_pick_date": "اختر تاريخاً",
+    "error_date_range": "خارج النطاق المسموح"
   }
 }

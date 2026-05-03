@@ -47,6 +47,21 @@
     "validating_characters": "Vahvistetaan hahmoja",
     "ran_into_issue": "Törmäsimme ongelmaan",
     "profanity": "Vaikuttaa siltä, että yrität käyttää jonkinlaista kiroilua/pahoja sanoja nimessäsi tai kansallisuudessasi!",
-    "forgotten_field": "Näyttää siltä, että olet unohtanut syöttää yhden tai useita kenttiä!"
+    "forgotten_field": "Näyttää siltä, että olet unohtanut syöttää yhden tai useita kenttiä!",
+    "letterhead_title": "Väestörekisteri",
+    "letterhead_subtitle": "Henkilörekisteri",
+    "form_id": "LOMAKE C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Osa I · Luettelo",
+    "section_ii_enrollment": "Osa II · Rekisteröinti",
+    "on_record": "{{filled}}/{{total}} kirjattua",
+    "select_a_file_hint": "Valitse kansio",
+    "active_badge": "Aktiivinen",
+    "file_progress": "Kansio {{current}}/{{total}}",
+    "error_required": "Pakollinen",
+    "error_too_short": "Vähintään 2 merkkiä",
+    "error_pick_option": "Valitse vaihtoehto",
+    "error_pick_date": "Valitse päivämäärä",
+    "error_date_range": "Sallitun alueen ulkopuolella"
   }
 }

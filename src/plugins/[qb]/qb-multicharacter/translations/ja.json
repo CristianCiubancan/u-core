@@ -47,6 +47,21 @@
     "validating_characters": "キャラクターの検証",
     "ran_into_issue": "問題が発生しました。",
     "profanity": "名前、出身国に不謹慎な言葉が使用されているようです。",
-    "forgotten_field": "何らかの入力欄が空白のようです。"
+    "forgotten_field": "何らかの入力欄が空白のようです。",
+    "letterhead_title": "戸籍課",
+    "letterhead_subtitle": "身分登録",
+    "form_id": "フォーム C–07",
+    "rev": "改訂 {{year}}",
+    "section_i_roster": "セクション I · 名簿",
+    "section_ii_enrollment": "セクション II · 登録",
+    "on_record": "{{filled}}/{{total}} 件登録",
+    "select_a_file_hint": "ファイルを選択",
+    "active_badge": "アクティブ",
+    "file_progress": "ファイル {{current}}/{{total}}",
+    "error_required": "必須",
+    "error_too_short": "2文字以上",
+    "error_pick_option": "項目を選択",
+    "error_pick_date": "日付を選択",
+    "error_date_range": "範囲外"
   }
 }

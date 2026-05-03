@@ -52,6 +52,16 @@
     "error_too_short": "At least 2 characters",
     "error_pick_option": "Pick an option",
     "error_pick_date": "Pick a date",
-    "error_date_range": "Out of allowed range"
+    "error_date_range": "Out of allowed range",
+    "letterhead_title": "Department of Citizen Affairs",
+    "letterhead_subtitle": "Identity Registry",
+    "form_id": "FORM C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Section I · Roster",
+    "section_ii_enrollment": "Section II · Enrollment",
+    "on_record": "{{filled}}/{{total}} on record",
+    "select_a_file_hint": "Select a file",
+    "active_badge": "Active",
+    "file_progress": "File {{current}}/{{total}}"
   }
 }

@@ -1,0 +1,15 @@
+{
+  "ui": {
+    "where_would_you_like_to_start": "Where would you like to start?",
+    "last_location": "Last Location",
+    "confirm": "Confirm",
+    "preset_spawns": "Preset Spawns",
+    "your_houses": "Your Houses",
+    "available_apartments": "Available Apartments",
+    "section_header": "Section I · Departure",
+    "page_title": "Spawn Selector",
+    "letterhead_title": "Field Office",
+    "letterhead_subtitle": "Spawn Coordinator",
+    "form_id": "FORM S-08"
+  }
+}

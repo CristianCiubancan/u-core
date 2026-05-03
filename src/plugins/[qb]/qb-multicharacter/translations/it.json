@@ -47,6 +47,21 @@
     "validating_characters": "Convalido i dati dei personaggi",
     "ran_into_issue": "Abbiamo riscontrato un problema, contatta lo staff",
     "profanity": "Sembra che tu stia usando qualche parola non consentita nella creazione del personaggio!",
-    "forgotten_field": "Tutti i campi devono essere compialti!"
+    "forgotten_field": "Tutti i campi devono essere compialti!",
+    "letterhead_title": "Ufficio Affari Civici",
+    "letterhead_subtitle": "Registro Identità",
+    "form_id": "MODULO C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Sezione I · Elenco",
+    "section_ii_enrollment": "Sezione II · Iscrizione",
+    "on_record": "{{filled}}/{{total}} registrati",
+    "select_a_file_hint": "Seleziona un fascicolo",
+    "active_badge": "Attivo",
+    "file_progress": "Fascicolo {{current}}/{{total}}",
+    "error_required": "Richiesto",
+    "error_too_short": "Almeno 2 caratteri",
+    "error_pick_option": "Seleziona un'opzione",
+    "error_pick_date": "Seleziona una data",
+    "error_date_range": "Fuori intervallo consentito"
   }
 }

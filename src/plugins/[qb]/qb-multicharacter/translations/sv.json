@@ -47,6 +47,21 @@
     "validating_characters": "Validerar karaktärer",
     "ran_into_issue": "Vi stötte på ett problem",
     "profanity": "Du verkar ha försökt använda någon sorts svordom eller fult ord i ditt namn eller nationalitet!",
-    "forgotten_field": "Det verkar som att du glömt fylla i någon utav fälten!"
+    "forgotten_field": "Det verkar som att du glömt fylla i någon utav fälten!",
+    "letterhead_title": "Folkbokföringen",
+    "letterhead_subtitle": "Identitetsregister",
+    "form_id": "FORMULÄR C–07",
+    "rev": "rev. {{year}}",
+    "section_i_roster": "Avsnitt I · Förteckning",
+    "section_ii_enrollment": "Avsnitt II · Registrering",
+    "on_record": "{{filled}}/{{total}} registrerade",
+    "select_a_file_hint": "Välj en akt",
+    "active_badge": "Aktiv",
+    "file_progress": "Akt {{current}}/{{total}}",
+    "error_required": "Obligatorisk",
+    "error_too_short": "Minst 2 tecken",
+    "error_pick_option": "Välj ett alternativ",
+    "error_pick_date": "Välj ett datum",
+    "error_date_range": "Utanför tillåtet intervall"
   }
 }

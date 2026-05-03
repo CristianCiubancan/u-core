@@ -47,6 +47,21 @@
     "validating_characters": "Charaktere werden überprüft",
     "ran_into_issue": "Wir haben ein Problem festgestellt",
     "profanity": "Es scheint, als würdest du versuchen, Schimpfwörter oder unangemessene Begriffe in deinem Namen oder deiner Nationalität zu verwenden!",
-    "forgotten_field": "Es scheint, als hättest du eines oder mehrere Felder vergessen auszufüllen!"
+    "forgotten_field": "Es scheint, als hättest du eines oder mehrere Felder vergessen auszufüllen!",
+    "letterhead_title": "Bürgeramt",
+    "letterhead_subtitle": "Personenstandsregister",
+    "form_id": "FORMULAR C–07",
+    "rev": "Rev. {{year}}",
+    "section_i_roster": "Abschnitt I · Verzeichnis",
+    "section_ii_enrollment": "Abschnitt II · Anmeldung",
+    "on_record": "{{filled}}/{{total}} erfasst",
+    "select_a_file_hint": "Datei auswählen",
+    "active_badge": "Aktiv",
+    "file_progress": "Akte {{current}}/{{total}}",
+    "error_required": "Erforderlich",
+    "error_too_short": "Mindestens 2 Zeichen",
+    "error_pick_option": "Bitte auswählen",
+    "error_pick_date": "Datum wählen",
+    "error_date_range": "Außerhalb des Bereichs"
   }
 }
