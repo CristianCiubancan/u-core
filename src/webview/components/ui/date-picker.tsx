@@ -70,7 +70,10 @@ const DatePicker = ({
             <CalendarIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-3" align="end">
+        <PopoverContent
+          className="w-[clamp(280px,28vw,340px)] p-3"
+          align="end"
+        >
           {/* captionLayout left as default ("label") because the dropdown
               variant overlays month/year <select>s on top of the static
               caption — looked like duplicated text. Users navigate via
