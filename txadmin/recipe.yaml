@@ -77,7 +77,7 @@ tasks:
   - action: download_github
     dest: ./resources/[standalone]/screenshot-basic
     ref: master
-    src: https://github.com/citizenfx/screenshot-basic
+    src: https://github.com/CristianCiubancan/screenshot-basic
 
   - action: download_github
     dest: ./resources/[standalone]/progressbar
