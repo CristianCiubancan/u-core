@@ -80,3 +80,6 @@ asset-server/original/*
 
 # Screenshots dropped into the working tree for issue reports.
 Screenshot*.png
+image.png
+image*.png
+*.screenshot.png
