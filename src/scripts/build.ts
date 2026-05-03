@@ -502,6 +502,32 @@ class PluginBuilder {
         );
         const classification = classify(plugin.fullPath, absolutePath);
         queueRebuild(plugin, classification);
+
+        // Tailwind's content glob (in src/webview/theme/tailwind.config.ts)
+        // covers all of src/**, but the compiled CSS lives only in the
+        // shared vendor bundle. When a consumer plugin's html/ changes,
+        // its main.js may reference Tailwind utilities that aren't yet
+        // baked into _shared/html/style.css — utilities then resolve to
+        // nothing and the card visibly fails to apply. Queue a _shared
+        // rebuild alongside the consumer rebuild so its style.css picks
+        // up any new class usages.
+        if (
+          classification.needsVite &&
+          !this.fileManager.getPluginsByName('_shared').some(
+            (p) => p.fullPath === plugin.fullPath
+          )
+        ) {
+          const sharedPlugins = this.fileManager.getPluginsByName('_shared');
+          for (const shared of sharedPlugins) {
+            const existing = rebuildQueue.get(shared.fullPath) ?? {
+              pluginPath: shared.fullPath,
+              viteRebuild: false,
+              manifestReload: false,
+            };
+            existing.viteRebuild = true;
+            rebuildQueue.set(shared.fullPath, existing);
+          }
+        }
       }
     };
 
