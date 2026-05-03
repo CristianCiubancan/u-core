@@ -931,14 +931,19 @@ class BuildManager {
       '<head>',
       '  <meta charset="utf-8">',
       `  <title>${title}</title>`,
-      '  <link rel="stylesheet" href="https://cfx-nui-_shared/style.css">',
+      // Paths under cfx-nui-_shared/ resolve relative to the _shared
+      // resource root, and the manifest's `files{}` block exposes both
+      // assets under html/. Without that prefix the browser gets 404s
+      // and qb-multicharacter throws ReferenceError on the first vendor
+      // global (because window.React etc never got assigned).
+      '  <link rel="stylesheet" href="https://cfx-nui-_shared/html/style.css">',
       ...(hasPluginCss
         ? ['  <link rel="stylesheet" href="./style.css">']
         : []),
       '</head>',
       '<body>',
       '  <div id="root"></div>',
-      '  <script src="https://cfx-nui-_shared/_shared.js"></script>',
+      '  <script src="https://cfx-nui-_shared/html/_shared.js"></script>',
       '  <script src="./main.js"></script>',
       '</body>',
       '</html>',
