@@ -12,10 +12,12 @@
 
 import { QBCore } from './qbcore';
 import { installFunctions } from './functions';
+import { installPlayer } from './player';
 
-// Replace the throw-on-call Functions stubs from qbcore.ts with the
-// real implementations from functions.ts.
+// Replace the throw-on-call Functions / Player stubs from qbcore.ts
+// with the real implementations.
 installFunctions(QBCore);
+installPlayer(QBCore);
 
 /**
  * Mirror of upstream main.lua's `GetCoreObject(filters)`. With no
@@ -66,5 +68,5 @@ console.log(
   }, Locations=${Object.keys(QBCore.Shared.Locations).length}.`
 );
 console.log(
-  '^3[qb-core]^7 Phase 2b running. Functions wired; Player/Commands still stubbed pending Phase 2c/d.'
+  '^3[qb-core]^7 Phase 2c running. Functions + Player wired; Commands still stubbed pending Phase 2d.'
 );
