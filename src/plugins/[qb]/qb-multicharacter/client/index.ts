@@ -176,6 +176,10 @@ onNet('qb-multicharacter:client:closeNUIdefault', async () => {
 onNet('qb-multicharacter:client:closeNUI', () => {
   destroyPed();
   SetNuiFocus(false, false);
+  // The original Lua relied on the apartments/spawn UI overlapping us
+  // to hide the multicharacter view. Our React shell stays mounted on
+  // top until told otherwise, so explicitly tell it to disappear.
+  SendNUIMessage({ action: 'ui', toggle: false });
 });
 
 onNet('qb-multicharacter:client:chooseChar', async () => {
