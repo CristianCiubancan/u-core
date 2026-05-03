@@ -5,6 +5,7 @@
   "games": ["gta5"],
   "lua54": true,
   "author": "u-core (TS port of qbcore-framework/qb-core)",
-  "description": "WIP port of qb-core. Phase 1 (shared data) only — no exports wired yet. The `-port-wip` suffix keeps this from claiming the `qb-core` resource name while upstream is still authoritative; we rename to plain `qb-core` and patch the txAdmin recipe once Phase 2/3 land the runtime code.",
+  "description": "WIP port of qb-core. Phase 2a: Shared data wiring + GetCoreObject exports. The `-port-wip` suffix keeps this from claiming the `qb-core` resource name while upstream is still authoritative; we rename to plain `qb-core` and patch the txAdmin recipe once Phase 2b/c land the runtime code.",
+  "server_scripts": ["server/*.js"],
   "dependencies": ["oxmysql"]
 }
