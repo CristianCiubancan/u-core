@@ -148,10 +148,10 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-adminmenu
 
-  - action: download_github
-    dest: ./resources/[qb]/qb-multicharacter
-    ref: main
-    src: https://github.com/qbcore-framework/qb-multicharacter
+  # qb-multicharacter is rewritten as a u-core plugin; the build pipeline
+  # emits it to [GENERATED]/[qb]/qb-multicharacter on `pnpm build`. The
+  # upstream qbcore-framework/qb-multicharacter download is intentionally
+  # absent so FXServer doesn't double-register the resource.
 
   - action: download_github
     dest: ./resources/[qb]/qb-target
