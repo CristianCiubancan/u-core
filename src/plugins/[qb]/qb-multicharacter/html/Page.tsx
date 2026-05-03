@@ -9,6 +9,7 @@ import {
   Trash2,
   Plus,
   X,
+  Loader2,
 } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
@@ -829,6 +830,36 @@ function RegisterPanel({
     (key: 'nationality' | 'gender') => (open: boolean) =>
       setOpenSelect(open ? key : (cur) => (cur === key ? null : cur));
 
+  // Two-stage mount for the nationality dropdown. The list has ~200
+  // items — mounting them all in the same frame as the open transition
+  // means the user clicks the trigger and waits ~100ms staring at the
+  // closed trigger before the dropdown appears already-populated.
+  // Instead: open paints a spinner first (cheap), then a queued frame
+  // later we flip ready=true and React mounts the actual items. The
+  // dropdown opens instantly with a loading state, and the items pop
+  // in once the heavy work runs. CSS spin animation runs on the
+  // compositor so it stays smooth even while React is busy mounting.
+  const [nationalityReady, setNationalityReady] = useState(false);
+  useEffect(() => {
+    if (openSelect !== 'nationality') {
+      setNationalityReady(false);
+      return;
+    }
+    // First rAF puts the spinner on screen; second rAF defers the
+    // item mount to the frame after the spinner has actually painted.
+    // One rAF alone often isn't enough — React's commit and the
+    // browser's paint can land in the same frame, so the second rAF
+    // is a guarantee, not paranoia.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setNationalityReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      if (inner) cancelAnimationFrame(inner);
+    };
+  }, [openSelect]);
+
   // Memoize the SelectItem element arrays. Without this, every keystroke
   // re-renders RegisterPanel, which re-evaluates the JSX inside each
   // <SelectContent>{...} — that's ~200 React.createElement calls for the
@@ -971,7 +1002,20 @@ function RegisterPanel({
                 >
                   <SelectValue placeholder={t('ui.nationality')} />
                 </SelectTrigger>
-                <SelectContent>{nationalityItems}</SelectContent>
+                <SelectContent>
+                  {nationalityReady ? (
+                    nationalityItems
+                  ) : (
+                    <div
+                      className="flex items-center justify-center gap-2 py-6 font-mono text-[9.5px] tracking-[0.3em] uppercase text-muted-foreground/70"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading</span>
+                    </div>
+                  )}
+                </SelectContent>
               </Select>
             </Field>
           )}
