@@ -20,7 +20,6 @@ import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime';
 import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 import * as ReactI18Next from 'react-i18next';
-import * as I18Next from 'i18next';
 import i18nextInstance from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -46,7 +45,7 @@ declare global {
     ReactDOM: typeof ReactDOM;
     ReactDOMClient: typeof ReactDOMClient;
     ReactI18Next: typeof ReactI18Next;
-    I18Next: typeof I18Next;
+    I18Next: typeof i18nextInstance;
   }
 }
 
@@ -56,4 +55,13 @@ window.ReactJSXDevRuntime = ReactJSXDevRuntime;
 window.ReactDOM = ReactDOM;
 window.ReactDOMClient = ReactDOMClient;
 window.ReactI18Next = ReactI18Next;
-window.I18Next = I18Next;
+// i18next is unique among the externalized vendors: its default export
+// is the singleton (with init/addResourceBundle/t/etc. methods); the
+// namespace is just `{ default: singleton, ...types }`. Rollup's IIFE
+// externalization for `import i18n from 'i18next'` reads the global
+// directly — `globals: { i18next: 'I18Next' }` resolves to window.I18Next
+// without a `.default` access. So we have to park the SINGLETON here,
+// not the namespace, or every consumer's `i18n.addResourceBundle(...)`
+// throws TypeError. React/ReactDOM/etc. work as namespaces because their
+// top-level functions live ON the namespace, not on `.default`.
+window.I18Next = i18nextInstance;
