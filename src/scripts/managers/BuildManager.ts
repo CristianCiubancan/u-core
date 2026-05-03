@@ -1282,6 +1282,13 @@ class BuildManager {
           this.production ? 'production' : 'development'
         ),
       };
+      // shadcn-style path alias `@/*` → src/webview/*. Mirrors what
+      // tsconfig.webview.json declares so consumer bundles can use the
+      // standard shadcn import paths at runtime as well as during type
+      // check.
+      const resolveAlias = {
+        '@': path.resolve('src/webview'),
+      };
       const config: InlineConfig =
         style === 'consumer'
           ? {
@@ -1290,6 +1297,7 @@ class BuildManager {
               logLevel: 'warn',
               plugins: [pluginPageEntry(), react()],
               define,
+              resolve: { alias: resolveAlias },
               build: {
                 outDir: outputDir,
                 emptyOutDir: true,
@@ -1320,6 +1328,7 @@ class BuildManager {
               plugins: [pluginPageEntry(), react()],
               root: path.resolve('src'),
               define,
+              resolve: { alias: resolveAlias },
               build: {
                 outDir: outputDir,
                 emptyOutDir: true,

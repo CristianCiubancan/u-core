@@ -7,6 +7,19 @@ export function hexToRgb(hex: string): string {
     .join(", ");
 }
 
+/**
+ * Hex → "r g b" triplet without commas. shadcn's CSS variable
+ * convention so Tailwind opacity modifiers (`bg-primary/50`) can
+ * compose into `rgb(var(--primary) / 0.5)`.
+ */
+export function hexToRgbTriplet(hex: string): string {
+  return hex
+    .replace("#", "")
+    .match(/.{2}/g)!
+    .map((h) => parseInt(h, 16))
+    .join(" ");
+}
+
 export function getContrastRatio(color1: string, color2: string): number {
   function getLuminance(hexColor: string): number {
     const rgb = hexColor

@@ -13,6 +13,7 @@ import { generateAccessibleTextUtilities } from './utils/accessibleTextUtils';
 import { generateThemedScrollbarStyles } from './utils/scrollbarThemeUtils';
 import { generateSafelist } from './utils/safelistUtils';
 import { generateDossierComponents } from './utils/dossierUtils';
+import { generateShadcnTokens } from './utils/shadcnTokens';
 import { hexToRgb, getContrastRatio } from '../utils/colorUtils';
 
 const tailwindConfig: Config = {
@@ -31,6 +32,50 @@ const tailwindConfig: Config = {
       colors: {
         brand: brandPalette,
         gray: grayPalette,
+
+        // shadcn-style semantic tokens. Values come from the
+        // generateShadcnTokens plugin below. The
+        // `rgb(var(--token) / <alpha-value>)` form lets utilities like
+        // `bg-primary/50` keep working.
+        background: 'rgb(var(--background) / <alpha-value>)',
+        foreground: 'rgb(var(--foreground) / <alpha-value>)',
+        card: {
+          DEFAULT: 'rgb(var(--card) / <alpha-value>)',
+          foreground: 'rgb(var(--card-foreground) / <alpha-value>)',
+        },
+        popover: {
+          DEFAULT: 'rgb(var(--popover) / <alpha-value>)',
+          foreground: 'rgb(var(--popover-foreground) / <alpha-value>)',
+        },
+        primary: {
+          DEFAULT: 'rgb(var(--primary) / <alpha-value>)',
+          foreground: 'rgb(var(--primary-foreground) / <alpha-value>)',
+        },
+        secondary: {
+          DEFAULT: 'rgb(var(--secondary) / <alpha-value>)',
+          foreground: 'rgb(var(--secondary-foreground) / <alpha-value>)',
+        },
+        muted: {
+          DEFAULT: 'rgb(var(--muted) / <alpha-value>)',
+          foreground: 'rgb(var(--muted-foreground) / <alpha-value>)',
+        },
+        accent: {
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          foreground: 'rgb(var(--accent-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'rgb(var(--destructive) / <alpha-value>)',
+          foreground: 'rgb(var(--destructive-foreground) / <alpha-value>)',
+        },
+        border: 'rgb(var(--border) / <alpha-value>)',
+        input: 'rgb(var(--input) / <alpha-value>)',
+        ring: 'rgb(var(--ring) / <alpha-value>)',
+      },
+      borderRadius: {
+        // shadcn's radius scale anchored to --radius.
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
         'glass': `0 4px 30px rgba(${hexToRgb(grayPalette[900])}, 0.1)`,
@@ -91,6 +136,18 @@ const tailwindConfig: Config = {
       // Use double assertion to satisfy the type checker
       addUtilities(
         generateMergedGlassClasses(
+          grayPalette,
+          brandPalette
+        ) as unknown as CSSRuleObject
+      );
+    },
+
+    // shadcn semantic CSS variables on :root, generated from the active
+    // palettes. Wired as `addBase` so they sit in Tailwind's base layer
+    // and don't fight with utility specificity.
+    function ({ addBase }: PluginAPI) {
+      addBase(
+        generateShadcnTokens(
           grayPalette,
           brandPalette
         ) as unknown as CSSRuleObject

@@ -29,7 +29,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* shadcn-style path alias. `@/` resolves to src/webview so that
+       components written against the upstream shadcn templates can use
+       `@/components/ui/...` and `@/lib/utils` import paths verbatim. */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/webview/*"]
+    }
   },
   "include": [
     "src/webview/**/*",
