@@ -648,11 +648,13 @@ function CharactersPanel({
         ))}
       </div>
 
-      {/* min-h-10 keeps the footer at button-height even when only the
-          "Select a file" hint is shown. Without it, the footer collapses
-          to ~text-height when no slot is selected and grows by ~15px
-          when a slot becomes selected, jumping the rest of the panel. */}
-      <footer className="flex items-center justify-end gap-2 pt-3 mt-3 min-h-10 border-t border-gray-800/60">
+      {/* The "Select a file" hint mirrors a Button's box exactly:
+          same px-3 py-1.5, same text-[10px] tracking-[0.25em], same
+          1px bottom border (transparent here so it doesn't read as a
+          tappable affordance). With both states sharing the same
+          intrinsic size, the footer's natural height is identical
+          whether actions or the hint render — no UI jump on select. */}
+      <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
         {showActions ? (
           <>
             <Button onClick={onPlay}>
@@ -667,7 +669,7 @@ function CharactersPanel({
             )}
           </>
         ) : (
-          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-500 uppercase">
+          <span className="inline-flex items-center px-3 py-1.5 border-b border-transparent font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground/70">
             Select a file
           </span>
         )}
@@ -1066,7 +1068,7 @@ function RegisterPanel({
           />
         </div>
 
-        <footer className="flex items-center justify-end gap-2 pt-3 mt-4 border-t border-gray-800/60">
+        <footer className="flex items-center justify-end gap-2 pt-3 mt-4 min-h-12 border-t border-gray-800/60">
           <Button
             type="button"
             variant="secondary"

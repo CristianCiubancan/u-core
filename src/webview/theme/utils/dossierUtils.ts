@@ -50,14 +50,17 @@ export function generateDossierComponents(
     // most visible on the *last* paper in a column where there's no
     // sibling to absorb the halo. The hairline border + backdrop-blur
     // already give enough separation from the live game scene.
+    // FiveM's CEF build does not reliably render `backdrop-filter`
+    // (the frosted-glass effect was being silently dropped), so the
+    // paper relies purely on `rgba()` alpha to be translucent. The
+    // alpha sits between 0.5 and 0.7 — high enough that body text
+    // stays legible against busy in-game scenes, low enough that the
+    // world clearly shows through. If the bg ever needs more frost,
+    // re-introduce backdrop-filter behind a feature query, not as a
+    // baseline.
     '.dossier-paper': {
       position: 'relative',
-      // 0.3 alpha (not 0.5) because zinc-950 is near-black; 50% blend
-      // with a dark game scene still reads as mostly opaque. 0.3 lets
-      // the scene show through enough to register as translucent.
-      backgroundColor: `rgba(${grayRgb(950)}, 0.3)`,
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
+      backgroundColor: `rgba(${grayRgb(950)}, 0.85)`,
       borderWidth: '1px',
       borderStyle: 'solid',
       borderColor: `rgba(${grayRgb(800)}, 0.6)`,
