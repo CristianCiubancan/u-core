@@ -625,7 +625,7 @@ function CharactersPanel({
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
               Section I · Roster
             </p>
-            <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
+            <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
               {t('ui.characters_header')}
             </h2>
           </div>
@@ -924,7 +924,7 @@ function RegisterPanel({
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
               Section II · Enrollment
             </p>
-            <h2 className="font-display text-xl font-light leading-none text-gray-100 mt-1.5 truncate">
+            <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
               {t('ui.chardel_header')}
             </h2>
           </div>
@@ -1017,7 +1017,19 @@ function RegisterPanel({
                       : undefined
                   }
                 >
-                  <SelectValue placeholder={t('ui.nationality')} />
+                  {/* Pass `children` so Radix bypasses its
+                      SelectItemText portal mechanism for the trigger
+                      label. The portal only lives while the matching
+                      <SelectItem> is mounted; our deferred-mount
+                      spinner unmounts the items between picks, which
+                      makes the portal disappear and the trigger fall
+                      back to the placeholder. Rendering the value as
+                      children sets `valueNodeHasChildren=true` and
+                      Radix uses our text directly. Works because
+                      label === value for nationalities. */}
+                  <SelectValue placeholder={t('ui.nationality')}>
+                    {data.nationality || undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {nationalityReady ? (
