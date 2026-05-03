@@ -2,15 +2,21 @@
    first via cfx-nui-_shared/style.css, so anything here is intentionally
    small and additive. */
 
+/* Make the root html/body transparent so the in-game camera (skyCam
+   stages a preview ped at the interior) shows through behind the card.
+   CEF's NUI default is opaque, so we have to be explicit. */
+html,
+body {
+  background: transparent !important;
+}
+
 .qbm-root {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 10, 18, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* No background here — the game/skyCam scene fills the whole viewport. */
 }
 
 .qbm-card {
