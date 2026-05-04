@@ -2263,12 +2263,31 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
-      // Define the extensions that are already handled by other methods
-      const handledExtensions = ['.lua', '.json', '.ts', '.js', '.tsx', '.jsx'];
-
-      // Filter files that don't have handled extensions
+      // What gets copied as "other":
+      //   - .lua / .json have dedicated build steps (buildPluginLua /
+      //     buildPluginJson) — skip here, they're already handled.
+      //   - .ts / .tsx are bundling sources — never copy raw.
+      //   - .js / .jsx are bundled IF the manifest declares them in
+      //     *_scripts (then buildPluginJs writes the bundle); otherwise
+      //     they're plain assets (e.g. NUI `html/js/*.js` referenced from
+      //     `<script src>` tags) and MUST be copied here. Excluding them
+      //     unconditionally — as a previous version did — silently dropped
+      //     qb-core's NUI scripts, leaving every SendNUIMessage with no
+      //     listener: no toasts, no DrawText popup.
+      const scriptedJsPaths = new Set(
+        this.getScriptEntries(plugin).map((e) => e.file.fullPath)
+      );
+      const isHandledElsewhere = (file: File): boolean => {
+        const fn = file.fileName;
+        if (fn.endsWith('.lua') || fn.endsWith('.json')) return true;
+        if (fn.endsWith('.ts') || fn.endsWith('.tsx')) return true;
+        if (fn.endsWith('.js') || fn.endsWith('.jsx')) {
+          return scriptedJsPaths.has(file.fullPath);
+        }
+        return false;
+      };
       const otherFiles = plugin.files.filter(
-        (file) => !handledExtensions.some((ext) => file.fileName.endsWith(ext))
+        (file) => !isHandledElsewhere(file)
       );
 
       for (const file of otherFiles) {

@@ -338,8 +338,13 @@ export function installEvents(QBCore: QBCoreShape): void {
   });
 
   // ---------- Vehicle base-events relay ----------
+  // baseevents fires these client→server via TriggerServerEvent, so the
+  // server listener MUST register them as net-safe. Upstream's events.lua
+  // uses RegisterNetEvent + AddEventHandler; in CFX JS, `onNet` is the
+  // equivalent. Using plain `on()` left these unregistered for net and
+  // every client transition logged "Event ... was not safe for net".
 
-  on(
+  onNet(
     'baseevents:enteringVehicle',
     (veh: number, seat: number, modelName: string) => {
       const src = (global as any).source as number;
@@ -352,7 +357,7 @@ export function installEvents(QBCore: QBCoreShape): void {
     }
   );
 
-  on(
+  onNet(
     'baseevents:enteredVehicle',
     (veh: number, seat: number, modelName: string) => {
       const src = (global as any).source as number;
@@ -365,12 +370,12 @@ export function installEvents(QBCore: QBCoreShape): void {
     }
   );
 
-  on('baseevents:enteringAborted', () => {
+  onNet('baseevents:enteringAborted', () => {
     const src = (global as any).source as number;
     emitNet('QBCore:Client:AbortVehicleEntering', src);
   });
 
-  on(
+  onNet(
     'baseevents:leftVehicle',
     (veh: number, seat: number, modelName: string) => {
       const src = (global as any).source as number;

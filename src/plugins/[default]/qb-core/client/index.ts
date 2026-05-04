@@ -12,7 +12,8 @@ import { installClientDrawText } from './drawtext';
 installClientFunctions(QBCore);
 installClientEvents(QBCore);
 installClientLoops(QBCore);
-installClientDrawText();
+// installClientDrawText() runs LATER, after the auto-export-all-Functions
+// loop below — see the comment above that loop for why order matters here.
 
 function GetCoreObject(filters?: string[]): unknown {
   if (!filters || !Array.isArray(filters) || filters.length === 0) {
@@ -34,7 +35,7 @@ const exportFn = (globalThis as any).exports as (
 // (`return a, b`). Our TS port returns `[a, b]` — a JS array — which
 // crosses the JS→Lua FFI as a single Lua table, NOT as multi-returns.
 // We expose these only under `_<Name>_Internal` from JS; the public
-// name is registered by `client/zz_compat.lua` with a wrapper that
+// name is registered by `shared/compat.lua` with a wrapper that
 // unpacks the array into Lua multi-returns. Same shim also patches
 // `core.Functions[name]` inside `GetCoreObject`'s return.
 const MULTI_RETURN_FNS = new Set([
@@ -58,6 +59,9 @@ exportFn(
     (QBCore.Shared as Record<string, Record<string, unknown>>)[namespace]?.[item]
 );
 
+// Auto-export every QBCore.Functions member (mirrors upstream
+// client/functions.lua's `for functionName, func in pairs(QBCore.Functions)
+// do exports(functionName, func) end` at the file's tail).
 for (const [name, fn] of Object.entries(
   QBCore.Functions as Record<string, unknown>
 )) {
@@ -68,6 +72,17 @@ for (const [name, fn] of Object.entries(
     exportFn(name, fn);
   }
 }
+
+// MUST run AFTER the auto-loop above. `QBCore.Functions.DrawText` is the
+// game-native 2D text helper (10 numeric args); `exports['qb-core']:DrawText`
+// must be the NUI corner overlay (text, position). Both share a name, so
+// last-wins decides — and the NUI version must win. Upstream resolves this
+// the same way: client/functions.lua runs the auto-loop, then client/drawtext.lua
+// runs LAST in client_scripts and overwrites with the NUI variant. Calling
+// installClientDrawText() before the loop (an earlier mistake) inverted the
+// order and left every `exports['qb-core']:DrawText('text', 'left')` calling
+// the game-native function with mismatched arg types — nothing visible.
+installClientDrawText();
 
 console.log(
   `^2[qb-core]^7 client port loaded. Functions registered: ${

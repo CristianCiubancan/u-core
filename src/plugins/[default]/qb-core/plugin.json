@@ -6,9 +6,9 @@
   "lua54": true,
   "author": "u-core (TS port of qbcore-framework/qb-core)",
   "description": "u-core TS port of qb-core. Server: Functions/Player/Events/Exports/Debug/Lang. Client: Functions/Events/Loops/DrawText/Lang. Vehicle-properties getters/setters cover the core fields only (model/plate/health/fuel/dirt/colors). Locale system ships the Locale class + the en.lua phrase tree; downstream consumers reach phrases via QBCore.Lang.t(key, subs) on either side. Replaces the upstream qbcore-framework/qb-core download in the txAdmin recipe — see txadmin/recipe.yaml.",
-  "client_scripts": ["client/*.js", "client/zz_compat.lua"],
-  "server_scripts": ["server/*.js", "server/zz_compat.lua"],
-  "shared_scripts": ["shared/locale.lua"],
+  "client_scripts": ["client/*.js"],
+  "server_scripts": ["server/*.js"],
+  "shared_scripts": ["shared/compat.lua", "shared/locale.lua"],
   "ui_page": "html/index.html",
   "files": [
     "html/index.html",

@@ -58,7 +58,7 @@ const exportFn = (globalThis as any).exports as (name: string, fn: unknown) => v
 // (`return a, b`). Our TS port returns `[a, b]` — a JS array — which
 // crosses the JS→Lua FFI as a single Lua table, NOT as multi-returns.
 // We expose these only under `_<Name>_Internal` from JS; the public
-// name is registered by `server/zz_compat.lua` with a wrapper that
+// name is registered by `shared/compat.lua` with a wrapper that
 // unpacks the array into Lua multi-returns. Same shim also patches
 // `core.Functions[name]` inside `GetCoreObject`'s return.
 const MULTI_RETURN_FNS = new Set([
