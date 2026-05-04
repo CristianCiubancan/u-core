@@ -49,54 +49,30 @@ Two extra wrinkles:
 
 ---
 
-## Tier 2 — open question (inherited upstream bug)
+## Tier 2 — fixed (server-side gate, preserves upstream apartment-ownership invariant)
 
-### 3. `spawnLastLocation` does nothing for SkipSelection players who don't own an apartment
+### 3. `spawnLastLocation` soft-locks SkipSelection players who don't own an apartment — ✅ FIXED
 
-**Location:** `src/plugins/[qb]/qb-multicharacter/client/index.ts:244-281`. Specifically `if (!result) return;` at line 250 inside the `apartments:GetOwnedApartment` callback.
+**Trigger:** `Config.SkipSelection = true` (qb-multicharacter) AND the chosen character has no row in the `apartments` table. Reachable when an admin runs `Apartments.Starting = false` (qb-apartments) so character creation skips apartment acquisition, or whenever an apartment is deleted out-of-band. Owning a `houses` row does NOT save you — the gate only consults `apartments`.
 
-**Trigger:** `Config.SkipSelection = true` AND the chosen character has no `player_houses`/`apartments` ownership row.
+**Symptom:** server fires `qb-multicharacter:client:spawnLastLocation` with the saved coords, the client fires `apartments:GetOwnedApartment`, callback returns `nil`, the entire client handler is wrapped in `if result then ... end` so it bails. Player is left at `Config.HiddenCoords` (the kitchen interior) with a black screen — `DoScreenFadeIn(250)`, `QBCore:Server:OnPlayerLoaded`, and `QBCore:Client:OnPlayerLoaded` are *all* inside the bail-out, so no recovery and no other resource initializes either. Soft-lock persists across reconnects.
 
-**Symptom:** server fires `qb-multicharacter:client:spawnLastLocation` with the saved coords, the client fires the `apartments:GetOwnedApartment` callback, the callback returns `nil`, the entire spawn handler bails out. Player is left at `Config.HiddenCoords` behind a black screen with no recovery.
+**Upstream status:** identical bail at `tmp/qb-multicharacter-upstream/client/main.lua:139-169`. Not a port-introduced regression.
 
-**Upstream status:** identical bug at `tmp/qb-multicharacter-upstream/client/main.lua:140-168`. Whole spawn block is wrapped in `if result then ... end`. Not a port-introduced regression.
+**Why the upstream client gate isn't arbitrary defensiveness** — `tmp/qb-apartments-upstream/client/main.lua:573-590`'s `apartments:client:setupSpawnUI` (the sister flow used by **non**-SkipSelection) explicitly handles the no-apartment case by routing into the spawn UI: Apartments.Starting=true → spawn UI in `isNew=true` mode with apartment options, Apartments.Starting=false → basic spawn UI. SkipSelection presumes valid apartment context. The saved coords are unsafe to trust without ownership: `insideMeta.apartment.apartmentId` can hold a non-owned apartment (visiting via doorbell + DC), and `qb-apartments:client:LastLocationHouse` would re-enter that interior without an ownership check.
 
-**Why the apartments callback gates spawn at all:** the original intent appears to be "restore the player to the apartment interior they were in when they disconnected." But the callback's `if result then` short-circuits the basic "teleport to saved coords" path too, which is the fallback that should always work.
+**Why an "always teleport client-side" deviation was the wrong call** — initial proposal was to drop the `if result then` gate and unconditionally teleport to coords. Three things this breaks:
+1. Coords for a player who DC'd inside someone else's apartment are *interior coords*; teleporting to those drops the player into a foreign apartment instance in the wrong routing bucket.
+2. `qb-apartments:client:LastLocationHouse` ungated re-enters that interior (no ownership check on the receiving end).
+3. Both expand the visiting-on-relog access leak that upstream contains via the at-least-one-apartment gate.
 
-**Proposed fix (deviates from upstream):**
-```ts
-QBCore.Functions.TriggerCallback('apartments:GetOwnedApartment', (result) => {
-  if (result) {
-    emit('apartments:client:SetHomeBlip', result.type);
-  }
-  // Always teleport to saved coords — interior restore is a refinement,
-  // not a precondition.
-  const ped = PlayerPedId();
-  SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, true);
-  SetEntityHeading(ped, coords.w);
-  FreezeEntityPosition(ped, false);
-  SetEntityVisible(ped, true, false);
+**Fix shape (shipped):** server-side gate in `qb-multicharacter:server:loadUserData`. When `Config.SkipSelection=true`, a `SELECT name FROM apartments WHERE citizenid = ? LIMIT 1` decides the route:
+- Has an apartment → fire `spawnLastLocation` (upstream behavior, client gate stays untouched).
+- No apartment → fall through to the SAME `apartments:client:setupSpawnUI` / `qb-spawn:client:setupSpawns` path that non-SkipSelection uses. That path's existing `apartments:client:setupSpawnUI` callback handles Apartments.Starting=true vs false branching correctly.
 
-  const insideMeta = QBCore.Functions.GetPlayerData().metadata.inside;
-  DoScreenFadeOut(500);
-  if (insideMeta?.house) {
-    emit('qb-houses:client:LastLocationHouse', insideMeta.house);
-  } else if (insideMeta?.apartment?.apartmentType && insideMeta?.apartment?.apartmentId) {
-    emit(
-      'qb-apartments:client:LastLocationHouse',
-      insideMeta.apartment.apartmentType,
-      insideMeta.apartment.apartmentId
-    );
-  }
-  // (no else needed — we already teleported above)
+This preserves the upstream's ownership invariant (no sneaking into apartments via stale coords or stale insideMeta) and removes the soft-lock — players who lack an apartment get a working UI to acquire one (or the basic spawn picker if Apartments.Starting=false) instead of a black screen forever. The `closeNUI` dispatch is hoisted out of the non-SkipSelection branch since the SkipSelection no-apartment fallback also needs the multichar UI gone before qb-spawn opens.
 
-  emitNet('QBCore:Server:OnPlayerLoaded');
-  emit('QBCore:Client:OnPlayerLoaded');
-  setTimeout(() => DoScreenFadeIn(250), 2000);
-}, cData.citizenid);
-```
-
-**Decision needed:** match upstream (do nothing, accept the black-screen edge case) or deviate (always teleport, treat apartments interior as a refinement)? The latter is the correct behavior but is a documented deviation.
+**Files:** `src/plugins/[qb]/qb-multicharacter/server/index.ts:265-322`. Client `spawnLastLocation` handler is intentionally left identical to upstream — it's only ever reached now when ownership exists.
 
 ---
 

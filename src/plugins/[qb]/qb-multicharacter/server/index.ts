@@ -262,28 +262,64 @@ onNet('qb-multicharacter:server:loadUserData', async (cData: any) => {
   QBCore.Commands.Refresh(src);
   await safeLoadHouseData(src);
 
+  // Close qb-multicharacter's NUI BEFORE handing off to apartments/
+  // spawn. Our React webview occupies the same right-column region as
+  // qb-spawn's; if qb-multi stays mounted in its 'loading' state it
+  // overlays qb-spawn and the player sees nothing happen even though
+  // the spawn flow fires correctly.
+  //
+  // The upstream Lua qb-multicharacter doesn't do this — its Vue UI
+  // is small enough not to overlap qb-spawn's top-left panel — but
+  // the upstream-vs-port layout difference means we need the explicit
+  // close here. The createCharacter+apartments path already fires
+  // closeNUI for the same reason.
+  //
+  // Hoisted out of the non-SkipSelection branch because the
+  // SkipSelection no-apartment fallback (added below) also needs the
+  // multichar UI gone before qb-spawn opens.
+  emitNet('qb-multicharacter:client:closeNUI', src);
+
   if (Config.SkipSelection) {
-    const coords = JSON.parse(cData.position);
-    emitNet('qb-multicharacter:client:spawnLastLocation', src, coords, cData);
-  } else {
-    // Close qb-multicharacter's NUI BEFORE handing off to apartments/
-    // spawn. Our React webview occupies the same right-column region
-    // as qb-spawn's; if qb-multi stays mounted in its 'loading' state
-    // it overlays qb-spawn and the player sees nothing happen even
-    // though the spawn flow fires correctly.
+    // Upstream fires `spawnLastLocation` unconditionally here, then the
+    // client wraps everything in `if apartmentResult then ... end`. If
+    // the player has no `apartments` row (reachable when this admin is
+    // running `Apartments.Starting=false`, or whenever an apartment was
+    // deleted out-of-band), the entire spawn block — including the
+    // screen fade-in and the QBCore:(Server|Client):OnPlayerLoaded
+    // events — bails. Soft-lock with a black screen and no recovery
+    // across reconnects.
     //
-    // The upstream Lua qb-multicharacter doesn't do this — its Vue UI
-    // is small enough not to overlap qb-spawn's top-left panel — but
-    // the upstream-vs-port layout difference means we need the
-    // explicit close here. The createCharacter+apartments path
-    // already fires closeNUI for the same reason.
-    emitNet('qb-multicharacter:client:closeNUI', src);
-    if (GetResourceState('qb-apartments') === 'started') {
+    // The upstream client gate isn't arbitrary: SkipSelection presumes
+    // valid apartment context. The saved coords are unsafe to trust
+    // without ownership — they may point at an apartment interior the
+    // player was visiting (insideMeta.apartment can hold a non-owned
+    // apartmentId), and `qb-apartments:client:LastLocationHouse` would
+    // re-enter that interior without an ownership check. So we don't
+    // weaken the client gate; we promote it server-side: only dispatch
+    // spawnLastLocation when ownership exists, and otherwise fall
+    // through to the SAME apartment/spawn UI path that non-SkipSelection
+    // uses. That path's own callback (`apartments:client:setupSpawnUI`,
+    // upstream `qb-apartments/client/main.lua:573-590`) handles the
+    // no-apartment case explicitly: Apartments.Starting=true → offer
+    // apartment choices; Apartments.Starting=false → basic spawn UI.
+    const ownedRows = await query<{ name: string }>(
+      'SELECT name FROM apartments WHERE citizenid = ? LIMIT 1',
+      [cData.citizenid]
+    );
+    if (ownedRows.length > 0) {
+      const coords = JSON.parse(cData.position);
+      emitNet('qb-multicharacter:client:spawnLastLocation', src, coords, cData);
+    } else if (GetResourceState('qb-apartments') === 'started') {
       emitNet('apartments:client:setupSpawnUI', src, cData);
     } else {
       emitNet('qb-spawn:client:setupSpawns', src, cData, false, null);
       emitNet('qb-spawn:client:openUI', src, true);
     }
+  } else if (GetResourceState('qb-apartments') === 'started') {
+    emitNet('apartments:client:setupSpawnUI', src, cData);
+  } else {
+    emitNet('qb-spawn:client:setupSpawns', src, cData, false, null);
+    emitNet('qb-spawn:client:openUI', src, true);
   }
 
   const discord =
