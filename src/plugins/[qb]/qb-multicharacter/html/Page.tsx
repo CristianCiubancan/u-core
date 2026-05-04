@@ -10,6 +10,7 @@ import {
   Plus,
   X,
   Loader2,
+  Languages,
 } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
@@ -85,6 +86,11 @@ interface UiOpenMessage {
 interface SetupCharactersMessage {
   action: 'setupCharacters';
   characters: CharacterRow[];
+}
+
+interface LocaleChangedMessage {
+  action: 'localeChanged';
+  code: string;
 }
 
 const LOADING_STAGES = [
@@ -215,6 +221,17 @@ export default function Page() {
     } else {
       setVisible(isEnvBrowser());
       setScreen('loading');
+    }
+  });
+
+  // Live locale change (player ran `/locale <code>` mid-session, or
+  // any other SetPlayerLocale call landed). qb-core's client-side
+  // forwarder (client/locale.ts) re-broadcasts QBCore:Locale:Changed
+  // as a SendNUIMessage with action='localeChanged'. We re-localize
+  // i18next without a full remount.
+  useNuiEvent<LocaleChangedMessage>('localeChanged', (data) => {
+    if (data?.code && BUNDLES[data.code] && i18n.language !== data.code) {
+      void i18n.changeLanguage(data.code);
     }
   });
 
@@ -522,6 +539,65 @@ export default function Page() {
 }
 
 // ============================================================
+// LocalePicker (small dropdown — sits in the Letterhead's right column)
+// ============================================================
+//
+// Native names so the dropdown reads as the language itself, not a
+// translation of it (a French speaker scanning for `Français` is
+// faster than scanning for `French` if the active locale is en).
+// Module-scoped const so the array reference is stable across renders;
+// SelectContent's children are also memoized into a single JSX array
+// so we don't re-create 15 SelectItem elements every parent re-render
+// (per memory: closed Radix Select still evaluates children).
+const LOCALE_OPTIONS: ReadonlyArray<{ code: string; native: string }> = [
+  { code: 'ar', native: 'العربية' },
+  { code: 'cs', native: 'Čeština' },
+  { code: 'de', native: 'Deutsch' },
+  { code: 'en', native: 'English' },
+  { code: 'es', native: 'Español' },
+  { code: 'fi', native: 'Suomi' },
+  { code: 'fr', native: 'Français' },
+  { code: 'it', native: 'Italiano' },
+  { code: 'ja', native: '日本語' },
+  { code: 'nl', native: 'Nederlands' },
+  { code: 'pt', native: 'Português' },
+  { code: 'pt-br', native: 'Português (BR)' },
+  { code: 'sv', native: 'Svenska' },
+  { code: 'tr', native: 'Türkçe' },
+  { code: 'vi', native: 'Tiếng Việt' },
+];
+
+const LOCALE_OPTION_NODES = LOCALE_OPTIONS.map((opt) => (
+  <SelectItem key={opt.code} value={opt.code}>
+    {opt.native}
+  </SelectItem>
+));
+
+function LocalePicker() {
+  // Source the active value from i18n.language (already kept in sync
+  // with the server via the localeChanged useNuiEvent at the top of
+  // CharacterMenu). On change, fire-and-forget to the client; the
+  // visual flip happens when the round-trip's QBCore:Locale:Changed
+  // echo lands and triggers i18n.changeLanguage there.
+  const { i18n } = useTranslation(NAMESPACE);
+  const handleChange = (code: string): void => {
+    void fetchNui('setLocale', { code });
+  };
+  return (
+    <Select value={i18n.language} onValueChange={handleChange}>
+      <SelectTrigger
+        className="h-7 px-2 gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase border-gray-700 text-gray-300 hover:text-gray-100 hover:border-gray-500 bg-transparent"
+        aria-label="Language"
+      >
+        <Languages className="w-3 h-3 shrink-0" aria-hidden />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>{LOCALE_OPTION_NODES}</SelectContent>
+    </Select>
+  );
+}
+
+// ============================================================
 // Letterhead (its own paper, compact)
 // ============================================================
 
@@ -534,28 +610,29 @@ function Letterhead() {
   const { t } = useTranslation(NAMESPACE);
   return (
     <Paper className="px-5 py-4 shrink-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
-            {t('ui.letterhead_title', {
-              defaultValue: 'Department of Citizen Affairs',
-            })}
-          </p>
-          <h1 className="font-display text-[1.6rem] font-light leading-tight mt-1.5 text-gray-50">
-            {t('ui.letterhead_subtitle', { defaultValue: 'Identity Registry' })}
-          </h1>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="font-mono text-[8.5px] tracking-[0.3em] text-gray-500 uppercase">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
+          {t('ui.letterhead_title', { defaultValue: 'Department of Citizen Affairs' })}
+        </p>
+        <div className="flex items-baseline gap-2 shrink-0 font-mono text-[8.5px]">
+          <span className="tracking-[0.3em] text-gray-500 uppercase">
             {t('ui.form_id', { defaultValue: 'FORM C–07' })}
-          </p>
-          <p className="font-mono text-[8.5px] text-gray-600 mt-0.5">
+          </span>
+          <span className="text-gray-700">·</span>
+          <span className="text-gray-600">
             {t('ui.rev', {
               year: new Date().getFullYear(),
               defaultValue: 'rev. {{year}}',
             })}
-          </p>
+          </span>
         </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-3 mt-2">
+        <h1 className="font-display text-[1.6rem] font-light leading-tight text-gray-50 truncate">
+          {t('ui.letterhead_subtitle', { defaultValue: 'Identity Registry' })}
+        </h1>
+        <LocalePicker />
       </div>
     </Paper>
   );
@@ -631,22 +708,22 @@ function CharactersPanel({
           border-b instead, row 01 selection would only recolor the
           left rail and frame asymmetrically. */}
       <div className="flex flex-col divide-y divide-gray-800/60">
-        <header className="flex items-baseline justify-between gap-2 pb-3">
-          <div className="min-w-0">
+        <header className="pb-3">
+          <div className="flex items-baseline justify-between gap-2">
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
               {t('ui.section_i_roster', { defaultValue: 'Section I · Roster' })}
             </p>
-            <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
-              {t('ui.characters_header')}
-            </h2>
+            <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
+              {t('ui.on_record', {
+                filled: filledCount,
+                total: slots.length,
+                defaultValue: '{{filled}}/{{total}} on record',
+              })}
+            </span>
           </div>
-          <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
-            {t('ui.on_record', {
-              filled: filledCount,
-              total: slots.length,
-              defaultValue: '{{filled}}/{{total}} on record',
-            })}
-          </span>
+          <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5">
+            {t('ui.characters_header')}
+          </h2>
         </header>
         {slots.map(({ index, data }, idx) => (
           <SlotRow

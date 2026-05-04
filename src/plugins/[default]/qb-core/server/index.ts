@@ -17,6 +17,7 @@ import { installEvents } from './events';
 import { installCommands } from './commands';
 import { installExtraExports } from './exports';
 import { installDebug } from './debug';
+import { installLocale } from './locale';
 
 // Replace the throw-on-call Functions / Player / Commands stubs from
 // qbcore.ts with the real implementations, then wire up server-side
@@ -33,6 +34,10 @@ installEvents(QBCore);
 installCommands(QBCore);
 installExtraExports(QBCore);
 installDebug(QBCore);
+// Locale install MUST run after Commands (registers /locale via
+// QBCore.Commands.Add) and after Events (binds to QBCore:Server:
+// PlayerLoaded / OnPlayerUnload, both of which Events declares).
+installLocale(QBCore);
 
 /**
  * Mirror of upstream main.lua's `GetCoreObject(filters)`. With no

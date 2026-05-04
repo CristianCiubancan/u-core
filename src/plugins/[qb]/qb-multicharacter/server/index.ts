@@ -9,6 +9,7 @@
 // the build pipeline copies countries.json next to plugin.json verbatim.
 
 import { Config } from '../shared/config';
+import { LangFor } from '../shared/lang';
 import type { CharInfo } from '../shared/types';
 
 const QBCore = (exports as any)['qb-core'].GetCoreObject();
@@ -217,13 +218,13 @@ QBCore.Commands.Add(
       emitNet(
         'QBCore:Notify',
         source,
-        `You successfully deleted the character with citizen id ${args[0]}.`
+        LangFor(source).t('notifications.deleted_other_char', { citizenid: args[0] })
       );
     } else {
       emitNet(
         'QBCore:Notify',
         source,
-        'You forgot to input a citizen id!',
+        LangFor(source).t('notifications.forgot_citizenid'),
         'error'
       );
     }
@@ -347,7 +348,7 @@ onNet('qb-multicharacter:server:deleteCharacter', (citizenid: string) => {
   const src = (global as any).source as number;
   if (!Config.EnableDeleteButton) return;
   QBCore.Player.DeleteCharacter(src, citizenid);
-  emitNet('QBCore:Notify', src, 'Character deleted!', 'success');
+  emitNet('QBCore:Notify', src, LangFor(src).t('notifications.char_deleted'), 'success');
 });
 
 // ---------------- QBCore callbacks (client → server with reply) ----------------
@@ -371,7 +372,10 @@ QBCore.Functions.CreateCallback(
 
 QBCore.Functions.CreateCallback(
   'qb-multicharacter:server:GetNumberOfCharacters',
-  (source: number, cb: (n: number, countries: string[]) => void) => {
+  async (
+    source: number,
+    cb: (n: number, countries: string[], locale: string) => void
+  ) => {
     const license = QBCore.Functions.GetIdentifier(source, 'license');
     let numOfChars = Config.DefaultNumberOfCharacters;
     if (Config.PlayersNumberOfCharacters.length > 0) {
@@ -380,7 +384,24 @@ QBCore.Functions.CreateCallback(
       );
       if (match) numOfChars = match.numberOfChars;
     }
-    cb(numOfChars, Countries);
+    // Resolve the player's saved locale from `player_locales` here —
+    // this callback fires on every multichar open, including the first
+    // one of the session, which is BEFORE QBCore:Server:PlayerLoaded
+    // (that only fires after character selection). Without an explicit
+    // load step, the client's `GetCurrentLocale()` would still be 'en'
+    // when openCharMenu runs and the saved DB locale would never apply
+    // until the player ran `/locale` manually.
+    let locale = 'en';
+    try {
+      const code = await (exports as any)['qb-core'].EnsurePlayerLocale(
+        source
+      );
+      if (typeof code === 'string' && code) locale = code;
+    } catch {
+      // qb-core export not reachable — fall back to en. The localeChanged
+      // round-trip will still flip the UI later if PlayerLoaded fires.
+    }
+    cb(numOfChars, Countries, locale);
   }
 );
 

@@ -123,7 +123,7 @@ function skyCam(enable: boolean): void {
 function openCharMenu(visible: boolean): void {
   QBCore.Functions.TriggerCallback(
     'qb-multicharacter:server:GetNumberOfCharacters',
-    (numChars: number, countries: string[]) => {
+    (numChars: number, countries: string[], locale: string) => {
       SetNuiFocus(visible, visible);
       SendNUIMessage({
         action: 'ui',
@@ -132,11 +132,16 @@ function openCharMenu(visible: boolean): void {
         customNationality: Config.customNationality,
         enableDeleteButton: Config.EnableDeleteButton,
         countries,
-        // Forward the QBCore locale so the webview can mirror it via
-        // i18n.changeLanguage. Replicated convar, so this reflects whatever
-        // server.cfg has (`setr qb_locale "<lang>"`); falls back to en
-        // when the convar is unset or empty.
-        locale: GetConvar('qb_locale', 'en') || 'en',
+        // Locale is resolved server-side in the callback (see
+        // qb-multicharacter/server/index.ts:GetNumberOfCharacters →
+        // qb-core EnsurePlayerLocale). That export hits the DB on cache
+        // miss, populates qb-core's source-keyed cache, AND broadcasts
+        // QBCore:Locale:Changed — so by the time we get here the value
+        // is authoritative and the qb-core client cache has been
+        // updated too. We use the callback arg directly rather than
+        // GetCurrentLocale() because on a fresh relog the broadcast
+        // round-trip may not have completed by this point.
+        locale: locale || 'en',
       });
       skyCam(visible);
       if (!loadScreenCheckState) {
@@ -173,6 +178,18 @@ const sessionPollTick = setTick(() => {
 });
 
 // ---------------- Net events ----------------
+
+// Locale relay. SendNUIMessage is resource-scoped — qb-core's
+// client/locale.ts handler only delivers to qb-core's own NUI iframe
+// (the DrawText overlay), never to ours. Each resource that ships a
+// webview has to subscribe to QBCore:Locale:Changed itself and forward
+// to its own NUI. The webview's useNuiEvent('localeChanged') reads
+// `code` and runs i18n.changeLanguage; the LocalePicker's value tracks
+// i18n.language and so flips on the same round-trip.
+onNet('QBCore:Locale:Changed', (code: string) => {
+  if (typeof code !== 'string' || !code) return;
+  SendNUIMessage({ action: 'localeChanged', code });
+});
 
 onNet('qb-multicharacter:client:closeNUIdefault', async () => {
   destroyPed();
@@ -310,6 +327,20 @@ RegisterNuiCallback('closeUI', (data: { cData?: any }, cb: NuiCb) => {
 RegisterNuiCallback('disconnectButton', (_data: unknown, cb: NuiCb) => {
   destroyPed();
   emitNet('qb-multicharacter:server:disconnect');
+  cb('ok');
+});
+
+// Locale picker — webview LocalePicker component fires this when the
+// user changes language. Forwards to qb-core's QBCore:Server:SetLocale
+// net handler (see [default]/qb-core/server/locale.ts) which validates,
+// persists to `player_locales`, and re-broadcasts QBCore:Locale:Changed.
+// We don't update i18n here; the broadcast round-trip → qb-core/client/
+// locale.ts → SendNUIMessage(localeChanged) → Page.tsx's i18n.changeLanguage
+// is what actually flips the UI.
+RegisterNuiCallback('setLocale', (data: { code?: string }, cb: NuiCb) => {
+  if (data?.code) {
+    emitNet('QBCore:Server:SetLocale', String(data.code));
+  }
   cb('ok');
 });
 

@@ -8,10 +8,12 @@ import { installClientFunctions } from './functions';
 import { installClientEvents } from './events';
 import { installClientLoops } from './loops';
 import { installClientDrawText } from './drawtext';
+import { installClientLocale } from './locale';
 
 installClientFunctions(QBCore);
 installClientEvents(QBCore);
 installClientLoops(QBCore);
+installClientLocale();
 // installClientDrawText() runs LATER, after the auto-export-all-Functions
 // loop below — see the comment above that loop for why order matters here.
 

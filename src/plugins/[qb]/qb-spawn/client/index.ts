@@ -62,7 +62,25 @@ function destroyCams(): void {
 function setDisplay(value: boolean): void {
   choosingSpawn = value;
   SetNuiFocus(value, value);
-  SendNUIMessage({ action: 'showUi', status: value });
+  // Push the active locale alongside the visibility flag so the webview
+  // is guaranteed to have the right language on every open. Belt-and-
+  // suspenders with the live `localeChanged` relay below: that one
+  // catches mid-session `/locale` changes, but if the very first
+  // QBCore:Locale:Changed at PlayerLoaded fired before our React app
+  // attached its useNuiEvent listener, only this push will reach it.
+  // Sourced from qb-core's client-side cache; falls back to 'en' if the
+  // export isn't reachable for any reason.
+  let locale = 'en';
+  try {
+    const cur = (exports as any)['qb-core'].GetCurrentLocale() as
+      | string
+      | undefined;
+    if (cur) locale = cur;
+  } catch {
+    // qb-core isn't started yet — keep the default and let the live
+    // relay deliver the real value once it's available.
+  }
+  SendNUIMessage({ action: 'showUi', status: value, locale });
 }
 
 interface CamCoords {
@@ -115,37 +133,37 @@ async function flyToLocation(target: CamCoords): Promise<void> {
 
 // ---------- Event handlers ----------
 //
-// Why both `on` AND `onNet` for these events:
+// Bare `onNet` covers BOTH net and local triggers. CFX's V8 runtime
+// (fivem-binaries/citizen/scripting/v8/main.js:243-265) registers `on`
+// and `onNet` callbacks on the same shared EventEmitter; the only
+// difference is whether the event name is added to `netSafeEventNames`,
+// which gates *incoming net events* but not local `TriggerEvent` calls.
+// So `onNet` is a strict superset of `on` for handler firing.
 //
-// Upstream qb-spawn registers handlers via Lua's `RegisterNetEvent`,
-// which marks the event as net-allowed AND fires for LOCAL
-// TriggerEvent calls. The CFX V8 runtime splits these into two
-// separate registrations: `onNet(name, fn)` fires only for net events
-// arriving from the server (or other clients), and `on(name, fn)`
-// fires only for local `emit(name, ...)` / Lua `TriggerEvent(...)`.
+// qb-apartments' client/main.lua:576-585 fires `qb-spawn:client:openUI`
+// and `qb-spawn:client:setupSpawns` via LOCAL `TriggerEvent`; the
+// `onNet` registrations below catch those. qb-multicharacter's server
+// also `emitNet`s the same names — same handler, single fire.
 //
-// qb-apartments' client/main.lua fires `qb-spawn:client:openUI` and
-// `qb-spawn:client:setupSpawns` via LOCAL `TriggerEvent` (lines 576-
-// 586). Without the local-event registration here, those handlers
-// never fire — the spawn UI never opens after createCharacter, and
-// the player is stuck on the loading screen indefinitely. Symptom:
-// "create char → stuck at loading, qb-spawn never appears."
-//
-// The `qb-houses:client:setHouseConfig` event is fired only by our
-// own qb-multicharacter SERVER via `emitNet`, so `onNet` alone is
-// sufficient there — kept that way to avoid noise. If a future
-// downstream resource adds a local TriggerEvent for it, this will
-// need the same dual-registration treatment.
+// An earlier `dualEvent` helper here registered both `on` AND `onNet`
+// thinking they had disjoint domains. They don't — that double-fired
+// every handler on every trigger. The "spawn UI never appears" symptom
+// that motivated the helper was actually qb-spawn's top-level
+// `GetCoreObject()` racing qb-core's V8 init; now fixed by the
+// `shared/compat.lua` load-order shield in qb-core.
 
-const dualEvent = (
-  name: string,
-  handler: (...args: unknown[]) => void
-): void => {
-  on(name, handler);
-  onNet(name, handler);
-};
+// Locale relay. SendNUIMessage is resource-scoped, so qb-core's
+// QBCore:Locale:Changed handler can't reach our NUI iframe — we have
+// to subscribe ourselves and forward to our own SendNUIMessage. The
+// webview's useNuiEvent('localeChanged') runs i18n.changeLanguage so
+// open spawn UIs re-localize live when the player runs `/locale <code>`
+// or flips the qb-multicharacter LocalePicker.
+onNet('QBCore:Locale:Changed', (code: string) => {
+  if (typeof code !== 'string' || !code) return;
+  SendNUIMessage({ action: 'localeChanged', code });
+});
 
-dualEvent('qb-spawn:client:openUI', ((...args: unknown[]) => {
+onNet('qb-spawn:client:openUI', (...args: unknown[]) => {
   const value = args[0] as boolean;
   SetEntityVisible(PlayerPedId(), false, false);
   DoScreenFadeOut(250);
@@ -200,7 +218,7 @@ dualEvent('qb-spawn:client:openUI', ((...args: unknown[]) => {
       console.error('[qb-spawn] openUI handler crashed:', e);
     }
   })();
-}) as (...args: unknown[]) => void);
+});
 
 onNet(
   'qb-houses:client:setHouseConfig',
@@ -209,7 +227,7 @@ onNet(
   }
 );
 
-dualEvent('qb-spawn:client:setupSpawns', ((...args: unknown[]) => {
+onNet('qb-spawn:client:setupSpawns', (...args: unknown[]) => {
   const cData = args[0] as
     | { citizenid: string; _firstSpawn?: boolean }
     | null
@@ -291,7 +309,7 @@ dualEvent('qb-spawn:client:setupSpawns', ((...args: unknown[]) => {
       };
       SendNUIMessage(message);
     }
-}) as (...args: unknown[]) => void);
+});
 
 // ---------- NUI callbacks ----------
 

@@ -56,6 +56,12 @@ interface SpawnOption {
 interface ShowUiMessage {
   action: 'showUi';
   status: boolean;
+  locale?: string;
+}
+
+interface LocaleChangedMessage {
+  action: 'localeChanged';
+  code: string;
 }
 
 interface SetupLocationsMessage {
@@ -89,8 +95,25 @@ export default function Page() {
   const [selected, setSelected] = useState<SpawnOption | null>(null);
 
   useNuiEvent<ShowUiMessage>('showUi', (data) => {
+    // Apply the locale piggy-backed on the show payload (see
+    // client/index.ts:setDisplay). Covers the boot race where the
+    // initial QBCore:Locale:Changed at PlayerLoaded fired before this
+    // useNuiEvent attached.
+    if (data.locale && BUNDLES[data.locale] && i18n.language !== data.locale) {
+      void i18n.changeLanguage(data.locale);
+    }
     setVisible(!!data.status);
     if (!data.status) setSelected(null);
+  });
+
+  // Live locale change. qb-spawn/client/index.ts has an
+  // onNet('QBCore:Locale:Changed') relay that turns the net event into
+  // a SendNUIMessage in this resource's iframe, so /locale <code> at
+  // any time during the spawn UI re-localizes without a re-mount.
+  useNuiEvent<LocaleChangedMessage>('localeChanged', (data) => {
+    if (data?.code && BUNDLES[data.code] && i18n.language !== data.code) {
+      void i18n.changeLanguage(data.code);
+    }
   });
 
   useNuiEvent<SetupLocationsMessage>('setupLocations', (data) => {

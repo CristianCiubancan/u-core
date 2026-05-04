@@ -4,7 +4,14 @@
 // `delete`, `replace`, `clear`, `has`, `locale`. Behavior matches
 // upstream Polyglot-style Locale.
 //
-// Substitution syntax: `%{name}` is replaced with `subs.name`.
+// Substitution syntax: BOTH `%{name}` (Polyglot/Lua, used by qb-core
+// and any direct-port-of-Lua resource) AND `{{name}}` (i18next, used
+// by qb-multicharacter and other resources whose JSON translations
+// also serve a React webview through i18next) are accepted. The two
+// syntaxes don't collide and consumers can pick whichever matches the
+// JSON they ship; e.g. translations that only feed our Locale should
+// stick to `%{name}`, but JSON files dual-purposed for i18next can use
+// `{{name}}` and they'll Just Work here too.
 // Lua-style `%s` positional substitution is NOT supported (upstream
 // doesn't either — only template-named subs).
 
@@ -36,7 +43,10 @@ function translateKey(phrase: string, subs?: Record<string, unknown>): string {
     // Escape regex specials in the key name; values are stringified
     // (matches Lua tostring()).
     const safeKey = k.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
-    const re = new RegExp(`%\\{${safeKey}\\}`, 'g');
+    // Match `%{name}` OR `{{name}}` in one pass. Two distinct
+    // alternatives so we don't half-consume an unbalanced delimiter
+    // (e.g. matching `%{name}}` because the regex was permissive).
+    const re = new RegExp(`%\\{${safeKey}\\}|\\{\\{${safeKey}\\}\\}`, 'g');
     result = result.replace(re, String(subs[k]));
   }
   return result;
