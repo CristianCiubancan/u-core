@@ -23,12 +23,46 @@ U-Core is a TypeScript build framework for FiveM server resources. You author ea
   - [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/), **or**
   - A local FXServer extracted to `fivem-binaries/FXServer.exe` (Windows only)
 
-## Installation
+## Setup (first run, Docker)
 
-```bash
-pnpm install
-cp .env.example .env       # then edit .env with your settings
-```
+1. **Install host deps and create `.env`**
+
+   ```bash
+   pnpm install
+   cp .env.example .env
+   ```
+
+   Open `.env` and fill in every variable. See the table below for what each one is for.
+
+2. **Bring the stack up**
+
+   ```bash
+   docker-compose up -d --build      # or: pnpm start:docker
+   ```
+
+   This boots MariaDB, runs the dbmate `migrator` once (it applies `db/migrations/*.sql` against the fresh DB and exits), and then starts FXServer + txAdmin. FXServer waits for the migrator to exit successfully, so by the time txAdmin is reachable the schema is already in place.
+
+3. **Open txAdmin** at <http://localhost:40120/> and start the deployer wizard.
+
+4. **Pick "Remote template" / custom recipe URL** and paste:
+
+   ```
+   https://raw.githubusercontent.com/CristianCiubancan/u-core/master/txadmin/recipe.yaml
+   ```
+
+5. **Fill in the wizard prompts** — server name (must match `SERVER_NAME` in `.env`), license key from [keymaster.fivem.net](https://keymaster.fivem.net/), admin user.
+
+6. **Database step** — host `db`, port `3306`, user / password / database matching `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` from your `.env`. **Do NOT check "wipe database"** — the migrator already ran in step 2 and owns the schema. Wiping here drops the migration ledger (`schema_migrations` table) and leaves you with a half-set-up DB.
+
+7. **Build the plugins** once the recipe finishes:
+
+   ```bash
+   pnpm build
+   ```
+
+   This emits every plugin under `txData/${SERVER_NAME}/resources/[GENERATED]/`, where FXServer can pick them up. If you started the server before running `pnpm build`, just stop the FXServer container (`docker-compose stop fivem`), run `pnpm build`, and start it again — `txData/` is bind-mounted, so the build lands in the live tree.
+
+Subsequent boots reuse the populated `txData/${SERVER_NAME}/` and skip the wizard. From then on, `pnpm dev` gives you watch + hot-reload against the running server.
 
 ### Required environment variables
 
@@ -176,24 +210,11 @@ This brings up a FiveM container that downloads FXServer from `BINARIES_ARCHIVE_
 
 Exposed ports: `30120/tcp+udp` (FiveM), `40120/tcp` (txAdmin), `3414/tcp` (reload endpoint, localhost-only), `3306/tcp` (MariaDB, internal compose network only).
 
-### First-run wizard (fresh `SERVER_NAME`)
+### About the recipe
 
-The container ships only the FXServer binaries — no resources. On a brand-new `SERVER_NAME`, txAdmin's wizard at `http://localhost:40120/` provisions everything from a recipe.
+Our recipe is a fork of [`qbcore-framework/txAdminRecipe`](https://github.com/qbcore-framework/txAdminRecipe) that pulls `server.cfg` and `myLogo.png` from [`txadmin/`](./txadmin/) instead of upstream's. Resource downloads (qb-core, the QBCore job pack, pma-voice, etc.) still hit the same upstream repos, so resource updates flow through without recipe changes.
 
-Use this repo's recipe URL when prompted:
-
-```
-https://raw.githubusercontent.com/CristianCiubancan/u-core/master/txadmin/recipe.yaml
-```
-
-It is a fork of [`qbcore-framework/txAdminRecipe`](https://github.com/qbcore-framework/txAdminRecipe) that pulls our `server.cfg` and `myLogo.png` from [`txadmin/`](./txadmin/) instead of upstream's. Resource downloads (qb-core, the QBCore job pack, pma-voice, etc.) still hit the same upstream repos, so resource updates flow through without recipe changes. Wizard prompts:
-
-- **Server name** — matches `SERVER_NAME` in `.env`.
-- **DB connection** — host `db`, port `3306`, user/password/database from `.env`.
-- **License key** — from [keymaster.fivem.net](https://keymaster.fivem.net/).
-- **Admin user** — your txAdmin login.
-
-Subsequent boots reuse the populated `txData/${SERVER_NAME}/` and skip the wizard.
+The wizard walkthrough lives in [Setup (first run, Docker)](#setup-first-run-docker) above.
 
 ### Maintaining the recipe fork
 
