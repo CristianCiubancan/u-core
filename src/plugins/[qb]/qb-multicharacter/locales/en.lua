@@ -67,7 +67,33 @@ local Translations = {
         -- Notifications
         ran_into_issue = "We ran into an issue",
         profanity = "It seems like you are trying to use some type of profanity / bad words in your name or nationality!",
-        forgotten_field = "It seems like you have forgotten to input one or multiple of the fields!"
+        forgotten_field = "It seems like you have forgotten to input one or multiple of the fields!",
+
+        -- u-core: keys consumed by the React webview only. Upstream Vue
+        -- carried equivalents in translations.js fallbacks (never in
+        -- en.lua). Adding them here lets `Lang:t('ui.<key>')` flow
+        -- through the SendNUIMessage('ui').translations payload to the
+        -- React tx() helper, and Polyglot's fallback chain delivers the
+        -- en value to the other 14 locale files for free.
+        firstname_too_short = "First name must be at least 2 characters long.",
+        firstname_too_long = "First name cannot exceed 16 characters.",
+        lastname_too_short = "Last name must be at least 2 characters long.",
+        lastname_too_long = "Last name cannot exceed 16 characters.",
+        invalid_date = "Please enter a valid date of birth.",
+
+        -- u-core: short captions for per-field error pills (uppercase tracked).
+        err_required = "Required",
+        err_too_short = "Too short",
+        err_too_long = "Too long",
+        err_profanity = "Not allowed",
+        err_invalid_date = "Invalid date",
+
+        -- u-core: copy that lives in the React shell, not on the upstream Vue.
+        select_character = "Select a character",
+        select_character_subtitle = "Choose a slot to begin or create a new identity.",
+        empty_slot = "Empty slot",
+        new_character = "New character",
+        disconnect = "Disconnect"
     }
 }
 
