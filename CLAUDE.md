@@ -10,12 +10,24 @@ U-Core is a TypeScript build framework for FiveM server resources. It is **not**
 
 - `pnpm build` — build all plugins once.
 - `pnpm dev` — `build.ts --watch`. Rebuilds the affected plugin on file change (debounced 300ms) and posts to the in-game reload endpoint (port 3414, authed by `RELOADER_API_KEY`) to hot-reload that resource.
-- `pnpm start:docker` — bring up FiveM + MariaDB containers (`docker-compose down && up -d --build`).
-- `pnpm start:windows` — launch `fivem-binaries/FXServer.exe` against `txData/${SERVER_NAME}/server.cfg` (kills any process on port 30120 first).
+- `pnpm start:docker` — bring up FiveM + MariaDB + dbmate `migrator` (`docker-compose down && up -d --build`). The `migrator` service runs once per stack-up, applies any pending migrations from `db/migrations/`, then exits 0; FXServer waits on its `service_completed_successfully` so it never boots against an un-migrated schema.
+- `pnpm start:windows` — launch `fivem-binaries/FXServer.exe` against `txData/${SERVER_NAME}/server.cfg` (kills any process on port 30120 first). **Does not run migrations** — apply them yourself first with `pnpm db:migrate` (which still requires the docker stack since the migrator is a compose service).
 - `pnpm start:assets` — runs the **separate** asset-server sub-package (it uses `npm`, not pnpm; it has its own `package.json` and `node_modules`).
+- `pnpm db:migrate` / `db:rollback` / `db:status` / `db:new <name>` — wrappers around `docker-compose run --rm migrator <cmd>` (dbmate). All schema changes live in `db/migrations/*.sql` as `-- migrate:up` / `-- migrate:down` blocks; dbmate tracks them in the `schema_migrations` table.
 - No test runner, linter, or formatter is configured. Don't invent commands for them.
 
 Required env vars (loaded from `.env` via dotenv): `SERVER_NAME`, `RELOADER_API_KEY`, `MYSQL_*`, `BINARIES_ARCHIVE_URL`.
+
+## Database migrations (dbmate)
+
+Schema is owned by **dbmate**, not by the txAdmin recipe and not by the per-resource `*.sql` files that ship inside QBCore resources. The compose stack has a `migrator` service (`ghcr.io/amacneil/dbmate:2`) that mounts `./db` and runs `dbmate --wait up` after MariaDB is healthy and before FXServer starts (FXServer's `depends_on` requires `service_completed_successfully`).
+
+- Source of truth: `db/migrations/<timestamp>_<name>.sql` — each file has a `-- migrate:up` and `-- migrate:down` section.
+- Ledger: dbmate creates `schema_migrations` (filename, applied_at) inside the FiveM DB.
+- Recipe contract: `txadmin/recipe.yaml` deliberately **omits** `query_database` for `qbcore.sql` (that schema is now `20260505120000_qbcore_baseline.sql`). Restoring `query_database` is a footgun — it reintroduces a second source of truth that drifts from the dbmate ledger. `connect_database` is kept so the wizard still validates DB credentials.
+- Per-resource SQL (`qb-banking/banking.sql`, `qb-inventory/qb-inventory.sql`, etc.) shipped inside upstream QBCore resources are **not** migrated yet — they're admin-import files the recipe never invoked. Add them as new dbmate migrations as features come online; don't run them ad-hoc against the live DB.
+- New migration: `pnpm db:new add_player_emails` → edits the generated file, then `pnpm db:migrate`.
+- Brand-new deploys: migrator runs the baseline cleanly. Existing deploys where the wizard already ran `qbcore.sql`: baseline is a no-op (`CREATE TABLE IF NOT EXISTS`) and dbmate records it as applied. The transition is idempotent.
 
 ## Server bootstrap (txAdmin recipe)
 

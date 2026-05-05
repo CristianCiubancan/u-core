@@ -16,11 +16,16 @@ services:
     restart: unless-stopped
     stdin_open: true
     tty: true
-    # Wait until MariaDB reports healthy before starting FXServer; otherwise
-    # the txAdmin first-run wizard / migrations race with mariadb-init.
+    # Wait until MariaDB is healthy AND dbmate has applied any pending
+    # migrations before FXServer comes up. Otherwise the txAdmin first-run
+    # wizard / oxmysql queries race the schema. The migrator must complete
+    # successfully — if it fails the stack should not start FXServer against
+    # a partially-migrated DB.
     depends_on:
       db:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     # Cap container log volume so long-running FXServer instances don't
     # silently fill the host disk.
     logging:
@@ -28,6 +33,34 @@ services:
       options:
         max-size: 10m
         max-file: '5'
+
+  # dbmate is the canonical owner of the SQL schema. Migrations live in
+  # `./db/migrations` (timestamped `up/down` blocks). On every `up` this
+  # service applies any pending migrations and exits 0 — fivem depends on
+  # its `service_completed_successfully`. The txAdmin recipe's
+  # `query_database` step has been removed so the wizard does not also
+  # run schema SQL (which would race / drift from this ledger).
+  # Pin the major tag; bump deliberately when reviewing a dbmate release.
+  migrator:
+    image: ghcr.io/amacneil/dbmate:2
+    env_file: .env
+    environment:
+      DATABASE_URL: 'mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}'
+    volumes:
+      - ./db:/db
+    depends_on:
+      db:
+        condition: service_healthy
+    # `--wait` retries the connection in case the healthcheck flips green
+    # before MariaDB finishes accepting auth (it sometimes does on cold
+    # starts). Idempotent: no-op when no migrations are pending.
+    command: ['--wait', 'up']
+    restart: 'no'
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '3'
 
   db:
     image: mariadb:11.4

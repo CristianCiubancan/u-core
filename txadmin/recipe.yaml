@@ -16,7 +16,10 @@ description: "U-Core deploy - upstream QBCore Framework with our server.cfg over
 # and merge intentionally.
 
 tasks:
-  # Pull upstream qbcore recipe contents — we still need qbcore.sql from here.
+  # Pull upstream qbcore recipe contents. We no longer need qbcore.sql from
+  # here — schema is owned by the dbmate `migrator` compose service. Kept
+  # for parity in case future upstream-recipe changes (resource lists,
+  # paths) flow through.
   - action: download_github
     src: https://github.com/qbcore-framework/txAdminRecipe
     ref: main
@@ -37,10 +40,14 @@ tasks:
     src: ./tmp/u-core-overrides/myLogo.png
     dest: ./myLogo.png
 
-  # Prepare Database
+  # Prepare Database — connection only; schema is applied by the dbmate
+  # `migrator` compose service before FXServer starts. The upstream
+  # `query_database: ./tmp/qbcore/qbcore.sql` step was removed so the
+  # wizard does not also create the same tables (and so the schema is
+  # owned by exactly one place: db/migrations/). On environments where
+  # `qbcore.sql` already ran via this step, the baseline migration is a
+  # no-op via CREATE TABLE IF NOT EXISTS and dbmate just records it.
   - action: connect_database
-  - action: query_database
-    file: ./tmp/qbcore/qbcore.sql
 
   # STANDALONE
   - action: download_github

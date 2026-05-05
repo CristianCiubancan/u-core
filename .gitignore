@@ -86,6 +86,15 @@ asset-server/original/*
 # ───────── Project-local agent settings ─────────
 **/.claude/settings.local.json
 
+# ───────── dbmate ─────────
+# `db/schema.sql` is auto-written by `dbmate up` from the live DB it's
+# pointed at. Ignored until the per-resource SQL backlog (qb-banking,
+# qb-inventory, qb-phone, etc.) is ported into proper migrations —
+# until then operators' live DBs contain manually-imported tables that
+# would otherwise leak into schema.sql and drift from the ledger.
+# Once the backlog is cleared, drop this entry and commit the snapshot.
+db/schema.sql
+
 # Screenshots dropped into the working tree for issue reports.
 Screenshot*.png
 image.png
