@@ -40,10 +40,10 @@ diff <(curl -sL https://raw.githubusercontent.com/qbcore-framework/txAdminRecipe
 
 The build is orchestrated by `src/scripts/build.ts` → `BuildManager` (`src/scripts/managers/BuildManager.ts`). For each discovered plugin it runs, in order:
 
-1. **Page.tsx → webview bundle** (`buildPluginPageTsx`). If the plugin has `html/Page.tsx`, the builder **overwrites `src/webview/App.tsx`** with a stub that re-exports that page, runs `npx vite build --outDir=<plugin-dist>/html`, then **restores the original App.tsx**. Consequence: `src/webview/App.tsx` is transient build state — never edit it, and never commit it as a meaningful file. Concurrent webview builds would clobber each other; the builder runs plugins sequentially for this reason.
-2. **TS / JS bundling** (esbuild, IIFE, `target: es2017`, inline sourcemaps). Server vs. client is detected purely by path: `/server/` → `platform: 'node'` + Node built-ins externalized + `canvas` external. Anything else → `platform: 'browser'`. There is no other config — putting server code outside a `server/` folder will silently bundle it for the browser.
+1. **Page.tsx → webview bundle** (`buildPluginPageTsx`). If the plugin has `html/Page.tsx`, the builder runs Vite's JS API in-process. The page is loaded via the `virtual:plugin-page` module, resolved by `src/scripts/util/vite-plugin-page-entry.ts` from a closure-captured path (NOT `process.env`, because parallel builds would race — see `project_buildmanager_env_race`). There is no `src/webview/App.tsx`; `main.tsx` does `import Page from 'virtual:plugin-page'`. Cross-plugin webview builds run in parallel.
+2. **TS / JS bundling** (esbuild, IIFE, `target: es2017`). Files are bundled only if they match a glob in `client_scripts` / `server_scripts` / `shared_scripts` from `plugin.json` — files outside those globs are silently NOT bundled. Platform comes from which list the file is in: server entries → `platform: 'node'` + Node built-ins externalized + `canvas` external. Client and shared → `platform: 'browser'`. Sourcemaps: client never (would leak source over the wire), server external in prod / inline in dev.
 3. **fxmanifest.lua generation** (`buildPluginManifest`). `plugin.json` is the **source of truth**; `fxmanifest.lua` is generated and written into the dist directory only. Do not hand-author `fxmanifest.lua`. Properties beyond the standard set (`name`, `client_scripts`, `ui_page`, `constraints`, etc. — see `getCustomProperties`) are emitted as `key 'value'` pairs.
-4. **Other files** — Lua, JSON (excluding `plugin.json`), translations, html assets are copied verbatim.
+4. **Other files** — Lua, JSON (excluding `plugin.json` and JSON files already inlined into a webview/script bundle — Vite output graph + esbuild metafile drive the exclusion; see `project_buildmanager_import_aware_assets`), html assets are copied verbatim.
 
 Output goes to **`txData/${SERVER_NAME}/resources/[GENERATED]/<parent-path>/<plugin-name>/`**, not `dist/`. The `dist/` references in the README are stale — `BuildManager`'s default is overridden in `build.ts` to the txData path so FXServer picks it up directly.
 
@@ -52,19 +52,22 @@ Output goes to **`txData/${SERVER_NAME}/resources/[GENERATED]/<parent-path>/<plu
 `FileManager` walks `src/plugins/**` looking for `plugin.json`. Folders wrapped in brackets (`[default]`, `[character]`, `[auth]`, `[misc]`) are FiveM's resource-grouping convention — they are **not** plugins themselves but their full bracket path is preserved in the output. Example: `src/plugins/[character]/[auth]/character-create/` builds to `[GENERATED]/[character]/[auth]/character-create/`.
 
 A plugin folder typically contains:
-- `client/`, `server/`, `shared/` — script roots (path-based platform detection, see above).
+- `client/`, `server/`, `shared/` — script roots. Convention only; whether a file actually bundles for client or server depends on which manifest glob (`client_scripts` / `server_scripts` / `shared_scripts`) matches it, not its directory.
 - `html/Page.tsx` — optional React UI entry; consumes shared webview infra in `src/webview/`.
-- `translations/*.json` — i18next resources.
+- `translations/*.json` — i18next resources, imported by Page.tsx and inlined into the webview bundle by Vite (not shipped as raw assets).
 - `plugin.json` — manifest.
+- Plain `.lua` files — copied to dist verbatim, no transformation. Plugin can mix Lua and TS freely.
 
 ## TypeScript project layout
 
-`tsconfig.json` is a solution file with three referenced projects. Keep new files in the right one or they won't typecheck:
+`tsconfig.json` is a solution file with five referenced projects. Keep new files in the right one or they won't typecheck:
 - `tsconfig.scripts.json` — Node tooling (`src/scripts/**`), NodeNext modules, emits to `dist/scripts`.
-- `tsconfig.plugins.json` — plugin client/server/shared code, ES2022, **excludes `**/html/**`**.
+- `tsconfig.plugins.client.json` — plugin client TS, lib `@citizenfx/client` only.
+- `tsconfig.plugins.server.json` — plugin server TS, lib `@citizenfx/server` + `node`.
+- `tsconfig.plugins.shared.json` — plugin shared TS, no platform-specific lib.
 - `tsconfig.webview.json` — webview + plugin `html/**` + plugin `shared/**`, JSX `react-jsx`, `noEmit` (Vite/esbuild handle emission).
 
-The `html/` directories live in the webview project (DOM lib, JSX) — the plugins project explicitly excludes them. Don't import DOM-only code from `client/` or `server/`.
+The split enforces type segregation: client TS can't accidentally `import` server-only APIs and vice versa. Don't import DOM-only code from `client/` or `server/`.
 
 ## Hot reload protocol
 
@@ -72,4 +75,4 @@ The `html/` directories live in the webview project (DOM lib, JSX) — the plugi
 
 ## Vite config quirks
 
-`vite.config.ts` sets `root: 'src/'` and `outDir: '../dist/webview'`. The build output **after** the BuildManager pipeline is moved/renamed: each per-plugin `vite build --outDir=<plugin-dist>/html` writes directly into the plugin's dist folder. The `dist/webview` path is effectively unused in production builds.
+`vite.config.ts` exists for IDE / standalone-CLI use but `BuildManager` does NOT load it — it calls Vite's JS API directly with `configFile: false` and an explicit `InlineConfig` per build (see `runViteBuild`), so the dep-prebundle cache and Rollup state stay warm across plugins and rebuilds in a single session. Each call writes straight to `<plugin-dist>/html`. Two modes exist: `consumer` (lib + IIFE + externalized React/ReactDOM/i18next, used when the `_shared` vendor plugin is present — see `project_shared_vendor_contract`) and `standalone` (full self-contained bundle for plugins built without the vendor).
