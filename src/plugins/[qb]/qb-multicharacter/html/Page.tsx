@@ -374,7 +374,18 @@ const Page: React.FC = () => {
       gender: registerData.gender,
       cid: selectedCid,
     });
+    // Hide locally — upstream's `createNewCharacter` Lua callback only
+    // fades the screen and triggers the server event; it never sends
+    // back `ui:toggle=false`, and the apartments-started branch of the
+    // server-side completion never does either. Without this the React
+    // UI keeps rendering behind whatever spawns next (apartments,
+    // clothing, etc.). Upstream Vue worked around this the same way
+    // (`show.register = false` inside its submit handler).
+    setVisible(false);
     setView('grid');
+    setRegisterData(emptyRegister());
+    setErrors({});
+    setSelectedCid(-1);
   };
 
   const handleCancelRegister: React.MouseEventHandler<HTMLButtonElement> = (
