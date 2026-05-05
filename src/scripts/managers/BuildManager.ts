@@ -199,6 +199,7 @@ class BuildManager {
       target: options.target,
       format: options.format,
       loader: options.loader,
+      metafile: options.metafile,
     });
 
     const existing = this.esbuildContexts.get(entryPath);
@@ -392,14 +393,25 @@ class BuildManager {
       // previous output isn't on disk (first build, or a prior failure
       // wiped it).
       const existingHtmlDir = path.join(destDir, 'html');
+      // Phase 1: webview build (always sequential, before scripts and
+      // assets) — `buildPluginPageTsx` returns the set of plugin-local
+      // source files Vite bundled, so subsequent asset-copy steps can
+      // skip emitting raw copies of files that are already inlined into
+      // `main.js` (e.g. translations/*.json).
+      let viteImports: Set<string>;
       if (options.skipVite && fsSync.existsSync(existingHtmlDir)) {
         const tmpHtmlDir = path.join(tmpDir, 'html');
         await fs.cp(existingHtmlDir, tmpHtmlDir, { recursive: true });
         this.logger.info(
           `Skipped Vite for ${plugin.pluginName}: copied previous html/ dist forward`
         );
+        // Empty set under skipVite — we don't have the cached graph from
+        // the previous build. JSONs imported by the cached webview will
+        // get re-copied to dist as raw assets; harmless duplication, only
+        // visible on the dev fast-path.
+        viteImports = new Set<string>();
       } else {
-        await this.buildPluginPageTsx(plugin, tmpDir);
+        viteImports = await this.buildPluginPageTsx(plugin, tmpDir);
       }
 
       // The shared vendor resource owns its `html/` output entirely (built
@@ -408,16 +420,36 @@ class BuildManager {
       // pre-compile Tailwind input — copying it as an "other file" would
       // overwrite the compiled stylesheet `buildSharedVendor` just wrote.
       const isShared = this.isSharedVendorPlugin(plugin);
-      const buildSteps = [
+
+      // Phase 2: script bundlers (TS + JS) in parallel. Their metafiles
+      // contribute to the import set so phase-3 asset copies can skip
+      // sources that were inlined into the IIFE.
+      let scriptImports = new Set<string>();
+      if (!isShared) {
+        const [tsImports, jsImports] = await Promise.all([
+          this.buildPluginTs(plugin, tmpDir),
+          this.buildPluginJs(plugin, tmpDir),
+        ]);
+        scriptImports = new Set<string>([...tsImports, ...jsImports]);
+      }
+
+      // Phase 3: assets (Lua, JSON, others) and manifest, in parallel.
+      // The `excludePaths` union (Vite + esbuild imports) suppresses
+      // raw copies of bundled-in sources. Ordering scripts-before-assets
+      // adds a few ms of serialization vs the previous "all parallel"
+      // path, which is negligible compared to esbuild/Vite cost.
+      const importedSources = new Set<string>([
+        ...viteImports,
+        ...scriptImports,
+      ]);
+      const buildSteps: Promise<unknown>[] = [
         this.buildPluginLua(plugin, tmpDir),
-        this.buildPluginJson(plugin, tmpDir),
+        this.buildPluginJson(plugin, tmpDir, importedSources),
         this.buildPluginManifest(plugin, tmpDir),
       ];
       if (!isShared) {
         buildSteps.push(
-          this.buildPluginTs(plugin, tmpDir),
-          this.buildPluginJs(plugin, tmpDir),
-          this.buildPluginOtherFiles(plugin, tmpDir)
+          this.buildPluginOtherFiles(plugin, tmpDir, importedSources)
         );
       }
       await Promise.all(buildSteps);
@@ -527,7 +559,8 @@ class BuildManager {
    */
   async buildPluginJson(
     pluginNameOrPath: string | Plugin,
-    outputDir?: string
+    outputDir?: string,
+    excludePaths?: ReadonlySet<string>
   ): Promise<void> {
     this.ensureInitialized();
 
@@ -541,10 +574,21 @@ class BuildManager {
         throw new Error(`Plugin not found: ${pluginNameOrPath}`);
       }
 
+      // Skip JSON files that the script bundlers already inlined into a
+      // bundle (translations imported by Page.tsx, fixture data imported
+      // from server.ts, etc.). copyFilesToDist would otherwise emit the
+      // raw source alongside the IIFE — pure dead bytes that bloat the
+      // resource and confuse downstream tooling.
+      const isExcluded = excludePaths && excludePaths.size > 0
+        ? (file: File) => excludePaths.has(path.normalize(file.fullPath))
+        : () => false;
+
       // Get all JSON files
       const jsonFiles = plugin.files.filter(
         (file) =>
-          file.fileName.endsWith('.json') && file.fileName !== 'plugin.json'
+          file.fileName.endsWith('.json') &&
+          file.fileName !== 'plugin.json' &&
+          !isExcluded(file)
       );
 
       if (jsonFiles.length === 0) {
@@ -587,7 +631,7 @@ class BuildManager {
   async buildPluginTs(
     pluginNameOrPath: string | Plugin,
     outputDir?: string
-  ): Promise<void> {
+  ): Promise<Set<string>> {
     this.ensureInitialized();
 
     try {
@@ -612,10 +656,15 @@ class BuildManager {
 
       if (tsEntries.length === 0) {
         this.logger.info(`No TypeScript files found in plugin ${plugin.pluginName}`);
-        return;
+        return new Set<string>();
       }
 
       const destDir = outputDir ?? this.getPluginDestDir(plugin);
+
+      // Aggregate inputs across every entry's metafile so the caller can
+      // skip dist-copying source files that were already inlined into a
+      // bundle (e.g. JSON imports — see `buildPluginJson`'s exclude path).
+      const rawInputs = new Set<string>();
 
       // Process each TypeScript entry
       for (const entry of tsEntries) {
@@ -677,7 +726,17 @@ class BuildManager {
             external: externalPackages.concat(isServerScript ? ['canvas'] : []), // Add canvas as external for server scripts
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',
+            // Cheap (~few KB / bundle) and lets us learn which sources
+            // were inlined — the caller uses this to suppress redundant
+            // dist copies of files that have already been baked into the
+            // IIFE.
+            metafile: true,
           });
+          if (result.metafile) {
+            for (const key of Object.keys(result.metafile.inputs)) {
+              rawInputs.add(key);
+            }
+          }
 
           // Check for errors
           if (result.errors.length > 0) {
@@ -715,6 +774,7 @@ class BuildManager {
       this.logger.info(
         `✓ Built ${tsEntries.length} TypeScript file(s) for plugin ${plugin.pluginName}`
       );
+      return this.collectPluginLocalImports(rawInputs, plugin);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -746,7 +806,7 @@ class BuildManager {
   async buildPluginJs(
     pluginNameOrPath: string | Plugin,
     outputDir?: string
-  ): Promise<void> {
+  ): Promise<Set<string>> {
     this.ensureInitialized();
 
     try {
@@ -767,10 +827,13 @@ class BuildManager {
 
       if (jsEntries.length === 0) {
         this.logger.info(`No JavaScript files found in plugin ${plugin.pluginName}`);
-        return;
+        return new Set<string>();
       }
 
       const destDir = outputDir ?? this.getPluginDestDir(plugin);
+
+      // Aggregate inputs across every entry's metafile (see buildPluginTs).
+      const rawInputs = new Set<string>();
 
       // Process each JavaScript entry
       for (const entry of jsEntries) {
@@ -805,7 +868,14 @@ class BuildManager {
             external: externalPackages,
             // Use node platform for server scripts, browser platform for client scripts
             platform: isServerScript ? 'node' : 'browser',
+            // See `buildPluginTs`. Same import-graph capture for JS sources.
+            metafile: true,
           });
+          if (result.metafile) {
+            for (const key of Object.keys(result.metafile.inputs)) {
+              rawInputs.add(key);
+            }
+          }
 
           // Check for errors
           if (result.errors.length > 0) {
@@ -840,6 +910,7 @@ class BuildManager {
       this.logger.info(
         `✓ Built ${jsEntries.length} JavaScript file(s) for plugin ${plugin.pluginName}`
       );
+      return this.collectPluginLocalImports(rawInputs, plugin);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -1125,7 +1196,7 @@ class BuildManager {
   async buildPluginPageTsx(
     pluginNameOrPath: string | Plugin,
     outputDir?: string
-  ): Promise<void> {
+  ): Promise<Set<string>> {
     this.ensureInitialized();
 
     try {
@@ -1143,7 +1214,7 @@ class BuildManager {
       if (this.isSharedVendorPlugin(plugin)) {
         const pluginDistDir = outputDir ?? this.getPluginDestDir(plugin);
         await this.buildSharedVendor(plugin, pluginDistDir);
-        return;
+        return new Set<string>();
       }
 
       const pageTsxFile = plugin.files.find(
@@ -1155,7 +1226,7 @@ class BuildManager {
 
       if (!pageTsxFile) {
         this.logger.info(`No Page.tsx file found in plugin ${plugin.pluginName}`);
-        return;
+        return new Set<string>();
       }
 
       this.logger.info(
@@ -1184,11 +1255,11 @@ class BuildManager {
         this.logger.info(
           `✓ Built webview placeholder for plugin ${plugin.pluginName} to ${this.pathToDisplay(htmlOutputDir)}`
         );
-        return;
+        return new Set<string>();
       }
 
       const consumerMode = this.isSharedVendorAvailable();
-      await this.runViteBuild(
+      const rawImports = await this.runViteBuild(
         htmlOutputDir,
         pageTsxFile.fullPath,
         consumerMode ? 'consumer' : 'standalone'
@@ -1211,6 +1282,7 @@ class BuildManager {
       this.logger.info(
         `✓ Built webview for plugin ${plugin.pluginName} to ${this.pathToDisplay(htmlOutputDir)}`
       );
+      return this.collectPluginLocalImports(rawImports, plugin);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -1242,7 +1314,7 @@ class BuildManager {
     outputDir: string,
     pluginPagePath: string,
     style: 'standalone' | 'consumer' = 'standalone'
-  ): Promise<void> {
+  ): Promise<Set<string>> {
     const mode = this.production ? 'production' : 'development';
     this.logger.info(
       `Running Vite build (JS API, mode=${mode}, style=${style}) → outDir=${outputDir}, page=${pluginPagePath}`
@@ -1336,7 +1408,25 @@ class BuildManager {
                 emptyOutDir: true,
               },
             };
-      await viteBuild(config);
+      const result = await viteBuild(config);
+      // Walk the rollup output graph so callers can learn which source
+      // files Vite bundled into the webview. Used by buildPluginJson /
+      // buildPluginOtherFiles to skip copying assets that have already
+      // been baked into `main.js` (e.g. translations/*.json imported by
+      // Page.tsx for i18next bundles).
+      const raw = new Set<string>();
+      const outputs = Array.isArray(result) ? result : [result];
+      for (const out of outputs) {
+        const chunks = (out as { output?: unknown[] } | null)?.output;
+        if (!Array.isArray(chunks)) continue;
+        for (const chunk of chunks) {
+          const modules = (chunk as { modules?: Record<string, unknown> } | null)
+            ?.modules;
+          if (!modules) continue;
+          for (const id of Object.keys(modules)) raw.add(id);
+        }
+      }
+      return raw;
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;
@@ -1373,6 +1463,39 @@ class BuildManager {
    * @param outputDir Override the destination directory (used by transactional buildPlugin to stage into a temp dir)
    * @private
    */
+  /**
+   * Resolve a heterogeneous set of import paths (esbuild metafile keys are
+   * cwd-relative; Vite chunk module IDs are usually absolute) into the
+   * subset that lives inside the given plugin's directory tree, normalized
+   * for case-insensitive comparison on Windows. Files outside the plugin
+   * (e.g. shared `src/webview/` modules, node_modules, virtual modules)
+   * are dropped — they're never candidates for `buildPluginJson` /
+   * `buildPluginOtherFiles` to copy anyway.
+   */
+  private collectPluginLocalImports(
+    rawPaths: Iterable<string>,
+    plugin: Plugin
+  ): Set<string> {
+    const set = new Set<string>();
+    const pluginPrefix = path.normalize(plugin.fullPath).toLowerCase();
+    for (const raw of rawPaths) {
+      // Rollup represents virtual modules with a leading null byte; drop
+      // them. Other non-file IDs (e.g. esbuild plugin prefixes like
+      // `vite:react`) get filtered out by the plugin-prefix check below
+      // since they don't resolve to anything inside the plugin's tree.
+      // Note: a regex like `/^[a-z]+:/i` would also match Windows drive
+      // letters (`D:\...`) and silently strip every absolute path on
+      // Windows — explicitly avoided.
+      if (raw.startsWith('\0')) continue;
+      const abs = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+      const norm = path.normalize(abs);
+      if (norm.toLowerCase().startsWith(pluginPrefix)) {
+        set.add(norm);
+      }
+    }
+    return set;
+  }
+
   private async copyFilesToDist(
     plugin: Plugin,
     files: File[],
@@ -2249,7 +2372,8 @@ class BuildManager {
    */
   async buildPluginOtherFiles(
     pluginNameOrPath: string | Plugin,
-    outputDir?: string
+    outputDir?: string,
+    excludePaths?: ReadonlySet<string>
   ): Promise<void> {
     this.ensureInitialized();
 
@@ -2286,8 +2410,13 @@ class BuildManager {
         }
         return false;
       };
+      // Same exclusion shape as buildPluginJson — drop assets that the
+      // script bundlers already inlined.
+      const isExcluded = excludePaths && excludePaths.size > 0
+        ? (file: File) => excludePaths.has(path.normalize(file.fullPath))
+        : () => false;
       const otherFiles = plugin.files.filter(
-        (file) => !isHandledElsewhere(file)
+        (file) => !isHandledElsewhere(file) && !isExcluded(file)
       );
 
       for (const file of otherFiles) {
