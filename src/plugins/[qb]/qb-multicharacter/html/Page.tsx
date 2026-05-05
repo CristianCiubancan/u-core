@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Banknote, LogOut, Play, Plus, Trash2, Wallet, X } from 'lucide-react';
+import { LogOut, Play, Plus, Trash2, X } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
 import { fetchNui } from '@/utils/fetchNui';
@@ -96,6 +96,15 @@ const emptyRegister = (): RegisterData => ({
 });
 
 const moneyFmt = new Intl.NumberFormat('en-US');
+// Compact notation kicks in above $10K so small amounts stay precise
+// ($8,500 is meaningful) while large amounts collapse to a fixed-width
+// form that won't overflow the narrow card column ($1.2M, $84K).
+const moneyCompactFmt = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+const formatMoney = (n: number): string =>
+  Math.abs(n) >= 10_000 ? moneyCompactFmt.format(n) : moneyFmt.format(n);
 
 // Mock dataset that lets `pnpm dev`'s browser preview render something
 // useful — none of this is shipped to FXServer (the simulator only fires
@@ -417,21 +426,40 @@ const Page: React.FC = () => {
   if (!visible) return null;
 
   const slots = Array.from({ length: characterAmount }, (_, i) => i + 1);
-  const selected = selectedCid !== -1 ? characters[selectedCid] : undefined;
   const showLoading = !hasCharacters && view === 'grid';
+  // Footer Play/Delete enable only when a *filled* slot is selected —
+  // an empty slot's selection state is for entering the register flow,
+  // not for play/delete actions.
+  const selectedFilled =
+    selectedCid !== -1 && Boolean(characters[selectedCid]);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center font-serif text-foreground antialiased pointer-events-auto">
-      <div className="w-full max-w-5xl px-8 py-10">
-        <header className="mb-8 flex items-end justify-between gap-6">
-          <div>
-            <p className="font-mono text-[10px] tracking-[0.4em] uppercase text-brand-400/80">
+    <div className="fixed inset-0 font-serif text-foreground antialiased pointer-events-auto">
+      {/* Gradient scrim — fades from the world (transparent on the left)
+          into a darkened band that lets the panel sit on a solid dark
+          backdrop instead of floating against the live scene. Width is
+          ~1.6x the panel so the fade has room to ease. */}
+      <div
+        aria-hidden
+        className="absolute inset-y-0 right-0 w-[clamp(620px,62vw,920px)] bg-gradient-to-l from-gray-950/95 via-gray-950/70 to-transparent pointer-events-none"
+      />
+      <aside
+        className={cn(
+          'absolute right-0 top-0 h-screen w-[clamp(380px,38vw,560px)]',
+          'flex flex-col',
+          'bg-gray-950 border-l border-border/60 shadow-[-12px_0_40px_-8px_rgba(0,0,0,0.6)]',
+          'animate-[fadeIn_220ms_ease-out_both]'
+        )}
+      >
+        <header className="flex items-start justify-between gap-3 px-[clamp(1.25rem,2vw,2rem)] pt-[clamp(1.5rem,3vh,2.5rem)] pb-[clamp(1rem,2vh,1.5rem)] border-b border-border/40">
+          <div className="min-w-0">
+            <p className="font-mono uppercase text-brand-400/80 tracking-[0.4em] text-[clamp(0.6rem,0.7vw,0.75rem)]">
               {tx('characters_header', 'My Characters')}
             </p>
-            <h1 className="mt-2 font-display text-4xl font-light leading-tight text-balance">
+            <h1 className="mt-2 font-display font-light leading-[1.1] text-balance text-[clamp(1.5rem,2.4vw,2.625rem)]">
               {tx('select_character', 'Select a character')}
             </h1>
-            <p className="mt-1 font-serif text-sm text-foreground/60">
+            <p className="mt-1.5 font-serif text-foreground/60 text-[clamp(0.78rem,0.95vw,0.95rem)] leading-snug">
               {tx(
                 'select_character_subtitle',
                 'Choose a slot to begin or create a new identity.'
@@ -443,7 +471,7 @@ const Page: React.FC = () => {
             <button
               type="button"
               onClick={handleDisconnect}
-              className="dossier-action group inline-flex items-center gap-2 text-foreground/60 hover:text-destructive border-b border-input/60 hover:border-destructive/70"
+              className="dossier-action group inline-flex shrink-0 items-center gap-2 text-foreground/60 hover:text-destructive border-b border-input/60 hover:border-destructive/70"
             >
               <LogOut className="h-3.5 w-3.5" />
               {tx('disconnect', 'Disconnect')}
@@ -451,307 +479,292 @@ const Page: React.FC = () => {
           )}
         </header>
 
-        {showLoading && (
-          <div className="dossier-paper p-12 flex items-center justify-center">
-            <div className="flex items-center gap-4 text-foreground/70">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand-400 animate-pulse" />
-              <span className="font-mono text-[10px] tracking-[0.35em] uppercase">
-                {tx('retrieving_characters', 'Retrieving characters')}
-              </span>
+        <main className="flex-1 overflow-y-auto px-[clamp(1.25rem,2vw,2rem)] py-[clamp(1rem,2vh,1.5rem)]">
+          {showLoading && (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex items-center gap-3 text-foreground/70">
+                <span className="inline-block h-2 w-2 rounded-full bg-brand-400 animate-pulse" />
+                <span className="font-mono uppercase tracking-[0.35em] text-[clamp(0.6rem,0.7vw,0.75rem)]">
+                  {tx('retrieving_characters', 'Retrieving characters')}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!showLoading && view === 'grid' && (
-          <div
-            className={cn(
-              'grid gap-5',
-              characterAmount <= 2 && 'grid-cols-2',
-              characterAmount === 3 && 'grid-cols-3',
-              characterAmount >= 4 && 'grid-cols-2 md:grid-cols-4'
-            )}
-          >
-            {slots.map((cid) => {
-              const c = characters[cid];
-              const isSelected = selectedCid === cid;
-              if (!c) {
+          {!showLoading && view === 'grid' && (
+            <div className="flex flex-col gap-[clamp(0.5rem,0.9vw,0.875rem)]">
+              {slots.map((cid) => {
+                const c = characters[cid];
+                const isSelected = selectedCid === cid;
+
+                if (!c) {
+                  return (
+                    <button
+                      key={cid}
+                      type="button"
+                      onClick={() => handleSlotClick(cid)}
+                      className={cn(
+                        'dossier-paper group relative flex w-full items-center justify-center gap-3',
+                        'p-[clamp(0.625rem,1vw,1rem)]',
+                        'transition-colors duration-200 hover:border-brand-500/50',
+                        isSelected && 'dossier-paper-selected'
+                      )}
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-input/60 text-foreground/40 transition-colors group-hover:border-brand-400/70 group-hover:text-brand-300">
+                        <Plus className="h-4 w-4" strokeWidth={1.25} />
+                      </span>
+                      <span className="font-mono uppercase tracking-[0.35em] text-foreground/50 text-[clamp(0.55rem,0.65vw,0.7rem)]">
+                        {tx('empty_slot', 'Empty slot')}
+                      </span>
+                    </button>
+                  );
+                }
+
                 return (
                   <button
                     key={cid}
                     type="button"
                     onClick={() => handleSlotClick(cid)}
                     className={cn(
-                      'dossier-paper group relative flex h-64 flex-col items-center justify-center gap-3',
-                      'transition-colors duration-200 hover:border-brand-500/50',
+                      'dossier-paper group relative flex w-full items-center gap-3 text-left',
+                      'p-[clamp(0.625rem,1vw,1rem)]',
+                      'transition-colors duration-200 hover:border-brand-500/40',
                       isSelected && 'dossier-paper-selected'
                     )}
                   >
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full border border-input/60 text-foreground/40 transition-colors group-hover:border-brand-400/70 group-hover:text-brand-300">
-                      <Plus className="h-7 w-7" strokeWidth={1.25} />
-                    </span>
-                    <span className="font-mono text-[9px] tracking-[0.35em] uppercase text-foreground/50">
-                      {tx('empty_slot', 'Empty slot')}
-                    </span>
-                  </button>
-                );
-              }
-
-              return (
-                <button
-                  key={cid}
-                  type="button"
-                  onClick={() => handleSlotClick(cid)}
-                  className={cn(
-                    'dossier-paper group relative flex h-64 flex-col p-4 text-left',
-                    'transition-colors duration-200 hover:border-brand-500/40',
-                    isSelected && 'dossier-paper-selected'
-                  )}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="font-mono text-[9px] tracking-[0.35em] uppercase text-foreground/40">
-                      #{String(cid).padStart(2, '0')}
-                    </span>
-                  </div>
-
-                  <div className="mt-auto space-y-3">
-                    <div>
-                      <p className="font-display text-xl leading-tight text-balance">
+                    {/* Identity column — name & job, takes remaining width */}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-mono uppercase tracking-[0.35em] text-foreground/40 text-[clamp(0.5rem,0.6vw,0.65rem)]">
+                        #{String(cid).padStart(2, '0')}
+                      </span>
+                      <p className="mt-0.5 font-display leading-[1.15] text-balance truncate text-[clamp(0.95rem,1.2vw,1.35rem)]">
                         {c.charinfo.firstname} {c.charinfo.lastname}
                       </p>
-                      <p className="mt-0.5 font-mono text-[9.5px] tracking-[0.25em] uppercase text-foreground/55">
+                      <p className="mt-0.5 font-mono uppercase tracking-[0.25em] text-foreground/55 truncate text-[clamp(0.55rem,0.7vw,0.75rem)]">
                         {c.job?.label}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-border/40 pt-3 text-[12px] text-foreground/75">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Wallet className="h-3.5 w-3.5 text-brand-400/80" />
-                        ${moneyFmt.format(c.money?.cash ?? 0)}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Banknote className="h-3.5 w-3.5 text-brand-400/80" />
-                        ${moneyFmt.format(c.money?.bank ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <div className="absolute right-3 top-3 flex gap-2">
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label={tx('play_button', 'Play')}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          handlePlay();
-                        }}
-                        onKeyDown={(ev) => {
-                          if (ev.key === 'Enter' || ev.key === ' ') {
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            handlePlay();
-                          }
-                        }}
-                        className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-brand-500/50 bg-brand-500/10 text-brand-300 transition-colors hover:bg-brand-500/25 hover:text-brand-100"
-                      >
-                        <Play className="h-3.5 w-3.5" fill="currentColor" />
-                      </span>
-                      {allowDelete && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          aria-label={tx('delete_button', 'Delete')}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            setShowDelete(true);
-                          }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === 'Enter' || ev.key === ' ') {
-                              ev.preventDefault();
-                              ev.stopPropagation();
-                              setShowDelete(true);
-                            }
-                          }}
-                          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-destructive/50 bg-destructive/10 text-destructive transition-colors hover:bg-destructive/25"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                    {/* Stats column — cash/bank stacked, right-aligned */}
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 border-l border-border/40 pl-3 text-foreground/80 text-[clamp(0.75rem,0.9vw,0.95rem)]">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono uppercase tracking-[0.2em] text-foreground/45 text-[clamp(0.5rem,0.6vw,0.65rem)]">
+                          {tx('cash', 'Cash')}
                         </span>
-                      )}
+                        <span className="font-mono tabular-nums">
+                          ${formatMoney(c.money?.cash ?? 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono uppercase tracking-[0.2em] text-foreground/45 text-[clamp(0.5rem,0.6vw,0.65rem)]">
+                          {tx('bank', 'Bank')}
+                        </span>
+                        <span className="font-mono tabular-nums">
+                          ${formatMoney(c.money?.bank ?? 0)}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
-        {view === 'register' && (
-          <form
-            onSubmit={handleSubmit}
-            className="dossier-paper relative mx-auto max-w-xl p-8"
-          >
-            <div className="flex items-start justify-between border-b border-border/50 pb-4">
-              <div>
-                <p className="font-mono text-[9.5px] tracking-[0.4em] uppercase text-brand-400/80">
-                  {tx('new_character', 'New character')}
-                </p>
-                <h2 className="mt-1 font-display text-2xl font-light">
-                  {tx('chardel_header', 'Character Registration')}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleCancelRegister}
-                aria-label={tx('cancel', 'Cancel')}
-                className="text-foreground/50 transition-colors hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+                  </button>
+                );
+              })}
             </div>
+          )}
 
-            <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5">
-              <div className="space-y-1.5 col-span-1">
-                <Label htmlFor="firstname">
-                  {tx('firstname', 'First Name')}
-                </Label>
-                <Input
-                  id="firstname"
-                  value={registerData.firstname}
-                  onChange={(e) => setField('firstname', e.target.value)}
-                  aria-invalid={!!errors.firstname}
-                  maxLength={32}
-                  autoComplete="off"
-                />
-                {errors.firstname && <ErrorCaption text={errors.firstname} />}
-              </div>
-
-              <div className="space-y-1.5 col-span-1">
-                <Label htmlFor="lastname">{tx('lastname', 'Last Name')}</Label>
-                <Input
-                  id="lastname"
-                  value={registerData.lastname}
-                  onChange={(e) => setField('lastname', e.target.value)}
-                  aria-invalid={!!errors.lastname}
-                  maxLength={32}
-                  autoComplete="off"
-                />
-                {errors.lastname && <ErrorCaption text={errors.lastname} />}
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="nationality">
-                  {tx('nationality', 'Nationality')}
-                </Label>
-                {customNationality ? (
-                  <>
-                    <Input
-                      id="nationality"
-                      value={registerData.nationality}
-                      onChange={(e) => setField('nationality', e.target.value)}
-                      aria-invalid={!!errors.nationality}
-                      autoComplete="off"
-                    />
-                    {errors.nationality && (
-                      <ErrorCaption text={errors.nationality} />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Select
-                      open={openSelect === 'nationality'}
-                      onOpenChange={(o) =>
-                        setOpenSelect(o ? 'nationality' : null)
-                      }
-                      value={registerData.nationality}
-                      onValueChange={(v) => setField('nationality', v)}
-                    >
-                      <SelectTrigger
-                        id="nationality"
-                        aria-invalid={!!errors.nationality}
-                      >
-                        <SelectValue
-                          placeholder={tx('nationality', 'Nationality')}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>{countryItems}</SelectContent>
-                    </Select>
-                    {errors.nationality && (
-                      <ErrorCaption text={errors.nationality} />
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-1.5 col-span-1">
-                <Label htmlFor="gender">{tx('gender', 'Gender')}</Label>
-                <Select
-                  open={openSelect === 'gender'}
-                  onOpenChange={(o) => setOpenSelect(o ? 'gender' : null)}
-                  value={registerData.gender}
-                  onValueChange={(v) => setField('gender', v)}
+          {view === 'register' && (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-mono uppercase tracking-[0.4em] text-brand-400/80 text-[clamp(0.6rem,0.7vw,0.75rem)]">
+                    {tx('new_character', 'New character')}
+                  </p>
+                  <h2 className="mt-1 font-display font-light text-[clamp(1.125rem,1.6vw,1.75rem)]">
+                    {tx('chardel_header', 'Character Registration')}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleCancelRegister}
+                  aria-label={tx('cancel', 'Cancel')}
+                  className="text-foreground/50 transition-colors hover:text-foreground"
                 >
-                  <SelectTrigger id="gender" aria-invalid={!!errors.gender}>
-                    <SelectValue placeholder={tx('gender', 'Gender')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={tx('male', 'Male')}>
-                      {tx('male', 'Male')}
-                    </SelectItem>
-                    <SelectItem value={tx('female', 'Female')}>
-                      {tx('female', 'Female')}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.gender && <ErrorCaption text={errors.gender} />}
+                  <X className="h-4 w-4" />
+                </button>
               </div>
 
-              <div className="space-y-1.5 col-span-1">
-                <DatePicker
-                  id="birthdate"
-                  label={tx('birthdate', 'Birthdate')}
-                  selected={
-                    registerData.date && isValidDate(registerData.date)
-                      ? new Date(registerData.date + 'T00:00:00')
-                      : null
-                  }
-                  onChange={(d) =>
-                    setField(
-                      'date',
-                      d
-                        ? `${d.getFullYear()}-${String(
-                            d.getMonth() + 1
-                          ).padStart(2, '0')}-${String(d.getDate()).padStart(
-                            2,
-                            '0'
-                          )}`
-                        : ''
-                    )
-                  }
-                  error={errors.date}
-                  minDate={new Date(1900, 0, 1)}
-                  maxDate={new Date()}
-                  yearNav
-                />
-              </div>
-            </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                <div className="space-y-1.5 col-span-1">
+                  <Label htmlFor="firstname">
+                    {tx('firstname', 'First Name')}
+                  </Label>
+                  <Input
+                    id="firstname"
+                    value={registerData.firstname}
+                    onChange={(e) => setField('firstname', e.target.value)}
+                    aria-invalid={!!errors.firstname}
+                    maxLength={32}
+                    autoComplete="off"
+                  />
+                  {errors.firstname && <ErrorCaption text={errors.firstname} />}
+                </div>
 
-            <div className="mt-8 flex items-center justify-end gap-3 border-t border-border/50 pt-5">
+                <div className="space-y-1.5 col-span-1">
+                  <Label htmlFor="lastname">
+                    {tx('lastname', 'Last Name')}
+                  </Label>
+                  <Input
+                    id="lastname"
+                    value={registerData.lastname}
+                    onChange={(e) => setField('lastname', e.target.value)}
+                    aria-invalid={!!errors.lastname}
+                    maxLength={32}
+                    autoComplete="off"
+                  />
+                  {errors.lastname && <ErrorCaption text={errors.lastname} />}
+                </div>
+
+                <div className="space-y-1.5 col-span-2">
+                  <Label htmlFor="nationality">
+                    {tx('nationality', 'Nationality')}
+                  </Label>
+                  {customNationality ? (
+                    <>
+                      <Input
+                        id="nationality"
+                        value={registerData.nationality}
+                        onChange={(e) =>
+                          setField('nationality', e.target.value)
+                        }
+                        aria-invalid={!!errors.nationality}
+                        autoComplete="off"
+                      />
+                      {errors.nationality && (
+                        <ErrorCaption text={errors.nationality} />
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Select
+                        open={openSelect === 'nationality'}
+                        onOpenChange={(o) =>
+                          setOpenSelect(o ? 'nationality' : null)
+                        }
+                        value={registerData.nationality}
+                        onValueChange={(v) => setField('nationality', v)}
+                      >
+                        <SelectTrigger
+                          id="nationality"
+                          aria-invalid={!!errors.nationality}
+                        >
+                          <SelectValue
+                            placeholder={tx('nationality', 'Nationality')}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>{countryItems}</SelectContent>
+                      </Select>
+                      {errors.nationality && (
+                        <ErrorCaption text={errors.nationality} />
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 col-span-1">
+                  <Label htmlFor="gender">{tx('gender', 'Gender')}</Label>
+                  <Select
+                    open={openSelect === 'gender'}
+                    onOpenChange={(o) => setOpenSelect(o ? 'gender' : null)}
+                    value={registerData.gender}
+                    onValueChange={(v) => setField('gender', v)}
+                  >
+                    <SelectTrigger id="gender" aria-invalid={!!errors.gender}>
+                      <SelectValue placeholder={tx('gender', 'Gender')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={tx('male', 'Male')}>
+                        {tx('male', 'Male')}
+                      </SelectItem>
+                      <SelectItem value={tx('female', 'Female')}>
+                        {tx('female', 'Female')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.gender && <ErrorCaption text={errors.gender} />}
+                </div>
+
+                <div className="space-y-1.5 col-span-1">
+                  <DatePicker
+                    id="birthdate"
+                    label={tx('birthdate', 'Birthdate')}
+                    selected={
+                      registerData.date && isValidDate(registerData.date)
+                        ? new Date(registerData.date + 'T00:00:00')
+                        : null
+                    }
+                    onChange={(d) =>
+                      setField(
+                        'date',
+                        d
+                          ? `${d.getFullYear()}-${String(
+                              d.getMonth() + 1
+                            ).padStart(2, '0')}-${String(d.getDate()).padStart(
+                              2,
+                              '0'
+                            )}`
+                          : ''
+                      )
+                    }
+                    error={errors.date}
+                    minDate={new Date(1900, 0, 1)}
+                    maxDate={new Date()}
+                    yearNav
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-border/50 pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleCancelRegister}
+                >
+                  {tx('cancel', 'Cancel')}
+                </Button>
+                <Button type="submit" size="lg">
+                  {tx('create_button', 'Create Character')}
+                </Button>
+              </div>
+            </form>
+          )}
+        </main>
+
+        {view === 'grid' && !showLoading && (
+          <footer className="flex items-center justify-end gap-2 px-[clamp(1.25rem,2vw,2rem)] py-[clamp(0.75rem,1.5vh,1.25rem)] border-t border-border/40">
+            {allowDelete && (
               <Button
                 type="button"
-                variant="secondary"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleCancelRegister}
+                variant="destructive"
+                disabled={!selectedFilled}
+                onClick={() => setShowDelete(true)}
               >
-                {tx('cancel', 'Cancel')}
+                <Trash2 className="h-3.5 w-3.5" />
+                {tx('delete_button', 'Delete')}
               </Button>
-              <Button type="submit" size="lg">
-                {tx('create_button', 'Create Character')}
-              </Button>
-            </div>
-          </form>
+            )}
+            <Button
+              type="button"
+              variant="default"
+              disabled={!selectedFilled}
+              onClick={handlePlay}
+            >
+              <Play className="h-3.5 w-3.5" fill="currentColor" />
+              {tx('play_button', 'Play')}
+            </Button>
+          </footer>
         )}
-      </div>
+      </aside>
 
       <AlertDialog
         open={showDelete}
