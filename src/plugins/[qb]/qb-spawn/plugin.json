@@ -4,8 +4,8 @@
   "fx_version": "cerulean",
   "games": ["gta5"],
   "lua54": true,
-  "author": "Kakarot (upstream); u-core (React UI)",
-  "description": "Allows players to select a spawn point from a list of available locations. Upstream Lua scripts; u-core React UI replacing the upstream Vue overlay.",
+  "author": "Kakarot",
+  "description": "Allows players to select a spawn point from a list of available locations",
   "shared_scripts": [
     "@qb-core/shared/locale.lua",
     "locales/en.lua",
@@ -14,7 +14,15 @@
     "@qb-apartments/config.lua"
   ],
   "client_scripts": ["client.lua"],
-  "server_scripts": ["@oxmysql/lib/MySQL.lua", "server.lua"],
+  "server_scripts": [
+    "@oxmysql/lib/MySQL.lua",
+    "server.lua"
+  ],
   "ui_page": "html/index.html",
-  "files": ["html/index.html", "html/main.js"]
+  "files": [
+    "html/index.html",
+    "html/style.css",
+    "html/vue.js",
+    "html/reset.css"
+  ]
 }

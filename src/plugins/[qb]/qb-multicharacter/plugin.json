@@ -4,8 +4,8 @@
   "fx_version": "cerulean",
   "games": ["gta5"],
   "lua54": true,
-  "author": "Kakarot (upstream); u-core (React UI)",
-  "description": "Allows players to create multiple characters. Upstream Lua scripts; u-core React UI replacing the upstream Vue overlay.",
+  "author": "Kakarot",
+  "description": "Allows players to create multiple characters",
   "shared_scripts": [
     "@qb-core/shared/locale.lua",
     "locales/en.lua",
@@ -19,6 +19,16 @@
     "server/main.lua"
   ],
   "ui_page": "html/index.html",
-  "files": ["html/index.html", "html/main.js", "countries.json"],
+  "files": [
+    "html/index.html",
+    "html/style.css",
+    "html/reset.css",
+    "html/vue.js",
+    "html/swal2.js",
+    "html/profanity.js",
+    "html/translations.js",
+    "html/validation.js",
+    "html/app.js"
+  ],
   "dependencies": ["qb-core", "qb-spawn"]
 }

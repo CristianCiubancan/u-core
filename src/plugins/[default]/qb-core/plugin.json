@@ -4,7 +4,7 @@
   "fx_version": "cerulean",
   "games": ["gta5"],
   "lua54": true,
-  "author": "Kakarot (upstream qbcore-framework/qb-core)",
+  "author": "Kakarot",
   "description": "Core resource for the framework, contains all the core functionality and features",
   "shared_scripts": [
     "config.lua",
