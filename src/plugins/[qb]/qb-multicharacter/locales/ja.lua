@@ -67,7 +67,29 @@ local Translations = {
         -- Notifications
         ran_into_issue = "問題が発生しました。",
         profanity = "名前、出身国に不謹慎な言葉が使用されているようです。",
-        forgotten_field = "何らかの入力欄が空白のようです。"
+        forgotten_field = "何らかの入力欄が空白のようです。",
+
+        -- u-core: React UIで使用するキー（バリデーション文言とUI
+        -- 表示テキスト）。Lang:replace() による実行時の言語切替は
+        -- Polyglot のフォールバックチェーンを保持しないため、
+        -- 各ロケールに翻訳を直接記載する必要がある。未翻訳の
+        -- キーは `translations` ペイロードに含まれず、UI に表示
+        -- されない。
+        firstname_too_short = "名は2文字以上で入力してください。",
+        firstname_too_long = "名は16文字以下で入力してください。",
+        lastname_too_short = "姓は2文字以上で入力してください。",
+        lastname_too_long = "姓は16文字以下で入力してください。",
+        invalid_date = "有効な生年月日を入力してください。",
+        err_required = "必須",
+        err_too_short = "短すぎます",
+        err_too_long = "長すぎます",
+        err_profanity = "使用できません",
+        err_invalid_date = "無効な日付",
+        select_character = "キャラクターを選択",
+        select_character_subtitle = "スロットを選択して開始するか、新しい身分を作成してください。",
+        empty_slot = "空きスロット",
+        new_character = "新規キャラクター",
+        disconnect = "切断"
     }
 }
 

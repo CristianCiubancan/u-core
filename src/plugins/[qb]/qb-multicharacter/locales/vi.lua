@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Chúng tôi gặp sự cố",
         profanity = "Có vẻ như bạn đang cố gắng sử dụng một số từ ngữ tục tĩu/xấu xa trong tên hoặc quốc tịch của bạn!",
-        forgotten_field = "Có vẻ như bạn đã quên nhập một hoặc nhiều trường!"
+        forgotten_field = "Có vẻ như bạn đã quên nhập một hoặc nhiều trường!",
+
+        -- u-core: các khóa được giao diện React sử dụng (xác thực biểu
+        -- mẫu và văn bản giao diện). Dịch riêng cho từng locale vì
+        -- việc đổi ngôn ngữ tại runtime qua Lang:replace() không giữ
+        -- chuỗi fallback của Polyglot — các khóa thiếu sẽ không xuất
+        -- hiện trong payload `translations` gửi đến giao diện React.
+        firstname_too_short = "Tên phải có ít nhất 2 ký tự.",
+        firstname_too_long = "Tên không được vượt quá 16 ký tự.",
+        lastname_too_short = "Họ phải có ít nhất 2 ký tự.",
+        lastname_too_long = "Họ không được vượt quá 16 ký tự.",
+        invalid_date = "Vui lòng nhập ngày sinh hợp lệ.",
+        err_required = "Bắt buộc",
+        err_too_short = "Quá ngắn",
+        err_too_long = "Quá dài",
+        err_profanity = "Không được phép",
+        err_invalid_date = "Ngày không hợp lệ",
+        select_character = "Chọn nhân vật",
+        select_character_subtitle = "Chọn ô để bắt đầu hoặc tạo nhân vật mới.",
+        empty_slot = "Ô trống",
+        new_character = "Nhân vật mới",
+        disconnect = "Ngắt kết nối"
     }
 }
 

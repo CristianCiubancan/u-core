@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Abbiamo riscontrato un problema, contatta lo staff",
         profanity = "Sembra che tu stia usando qualche parola non consentita nella creazione del personaggio!",
-        forgotten_field = "Tutti i campi devono essere compialti!"
+        forgotten_field = "Tutti i campi devono essere compialti!",
+
+        -- u-core: chiavi usate dall'UI React (validazione + testi
+        -- dell'interfaccia). Tradotte per ogni locale perché lo
+        -- swap a runtime via Lang:replace() non preserva la catena
+        -- di fallback di Polyglot: le chiavi mancanti non
+        -- comparirebbero nel payload `translations` inviato all'UI.
+        firstname_too_short = "Il nome deve contenere almeno 2 caratteri.",
+        firstname_too_long = "Il nome non può superare i 16 caratteri.",
+        lastname_too_short = "Il cognome deve contenere almeno 2 caratteri.",
+        lastname_too_long = "Il cognome non può superare i 16 caratteri.",
+        invalid_date = "Inserisci una data di nascita valida.",
+        err_required = "Obbligatorio",
+        err_too_short = "Troppo corto",
+        err_too_long = "Troppo lungo",
+        err_profanity = "Non consentito",
+        err_invalid_date = "Data non valida",
+        select_character = "Seleziona un personaggio",
+        select_character_subtitle = "Scegli uno slot per iniziare o creare una nuova identità.",
+        empty_slot = "Slot vuoto",
+        new_character = "Nuovo personaggio",
+        disconnect = "Disconnetti"
     }
 }
 

@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Törmäsimme ongelmaan",
         profanity = "Vaikuttaa siltä, että yrität käyttää jonkinlaista kiroilua/pahoja sanoja nimessäsi tai kansallisuudessasi!",
-        forgotten_field = "Näyttää siltä, että olet unohtanut syöttää yhden tai useita kenttiä!"
+        forgotten_field = "Näyttää siltä, että olet unohtanut syöttää yhden tai useita kenttiä!",
+
+        -- u-core: avaimet, joita React-käyttöliittymä käyttää (kenttien
+        -- vahvistus + käyttöliittymän tekstit). Käännetty jokaiselle
+        -- kielelle erikseen, koska ajonaikainen vaihto Lang:replace()
+        -- -funktiolla ei säilytä Polyglotin fallback-ketjua —
+        -- puuttuvat avaimet eivät ilmestyisi `translations`-payloadiin.
+        firstname_too_short = "Etunimen tulee olla vähintään 2 merkkiä pitkä.",
+        firstname_too_long = "Etunimi ei voi olla yli 16 merkkiä pitkä.",
+        lastname_too_short = "Sukunimen tulee olla vähintään 2 merkkiä pitkä.",
+        lastname_too_long = "Sukunimi ei voi olla yli 16 merkkiä pitkä.",
+        invalid_date = "Anna kelvollinen syntymäaika.",
+        err_required = "Pakollinen",
+        err_too_short = "Liian lyhyt",
+        err_too_long = "Liian pitkä",
+        err_profanity = "Ei sallittu",
+        err_invalid_date = "Virheellinen päivämäärä",
+        select_character = "Valitse hahmo",
+        select_character_subtitle = "Valitse paikka aloittaaksesi tai luo uusi henkilöllisyys.",
+        empty_slot = "Tyhjä paikka",
+        new_character = "Uusi hahmo",
+        disconnect = "Katkaise yhteys"
     }
 }
 

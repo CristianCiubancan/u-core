@@ -54,6 +54,8 @@ type Character = {
   job: Job;
 };
 
+type LocaleEntry = { code: string; name: string };
+
 type UiPayload = {
   action: 'ui';
   customNationality?: boolean;
@@ -62,11 +64,24 @@ type UiPayload = {
   enableDeleteButton?: boolean;
   translations?: Record<string, string>;
   countries?: string[];
+  currentLocale?: string;
+  availableLocales?: LocaleEntry[];
 };
 
 type SetupCharactersPayload = {
   action: 'setupCharacters';
   characters?: Character[];
+};
+
+type LocaleChangedPayload = {
+  action: 'localeChanged';
+  currentLocale?: string;
+  translations?: Record<string, string>;
+};
+
+type SetVisiblePayload = {
+  action: 'setVisible';
+  visible?: boolean;
 };
 
 type RegisterErrors = Partial<
@@ -170,6 +185,14 @@ const BROWSER_MOCK_CHARACTERS: Character[] = [
 
 const BROWSER_MOCK_COUNTRIES = ['United States', 'Romania', 'Japan', 'Brazil'];
 
+const BROWSER_MOCK_LOCALES: LocaleEntry[] = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+  { code: 'pt-br', name: 'Português (BR)' },
+];
+
 const isValidDate = (value: string): boolean => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split('-').map((n) => parseInt(n, 10));
@@ -212,6 +235,12 @@ const Page: React.FC = () => {
   const [hasCharacters, setHasCharacters] = React.useState<boolean>(
     isEnvBrowser() ? true : false
   );
+  const [currentLocale, setCurrentLocale] = React.useState<string>(
+    isEnvBrowser() ? 'en' : 'en'
+  );
+  const [availableLocales, setAvailableLocales] = React.useState<LocaleEntry[]>(
+    isEnvBrowser() ? BROWSER_MOCK_LOCALES : []
+  );
 
   const [selectedCid, setSelectedCid] = React.useState<number>(-1);
   const [view, setView] = React.useState<'grid' | 'register'>('grid');
@@ -225,7 +254,7 @@ const Page: React.FC = () => {
   // unreliable when sibling Selects shared the form (per the
   // feedback_radix_select_onblur memory).
   const [openSelect, setOpenSelect] = React.useState<
-    'gender' | 'nationality' | null
+    'gender' | 'nationality' | 'locale' | null
   >(null);
 
   const tx = React.useCallback(
@@ -253,6 +282,12 @@ const Page: React.FC = () => {
     if (data.translations) setTranslations(data.translations);
     if (data.countries) setCountries(data.countries);
     if (typeof data.nChar === 'number') setCharacterAmount(data.nChar);
+    if (typeof data.currentLocale === 'string') {
+      setCurrentLocale(data.currentLocale);
+    }
+    if (Array.isArray(data.availableLocales)) {
+      setAvailableLocales(data.availableLocales);
+    }
 
     setSelectedCid(-1);
     setView('grid');
@@ -279,6 +314,53 @@ const Page: React.FC = () => {
     // theatre — we do the same as soon as the grid is ready.
     void fetchNui('removeBlur');
   });
+
+  // Locale-change echo from qb-core's broadcast (relayed by our
+  // resource's client/main.lua). Server is the source of truth — we
+  // only flip state when this fires, not optimistically on the picker
+  // change.
+  useNuiEvent<LocaleChangedPayload>('localeChanged', (data) => {
+    if (typeof data.currentLocale === 'string') {
+      setCurrentLocale(data.currentLocale);
+    }
+    if (data.translations) setTranslations(data.translations);
+  });
+
+  // Pause-menu suspend/resume. Lua side toggles `visible` when the
+  // GTA pause menu opens/closes mid-session so the React UI isn't
+  // painting on top of the pause overlay. Distinct from the `ui`
+  // toggle path because we want to PRESERVE state (selectedCid,
+  // form, etc.) — this is just visibility, not a session reset.
+  useNuiEvent<SetVisiblePayload>('setVisible', (data) => {
+    if (typeof data.visible === 'boolean') setVisible(!!data.visible);
+  });
+
+  // Window-focus suspend/resume. Catches the FiveM client's OS-level
+  // quit prompt (X button, ALT+F4) which isn't a GTA pause menu or
+  // warning screen — Lua-side `IsPauseMenuActive`/`IsWarningMessageActive`
+  // both stay false for it, so the polling thread can't see it. The
+  // webview's `window.blur` does fire when the CEF surface loses focus
+  // to the FiveM frontend prompt, so we use that to mirror what the
+  // pause-menu path does: hide locally + ask Lua to release NUI focus
+  // so the prompt is clickable. On focus return, do the inverse.
+  const [osFocused, setOsFocused] = React.useState<boolean>(true);
+  React.useEffect(() => {
+    if (isEnvBrowser()) return;
+    const onBlur = () => {
+      setOsFocused(false);
+      void fetchNui('uiBlurred');
+    };
+    const onFocus = () => {
+      setOsFocused(true);
+      void fetchNui('uiFocused');
+    };
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   // ---- grid actions ---------------------------------------------------
 
@@ -316,6 +398,15 @@ const Page: React.FC = () => {
 
   const handleDisconnect = () => {
     void fetchNui('disconnectButton');
+  };
+
+  const handleLocaleChange = (next: string) => {
+    if (next === currentLocale) return;
+    void fetchNui('setLocale', { locale: next });
+    // Don't flip currentLocale here — wait for the localeChanged echo
+    // so the picker only shows the change after the server confirms
+    // the write. If the server rejects (unknown code), we stay on the
+    // current value.
   };
 
   // ---- register form --------------------------------------------------
@@ -421,9 +512,22 @@ const Page: React.FC = () => {
     [countries]
   );
 
+  // Locale list is short (~15) but memoize on the same principle —
+  // the grid view re-renders on every selection / hover and we don't
+  // want to thrash 15 SelectItem elements when the picker is closed.
+  const localeItems = React.useMemo(
+    () =>
+      availableLocales.map((entry) => (
+        <SelectItem key={entry.code} value={entry.code}>
+          {entry.name}
+        </SelectItem>
+      )),
+    [availableLocales]
+  );
+
   // ---- render ---------------------------------------------------------
 
-  if (!visible) return null;
+  if (!visible || !osFocused) return null;
 
   const slots = Array.from({ length: characterAmount }, (_, i) => i + 1);
   const showLoading = !hasCharacters && view === 'grid';
@@ -468,14 +572,32 @@ const Page: React.FC = () => {
           </div>
 
           {view === 'grid' && !showLoading && (
-            <button
-              type="button"
-              onClick={handleDisconnect}
-              className="dossier-action group inline-flex shrink-0 items-center gap-2 text-foreground/60 hover:text-destructive border-b border-input/60 hover:border-destructive/70"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              {tx('disconnect', 'Disconnect')}
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-2 min-w-[8rem]">
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="dossier-action group inline-flex items-center gap-2 text-foreground/60 hover:text-destructive border-b border-input/60 hover:border-destructive/70"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {tx('disconnect', 'Disconnect')}
+              </button>
+              {availableLocales.length > 0 && (
+                <Select
+                  open={openSelect === 'locale'}
+                  onOpenChange={(o) => setOpenSelect(o ? 'locale' : null)}
+                  value={currentLocale}
+                  onValueChange={handleLocaleChange}
+                >
+                  <SelectTrigger
+                    className="h-auto py-1 text-[clamp(0.7rem,0.85vw,0.9rem)]"
+                    aria-label="Locale"
+                  >
+                    <SelectValue placeholder={currentLocale} />
+                  </SelectTrigger>
+                  <SelectContent>{localeItems}</SelectContent>
+                </Select>
+              )}
+            </div>
           )}
         </header>
 

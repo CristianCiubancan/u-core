@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Vi stötte på ett problem",
         profanity = "Du verkar ha försökt använda någon sorts svordom eller fult ord i ditt namn eller nationalitet!",
-        forgotten_field = "Det verkar som att du glömt fylla i någon utav fälten!"
+        forgotten_field = "Det verkar som att du glömt fylla i någon utav fälten!",
+
+        -- u-core: nycklar som används av React-gränssnittet (validering
+        -- och text i gränssnittet). Översätts per språk eftersom
+        -- runtime-byte via Lang:replace() inte bevarar Polyglots
+        -- fallback-kedja — saknade nycklar skulle helt enkelt inte
+        -- finnas i `translations`-payloaden som skickas till UI:t.
+        firstname_too_short = "Förnamnet måste vara minst 2 tecken långt.",
+        firstname_too_long = "Förnamnet får inte överstiga 16 tecken.",
+        lastname_too_short = "Efternamnet måste vara minst 2 tecken långt.",
+        lastname_too_long = "Efternamnet får inte överstiga 16 tecken.",
+        invalid_date = "Ange ett giltigt födelsedatum.",
+        err_required = "Obligatoriskt",
+        err_too_short = "För kort",
+        err_too_long = "För långt",
+        err_profanity = "Inte tillåtet",
+        err_invalid_date = "Ogiltigt datum",
+        select_character = "Välj en karaktär",
+        select_character_subtitle = "Välj en plats för att börja eller skapa en ny identitet.",
+        empty_slot = "Tom plats",
+        new_character = "Ny karaktär",
+        disconnect = "Koppla från"
     }
 }
 

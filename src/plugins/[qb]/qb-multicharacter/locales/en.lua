@@ -73,8 +73,11 @@ local Translations = {
         -- carried equivalents in translations.js fallbacks (never in
         -- en.lua). Adding them here lets `Lang:t('ui.<key>')` flow
         -- through the SendNUIMessage('ui').translations payload to the
-        -- React tx() helper, and Polyglot's fallback chain delivers the
-        -- en value to the other 14 locale files for free.
+        -- React tx() helper. Mirrored across all 14 other locale files
+        -- under matching `-- u-core:` blocks — runtime Lang:replace()
+        -- swaps don't preserve Polyglot's fallback chain, so each
+        -- locale must carry its own translations or those keys would
+        -- silently drop from the payload.
         firstname_too_short = "First name must be at least 2 characters long.",
         firstname_too_long = "First name cannot exceed 16 characters.",
         lastname_too_short = "Last name must be at least 2 characters long.",

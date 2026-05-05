@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Nous avons rencontré un problème",
         profanity = "Il semblerait que vous essayez d'utiliser une profanité / gros mot dans votre nom / nationalité!",
-        forgotten_field = "Il semblerait que vous avez oublié de remplir un ou plusieurs champ(s)!"
+        forgotten_field = "Il semblerait que vous avez oublié de remplir un ou plusieurs champ(s)!",
+
+        -- u-core: clés consommées par l'interface React (validation +
+        -- éléments de l'interface). Traduites par locale car le swap
+        -- au runtime via Lang:replace() ne préserve pas la chaîne de
+        -- fallback Polyglot : les clés manquantes seraient absentes
+        -- du payload `translations` envoyé à l'UI React.
+        firstname_too_short = "Le prénom doit comporter au moins 2 caractères.",
+        firstname_too_long = "Le prénom ne peut pas dépasser 16 caractères.",
+        lastname_too_short = "Le nom doit comporter au moins 2 caractères.",
+        lastname_too_long = "Le nom ne peut pas dépasser 16 caractères.",
+        invalid_date = "Veuillez saisir une date de naissance valide.",
+        err_required = "Requis",
+        err_too_short = "Trop court",
+        err_too_long = "Trop long",
+        err_profanity = "Interdit",
+        err_invalid_date = "Date invalide",
+        select_character = "Choisir un personnage",
+        select_character_subtitle = "Sélectionnez un emplacement pour commencer ou créer une nouvelle identité.",
+        empty_slot = "Emplacement vide",
+        new_character = "Nouveau personnage",
+        disconnect = "Déconnexion"
     }
 }
 

@@ -180,7 +180,16 @@ QBCore.Functions.CreateCallback('qb-multicharacter:server:GetNumberOfCharacters'
     else
         numOfChars = Config.DefaultNumberOfCharacters
     end
-    cb(numOfChars, Countries)
+    -- u-core: warm + return the per-license locale alongside the
+    -- numbers/countries the upstream callback returns. The multichar
+    -- UI opens BEFORE QBCore:Server:PlayerLoaded fires (the player
+    -- isn't logged in yet), so a license-DB read here is the first
+    -- chance we have to populate the locale state for the React UI.
+    -- The qb-core export both populates the source-keyed cache as a
+    -- side effect AND returns the resolved code synchronously.
+    local currentLocale = exports['qb-core']:EnsurePlayerLocale(src)
+    local localeManifest = exports['qb-core']:GetLocaleManifest()
+    cb(numOfChars, Countries, currentLocale, localeManifest)
 end)
 
 QBCore.Functions.CreateCallback('qb-multicharacter:server:setupCharacters', function(source, cb)

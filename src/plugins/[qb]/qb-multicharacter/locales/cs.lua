@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "Narazili jsme na problém",
         profanity = "Zdá se, že se snažíte použít nějaký druh nadávek / sprostých slov ve svém jménu nebo národnosti!",
-        forgotten_field = "Zdá se, že jste zapomněli zadat jedno nebo více polí!"
+        forgotten_field = "Zdá se, že jste zapomněli zadat jedno nebo více polí!",
+
+        -- u-core: klíče používané React rozhraním (validace + texty
+        -- rozhraní). Přeloženo do každého jazyka zvlášť, protože
+        -- výměna za běhu pomocí Lang:replace() nezachovává Polyglot
+        -- fallback řetězec — chybějící klíče by se nedostaly do
+        -- `translations` payloadu odeslaného do React UI.
+        firstname_too_short = "Křestní jméno musí mít alespoň 2 znaky.",
+        firstname_too_long = "Křestní jméno nesmí být delší než 16 znaků.",
+        lastname_too_short = "Příjmení musí mít alespoň 2 znaky.",
+        lastname_too_long = "Příjmení nesmí být delší než 16 znaků.",
+        invalid_date = "Zadejte platné datum narození.",
+        err_required = "Povinné",
+        err_too_short = "Příliš krátké",
+        err_too_long = "Příliš dlouhé",
+        err_profanity = "Nepovoleno",
+        err_invalid_date = "Neplatné datum",
+        select_character = "Vyberte postavu",
+        select_character_subtitle = "Vyberte slot pro začátek nebo vytvořte novou identitu.",
+        empty_slot = "Prázdný slot",
+        new_character = "Nová postava",
+        disconnect = "Odpojit"
     }
 }
 

@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "We kwamen een probleem tegen (report dit aub)",
         profanity = "Het lijkt erop dat u probeert een soort godslastering / slechte woorden in uw naam of nationaliteit te gebruiken!",
-        forgotten_field = "Het lijkt erop dat je bent vergeten een of meerdere van de velden in te voeren!"
+        forgotten_field = "Het lijkt erop dat je bent vergeten een of meerdere van de velden in te voeren!",
+
+        -- u-core: sleutels die de React-UI consumeert (validatie en
+        -- shell-teksten). Per locale vertaald omdat een runtime-swap
+        -- via Lang:replace() de Polyglot-fallback-keten niet behoudt —
+        -- ontbrekende sleutels zouden simpelweg niet in de
+        -- `translations`-payload voor de React-UI verschijnen.
+        firstname_too_short = "Voornaam moet minstens 2 tekens lang zijn.",
+        firstname_too_long = "Voornaam mag niet langer zijn dan 16 tekens.",
+        lastname_too_short = "Achternaam moet minstens 2 tekens lang zijn.",
+        lastname_too_long = "Achternaam mag niet langer zijn dan 16 tekens.",
+        invalid_date = "Voer een geldige geboortedatum in.",
+        err_required = "Verplicht",
+        err_too_short = "Te kort",
+        err_too_long = "Te lang",
+        err_profanity = "Niet toegestaan",
+        err_invalid_date = "Ongeldige datum",
+        select_character = "Selecteer een personage",
+        select_character_subtitle = "Kies een slot om te beginnen of een nieuwe identiteit te maken.",
+        empty_slot = "Lege plek",
+        new_character = "Nieuw personage",
+        disconnect = "Verbinding verbreken"
     }
 }
 

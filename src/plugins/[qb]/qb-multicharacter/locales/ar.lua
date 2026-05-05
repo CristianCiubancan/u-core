@@ -67,7 +67,28 @@ local Translations = {
         -- Notifications
         ran_into_issue = "واجهتنا مشكلة",
         profanity = "يبدو انك تحاول استخدام اسم غير لائق في اسمك او جنسيتك حاول مرة اخرى!",
-        forgotten_field = "يبدو أنك نسيت ادخال بعض المعلومات تحقق مرة اخرى!"
+        forgotten_field = "يبدو أنك نسيت ادخال بعض المعلومات تحقق مرة اخرى!",
+
+        -- u-core: مفاتيح تستخدمها واجهة React (التحقق من الإدخال
+        -- ونصوص الواجهة). تُترجم لكل لغة على حدة لأن استبدال اللغة
+        -- في وقت التشغيل عبر Lang:replace() لا يحافظ على سلسلة
+        -- fallback الخاصة بـ Polyglot — المفاتيح المفقودة لن تظهر
+        -- في حمولة `translations` المرسلة إلى الواجهة.
+        firstname_too_short = "يجب أن يتكون الاسم الأول من حرفين على الأقل.",
+        firstname_too_long = "لا يمكن أن يتجاوز الاسم الأول 16 حرفاً.",
+        lastname_too_short = "يجب أن يتكون اسم العائلة من حرفين على الأقل.",
+        lastname_too_long = "لا يمكن أن يتجاوز اسم العائلة 16 حرفاً.",
+        invalid_date = "يرجى إدخال تاريخ ميلاد صالح.",
+        err_required = "مطلوب",
+        err_too_short = "قصير جداً",
+        err_too_long = "طويل جداً",
+        err_profanity = "غير مسموح",
+        err_invalid_date = "تاريخ غير صالح",
+        select_character = "اختر شخصية",
+        select_character_subtitle = "اختر خانة للبدء أو إنشاء هوية جديدة.",
+        empty_slot = "خانة فارغة",
+        new_character = "شخصية جديدة",
+        disconnect = "قطع الاتصال"
     }
 }
 
