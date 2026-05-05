@@ -64,7 +64,7 @@ class PluginBuilder {
   private startTime: number = 0;
   private pluginResults: Map<
     string,
-    { success: boolean; time: number; error?: string }
+    { success: boolean; time: number; error?: string; distChanged?: boolean }
   > = new Map();
   private watcher: chokidar.FSWatcher | null = null;
   private logger: Logger;
@@ -412,13 +412,28 @@ class PluginBuilder {
             this.log('info', chalk.red.bold(`✗ Failed: ${failureCount}`));
           }
 
-          // Reload plugins
+          // Reload plugins. Skip the reload POST when the build's dist
+          // bytes are unchanged — `_shared` recompiles to byte-identical
+          // output every time a consumer Page.tsx edit doesn't introduce
+          // a new Tailwind class, and historically that no-op reload was
+          // the dominant trigger for FXServer cascade-stops (and the
+          // occasional SIGSEGV) in dev sessions.
           if (successCount > 0) {
             for (const plugin of plugins) {
-              const result = await this.buildManager.reloadPlugin(
+              const result = this.pluginResults.get(plugin.pluginName);
+              if (result && result.success && result.distChanged === false) {
+                this.log(
+                  'verbose',
+                  chalk.gray(
+                    `↷ Skipped reload (dist unchanged): ${plugin.pluginName}`
+                  )
+                );
+                continue;
+              }
+              const reloadResult = await this.buildManager.reloadPlugin(
                 plugin.pluginName
               );
-              if (result.success) {
+              if (reloadResult.success) {
                 this.log(
                   'info',
                   chalk.green(`✓ Reloaded plugin: ${plugin.pluginName}`)
@@ -427,7 +442,7 @@ class PluginBuilder {
                 this.log(
                   'warn',
                   chalk.yellow(
-                    `⚠ Failed to reload plugin: ${plugin.pluginName} - ${result.message}`
+                    `⚠ Failed to reload plugin: ${plugin.pluginName} - ${reloadResult.message}`
                   )
                 );
               }
@@ -624,13 +639,18 @@ class PluginBuilder {
       this.log('info', chalk.cyan(`🔨 Building plugin: ${plugin.pluginName}`));
 
       // Build the plugin
-      await this.buildManager.buildPlugin(plugin.pluginName, false, options);
+      const buildResult = await this.buildManager.buildPlugin(
+        plugin.pluginName,
+        false,
+        options
+      );
 
       // Record success
       const buildTime = (performance.now() - pluginStartTime) / 1000;
       this.pluginResults.set(plugin.pluginName, {
         success: true,
         time: buildTime,
+        distChanged: buildResult.distChanged,
       });
 
       // Log completion

@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { builtinModules } from 'module';
 import * as esbuild from 'esbuild';
 import { build as viteBuild, type InlineConfig } from 'vite';
@@ -135,6 +136,18 @@ class BuildManager {
    * `BuildManager.dispose()` when the watcher shuts down.
    */
   private esbuildContexts: Map<string, CachedEsbuildContext> = new Map();
+
+  /**
+   * sha256 of each plugin's last-built dist contents, keyed by plugin name.
+   * Compared against the freshly-built dist after each transactional rename
+   * so the watcher can skip the reload POST when the bytes are unchanged.
+   * The dominant case for `_shared` is a Page.tsx edit elsewhere that
+   * triggers a recompile producing identical CSS + identical vendor IIFE —
+   * historically that was issuing a full FXServer restart cycle (with
+   * cascade-stop of every dependent) for no behavioral change, and was the
+   * primary trigger for FXServer SIGSEGVs during `_shared` lifecycle churn.
+   */
+  private distHashes: Map<string, string> = new Map();
 
   /**
    * Creates a new BuildManager instance
@@ -354,7 +367,7 @@ class BuildManager {
     pluginNameOrPath: string,
     reload: boolean = false,
     options: { skipVite?: boolean } = {}
-  ): Promise<void> {
+  ): Promise<{ distChanged: boolean }> {
     this.ensureInitialized();
 
     let tmpDir: string | undefined;
@@ -460,11 +473,35 @@ class BuildManager {
       await fs.rename(tmpDir, destDir);
       tmpDir = undefined;
 
+      // Hash the freshly-renamed dist and compare with the prior build's
+      // hash. Watchers downstream skip the FXServer reload POST when
+      // `distChanged` is false — see the field-doc on `distHashes`.
+      const newHash = await this.hashDir(destDir);
+      const prevHash = this.distHashes.get(plugin.pluginName);
+      const distChanged = prevHash !== newHash;
+      this.distHashes.set(plugin.pluginName, newHash);
+
       this.logger.info(
         `✓ Plugin ${
           plugin.pluginName
-        } built successfully to ${this.pathToDisplay(destDir)}`
+        } built successfully to ${this.pathToDisplay(destDir)}` +
+          (distChanged ? '' : ' (dist unchanged)')
       );
+
+      // After successful build, reload if requested — but only when the
+      // dist actually changed. Skipping no-op reloads is the whole point
+      // of the hash check; doing the reload anyway would defeat it.
+      if (reload && this.reloadManager && distChanged) {
+        try {
+          await this.reloadPlugin(pluginNameOrPath);
+        } catch (reloadError) {
+          this.logger.warn(
+            `⚠ Plugin built successfully but reload failed: ${reloadError}`
+          );
+        }
+      }
+
+      return { distChanged };
     } catch (error) {
       this.logger.error(`Error building plugin ${pluginNameOrPath}`, error);
       if (tmpDir) {
@@ -480,17 +517,6 @@ class BuildManager {
       throw new Error(`Failed to build plugin ${pluginNameOrPath}`, {
         cause: error,
       });
-    }
-
-    // After successful build, reload if requested
-    if (reload && this.reloadManager) {
-      try {
-        await this.reloadPlugin(pluginNameOrPath);
-      } catch (reloadError) {
-        this.logger.warn(
-          `⚠ Plugin built successfully but reload failed: ${reloadError}`
-        );
-      }
     }
   }
 
@@ -996,6 +1022,18 @@ class BuildManager {
     const title = this.escapeHtml(plugin.pluginName);
     const pluginCssPath = path.join(htmlOutputDir, 'style.css');
     const hasPluginCss = fsSync.existsSync(pluginCssPath);
+    // Cache-bust the cfx-nui-_shared/* URLs with the first 8 hex chars of
+    // the vendor bundle's dist hash. CEF caches by URL, and without a
+    // changing query string a stale `_shared.js` (e.g. from a prior
+    // session, before VENDOR_GLOBALS or main.ts was edited) will keep
+    // being served even after FXServer restarts the resource — which
+    // surfaces as `ReferenceError: ReactJSXRuntime is not defined` in
+    // every consumer's main.js the first time the hashes diverge. Empty
+    // string when `_shared` hasn't been built yet (cold-build edge); the
+    // build orders `_shared` first so consumers see a populated hash in
+    // every normal flow.
+    const sharedHash = this.distHashes.get(SHARED_RESOURCE_NAME) ?? '';
+    const sharedQuery = sharedHash ? `?v=${sharedHash.slice(0, 8)}` : '';
     const html = [
       '<!doctype html>',
       '<html>',
@@ -1007,14 +1045,14 @@ class BuildManager {
       // assets under html/. Without that prefix the browser gets 404s
       // and qb-multicharacter throws ReferenceError on the first vendor
       // global (because window.React etc never got assigned).
-      '  <link rel="stylesheet" href="https://cfx-nui-_shared/html/style.css">',
+      `  <link rel="stylesheet" href="https://cfx-nui-_shared/html/style.css${sharedQuery}">`,
       ...(hasPluginCss
         ? ['  <link rel="stylesheet" href="./style.css">']
         : []),
       '</head>',
       '<body>',
       '  <div id="root"></div>',
-      '  <script src="https://cfx-nui-_shared/html/_shared.js"></script>',
+      `  <script src="https://cfx-nui-_shared/html/_shared.js${sharedQuery}"></script>`,
       '  <script src="./main.js"></script>',
       '</body>',
       '</html>',
@@ -1786,6 +1824,41 @@ class BuildManager {
         'BuildManager must be initialized before use. Call initialize() first.'
       );
     }
+  }
+
+  /**
+   * sha256 of every regular file under `dir`, mixed with each file's
+   * dist-relative path (sorted, slash-normalized). Empty directories don't
+   * contribute, but no plugin's reload semantics depend on them. Symlinks
+   * and special files are skipped — the build only emits regular files
+   * anyway, so encountering one would already indicate something else is
+   * wrong.
+   * @private
+   */
+  private async hashDir(dir: string): Promise<string> {
+    const entries: string[] = [];
+    const walk = async (current: string): Promise<void> => {
+      const items = await fs.readdir(current, { withFileTypes: true });
+      items.sort((a, b) => a.name.localeCompare(b.name));
+      for (const item of items) {
+        const full = path.join(current, item.name);
+        if (item.isDirectory()) {
+          await walk(full);
+        } else if (item.isFile()) {
+          entries.push(path.relative(dir, full).replace(/\\/g, '/'));
+        }
+      }
+    };
+    await walk(dir);
+    entries.sort();
+    const hash = crypto.createHash('sha256');
+    for (const rel of entries) {
+      hash.update(rel);
+      hash.update('\0');
+      hash.update(await fs.readFile(path.join(dir, rel)));
+      hash.update('\0');
+    }
+    return hash.digest('hex');
   }
 
   /**
