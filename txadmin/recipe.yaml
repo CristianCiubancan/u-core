@@ -132,14 +132,11 @@ tasks:
   - action: waste_time # prevent github throttling
     seconds: 10
 
-  # qb-core is rewritten as a u-core plugin; the build pipeline emits
-  # it to [GENERATED]/[default]/qb-core on `pnpm build`. The upstream
+  # qb-core is shipped via the u-core plugin pipeline. Upstream Lua
+  # scripts byte-for-byte; the build emits to
+  # [GENERATED]/[default]/qb-core on `pnpm build`. The upstream
   # qbcore-framework/qb-core download is intentionally absent so
-  # FXServer doesn't double-register the resource (the second
-  # `ensure qb-core` would otherwise win and load the upstream Lua
-  # framework instead of our TS port, which is a silent functional
-  # downgrade — our port emits OnPlayerUnload on hard disconnects,
-  # upstream doesn't).
+  # FXServer doesn't double-register the resource.
 
   # Downloading QBCore resources
   - action: download_github
@@ -152,10 +149,13 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-adminmenu
 
-  # qb-multicharacter is rewritten as a u-core plugin; the build pipeline
-  # emits it to [GENERATED]/[qb]/qb-multicharacter on `pnpm build`. The
-  # upstream qbcore-framework/qb-multicharacter download is intentionally
-  # absent so FXServer doesn't double-register the resource.
+  # qb-multicharacter is shipped via the u-core plugin pipeline:
+  # upstream Lua scripts byte-for-byte; the upstream Vue NUI is
+  # replaced with our React webview (same NUI message contract). The
+  # build emits to [GENERATED]/[qb]/qb-multicharacter on `pnpm build`.
+  # The upstream qbcore-framework/qb-multicharacter download is
+  # intentionally absent so FXServer doesn't double-register the
+  # resource.
 
   - action: download_github
     dest: ./resources/[qb]/qb-target
@@ -301,12 +301,12 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-storerobbery
 
-  # qb-spawn is rewritten as a u-core plugin; the build pipeline
-  # emits it to [GENERATED]/[qb]/qb-spawn on `pnpm build`. The
+  # qb-spawn is shipped via the u-core plugin pipeline: upstream
+  # Lua scripts byte-for-byte; the upstream Vue NUI is replaced
+  # with our React webview (same NUI message contract). The build
+  # emits to [GENERATED]/[qb]/qb-spawn on `pnpm build`. The
   # upstream qbcore-framework/qb-spawn download is intentionally
-  # absent so FXServer doesn't double-register the resource (the
-  # second `ensure qb-spawn` would otherwise win and load the
-  # upstream Vue UI instead of our React port).
+  # absent so FXServer doesn't double-register the resource.
 
   - action: download_github
     dest: ./resources/[qb]/qb-smallresources

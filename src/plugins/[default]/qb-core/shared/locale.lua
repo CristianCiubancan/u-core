@@ -1,17 +1,3 @@
--- Compat shim for downstream Lua resources. Verbatim copy of upstream
--- qbcore-framework/qb-core/shared/locale.lua, kept in sync intentionally.
---
--- Downstream qb-* resources do `shared_script '@qb-core/shared/locale.lua'`
--- to pick up the `Locale` Lua class, then load their own `locales/<lng>.lua`
--- which assigns `Lang = Locale:new({ phrases = ... })`. Our TS port has its
--- own Locale/Lang in `shared/locale.ts` — that's for OUR TS code; this Lua
--- file exists purely so Lua consumers like qb-adminmenu / qb-ambulancejob /
--- qb-clothing keep working without a code change.
---
--- The file is also declared in our generated fxmanifest's `shared_scripts`
--- (via plugin.json) so FXServer treats it as a first-class exposed Lua
--- script — same surface as upstream qb-core's fxmanifest.
-
 --- @class Locale
 Locale = {}
 Locale.__index = Locale

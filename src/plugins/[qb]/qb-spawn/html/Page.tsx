@@ -1,14 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
-import {
-  ArrowLeft,
-  Building2,
-  Home,
-  MapPin,
-  Navigation,
-  Play,
-} from 'lucide-react';
+import { Building2, Home, MapPin, Navigation, Play } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
 import { fetchNui } from '@/utils/fetchNui';
@@ -16,11 +9,6 @@ import { isEnvBrowser } from '@/utils/misc';
 import { Button } from '@/components/ui/button';
 import Paper from '@/components/ui/Paper';
 
-// Locale set is the u-core 15-locale baseline — every plugin ships
-// translations for the same set as qb-multicharacter so language
-// switching feels consistent across the suite. Don't add or drop
-// locales unilaterally; per project_port_handoff_checklist.md, the
-// baseline moves only by changing every plugin together.
 import ar from '../translations/ar.json';
 import cs from '../translations/cs.json';
 import de from '../translations/de.json';
@@ -46,8 +34,6 @@ for (const [lng, resources] of Object.entries(BUNDLES)) {
 }
 
 interface SpawnOption {
-  /** Wire-format type. `appartment` keeps the upstream double-p so the
-   *  client/server stay drop-in compatible. */
   type: 'current' | 'normal' | 'house' | 'appartment';
   name: string;
   label: string;
@@ -56,12 +42,12 @@ interface SpawnOption {
 interface ShowUiMessage {
   action: 'showUi';
   status: boolean;
-  locale?: string;
-}
-
-interface LocaleChangedMessage {
-  action: 'localeChanged';
-  code: string;
+  // Upstream client.lua sends a flat key→phrase map (the `ui.*` slice
+  // of qb-spawn's Lang phrases, with the `ui.` prefix stripped). Used
+  // as the source of truth for the three keys upstream translates;
+  // our extra UI strings (page_title, letterhead_title, etc.) still
+  // come from i18next bundles with English defaults.
+  translations?: Record<string, string>;
 }
 
 interface SetupLocationsMessage {
@@ -69,14 +55,12 @@ interface SetupLocationsMessage {
   locations: Record<string, { location: string; label: string; coords: unknown }>;
   houses: Array<{ house: string; label: string }>;
   isNew: false;
-  firstSpawn?: boolean;
 }
 
 interface SetupAppartementsMessage {
   action: 'setupAppartements';
   locations: Record<string, { id?: string; label: string }>;
   isNew: true;
-  firstSpawn?: boolean;
 }
 
 export default function Page() {
@@ -87,33 +71,16 @@ export default function Page() {
   const [houses, setHouses] = useState<SpawnOption[]>([]);
   const [apartments, setApartments] = useState<SpawnOption[]>([]);
   const [isNew, setIsNew] = useState<boolean>(false);
-  // True for the player's first spawn after createCharacter; suppresses
-  // the "Last Location" option since `cData.position` would point at
-  // the character creation interior. Sourced from qb-multicharacter via
-  // the `_firstSpawn` cData marker; see `shared/types.ts`.
-  const [firstSpawn, setFirstSpawn] = useState<boolean>(false);
   const [selected, setSelected] = useState<SpawnOption | null>(null);
+  const [upstream, setUpstream] = useState<Record<string, string>>({});
+
+  const tx = (suffix: string, fallback: string): string =>
+    upstream[suffix] ?? t(`ui.${suffix}`, { defaultValue: fallback });
 
   useNuiEvent<ShowUiMessage>('showUi', (data) => {
-    // Apply the locale piggy-backed on the show payload (see
-    // client/index.ts:setDisplay). Covers the boot race where the
-    // initial QBCore:Locale:Changed at PlayerLoaded fired before this
-    // useNuiEvent attached.
-    if (data.locale && BUNDLES[data.locale] && i18n.language !== data.locale) {
-      void i18n.changeLanguage(data.locale);
-    }
     setVisible(!!data.status);
+    if (data.translations) setUpstream(data.translations);
     if (!data.status) setSelected(null);
-  });
-
-  // Live locale change. qb-spawn/client/index.ts has an
-  // onNet('QBCore:Locale:Changed') relay that turns the net event into
-  // a SendNUIMessage in this resource's iframe, so /locale <code> at
-  // any time during the spawn UI re-localizes without a re-mount.
-  useNuiEvent<LocaleChangedMessage>('localeChanged', (data) => {
-    if (data?.code && BUNDLES[data.code] && i18n.language !== data.code) {
-      void i18n.changeLanguage(data.code);
-    }
   });
 
   useNuiEvent<SetupLocationsMessage>('setupLocations', (data) => {
@@ -133,7 +100,6 @@ export default function Page() {
     setHouses(housesNext);
     setApartments([]);
     setIsNew(false);
-    setFirstSpawn(!!data.firstSpawn);
     setSelected(null);
   });
 
@@ -149,18 +115,11 @@ export default function Page() {
     setPresets([]);
     setHouses([]);
     setIsNew(true);
-    setFirstSpawn(!!data.firstSpawn);
     setSelected(null);
   });
 
-  // ---------- Selection wiring ----------
-
   const onPickLocation = (option: SpawnOption) => {
     setSelected(option);
-    // Only `normal` triggers a camera fly-in upstream; preserve that —
-    // current/house/apartment have their cameras handled differently
-    // (current uses the player's stored position, house/apartment use
-    // qb-houses/qb-apartments configs which the client looks up).
     if (option.type === 'normal') {
       void fetchNui('setCam', { posname: option.name, type: option.type });
     } else if (option.type === 'house' || option.type === 'appartment') {
@@ -182,26 +141,9 @@ export default function Page() {
     }
   };
 
-  const onBack = () => {
-    void fetchNui('backToSelect');
-  };
-
-  // ---------- Memoized row groups ----------
-
-  // Hide "Last Location" when:
-  //   - isNew=true: only apartments are valid spawns for new char with
-  //     Apartments.Starting=true (already covered by upstream contract).
-  //   - firstSpawn=true: u-core marker for createCharacter where
-  //     `cData.position` still points at the char creation interior;
-  //     covers the Apartments.Starting=false branch where isNew=false
-  //     but the last-location coords are still meaningless.
-  const lastLocationOption: SpawnOption | null = useMemo(
-    () =>
-      isNew || firstSpawn
-        ? null
-        : { type: 'current', name: 'current', label: t('ui.last_location') },
-    [isNew, firstSpawn, t]
-  );
+  const lastLocationOption: SpawnOption | null = isNew
+    ? null
+    : { type: 'current', name: 'current', label: tx('last_location', 'Last Location') };
 
   if (!visible) return null;
 
@@ -215,14 +157,6 @@ export default function Page() {
 
         <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
           <div className="flex flex-col divide-y divide-gray-800/60">
-            {/* Header: stack eyebrow + title + prompt vertically. The
-                prompt used to be a right-side badge, but its full text
-                is the page's primary call-to-action — putting it in a
-                shrink-0 sibling stole all the horizontal space and
-                forced the h2 to truncate to "Spawn Sele…" even at the
-                460px clamp upper bound. As a subtitle under the h2 it
-                gets to wrap if needed and the title finally renders
-                in full. */}
             <header className="pb-3">
               <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
                 {t('ui.section_header', { defaultValue: 'Section I · Departure' })}
@@ -231,13 +165,13 @@ export default function Page() {
                 {t('ui.page_title', { defaultValue: 'Spawn Selector' })}
               </h2>
               <p className="font-mono text-[9px] tracking-[0.25em] text-gray-400 uppercase mt-2 leading-snug">
-                {t('ui.where_would_you_like_to_start')}
+                {tx('where_would_you_like_to_start', 'Where would you like to start?')}
               </p>
             </header>
 
             {lastLocationOption && (
               <SpawnGroup
-                label={t('ui.last_location')}
+                label={tx('last_location', 'Last Location')}
                 hideGroupHeader
                 options={[lastLocationOption]}
                 selected={selected}
@@ -277,19 +211,11 @@ export default function Page() {
             )}
           </div>
 
-          {/* Back is always visible (left); Confirm only renders once
-              the player picks a spawn (right). Both use the same
-              <Button> primitive so footer height is constant whether
-              one or two buttons are shown — no reflow on selection. */}
-          <footer className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-800/60">
-            <Button variant="secondary" onClick={onBack}>
-              <ArrowLeft />
-              {t('ui.back', { defaultValue: 'Back' })}
-            </Button>
+          <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
             {selected ? (
               <Button onClick={onConfirm}>
                 <Play />
-                {t('ui.confirm')}
+                {tx('confirm', 'Confirm')}
               </Button>
             ) : (
               <span className="inline-flex items-center px-3 py-1.5 border-b border-transparent font-mono text-[10px] tracking-[0.25em] uppercase text-muted-foreground/70">
@@ -303,8 +229,6 @@ export default function Page() {
   );
 }
 
-// `t` is typed loosely here so we can pass i18n options (defaultValue)
-// without forcing TFunction's full generic signature into the prop.
 function Letterhead({
   t,
 }: {
@@ -339,12 +263,7 @@ interface SpawnGroupProps {
   options: SpawnOption[];
   selected: SpawnOption | null;
   onPick: (option: SpawnOption) => void;
-  /** Skip rendering the group header eyebrow — used for the
-   *  single-row "Last Location" group where a label would feel
-   *  redundant. */
   hideGroupHeader?: boolean;
-  // Forwarded as a JSX component so each group's icon stays consistent
-  // without each option carrying its own lookup.
   Icon: typeof MapPin;
 }
 
@@ -372,9 +291,6 @@ function SpawnGroup({
               key={`${option.type}:${option.name}`}
               type="button"
               onClick={() => onPick(option)}
-              // Same row vocabulary as qb-multicharacter's SlotRow:
-              // border-l-2 always reserved (transparent → brand on
-              // selected) so picking never shifts horizontal layout.
               className={[
                 'group cursor-pointer outline-none text-left',
                 'grid grid-cols-[1.75rem_1fr_auto] items-center gap-2.5',
@@ -415,7 +331,3 @@ function SpawnGroup({
     </div>
   );
 }
-
-// Silence unused-import if useEffect ever drops out of edits — kept on
-// hand for downstream extensions like keyboard nav.
-void useEffect;

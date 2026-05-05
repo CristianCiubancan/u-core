@@ -10,7 +10,6 @@ import {
   Plus,
   X,
   Loader2,
-  Languages,
 } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
@@ -37,11 +36,6 @@ import {
 } from '@/components/ui/dialog';
 import Paper from '@/components/ui/Paper';
 
-import type {
-  CharacterRow,
-  NewCharacterPayload,
-} from '../shared/types';
-
 import ar from '../translations/ar.json';
 import cs from '../translations/cs.json';
 import de from '../translations/de.json';
@@ -66,6 +60,42 @@ for (const [lng, resources] of Object.entries(BUNDLES)) {
   i18n.addResourceBundle(lng, NAMESPACE, resources, true, true);
 }
 
+interface CharInfo {
+  firstname: string;
+  lastname: string;
+  birthdate: string;
+  gender: number | string;
+  nationality: string;
+  phone?: string;
+  account?: string;
+  cid?: number | string;
+}
+
+interface MoneyInfo {
+  cash: number;
+  bank: number;
+  crypto?: number;
+}
+
+interface JobInfo {
+  name: string;
+  label: string;
+  grade?: { level: number; name: string };
+  onduty?: boolean;
+  isboss?: boolean;
+}
+
+interface CharacterRow {
+  citizenid: string;
+  cid: number;
+  license: string;
+  name?: string;
+  charinfo: CharInfo;
+  money: MoneyInfo;
+  job: JobInfo;
+  position?: string;
+}
+
 type Screen = 'loading' | 'characters' | 'register';
 
 const NAME_MAX_LENGTH = 30;
@@ -80,7 +110,13 @@ interface UiOpenMessage {
   enableDeleteButton: boolean;
   nChar: number;
   countries: string[];
-  locale?: string;
+  // Upstream client.lua sends a flat key→phrase map (the `ui.*` slice
+  // of qb-multicharacter's Lang phrases, with the `ui.` prefix
+  // stripped). Used as the source of truth for keys upstream
+  // translates; our extra UI strings (letterhead_title,
+  // section_i_roster, etc.) still come from i18next bundles with
+  // English defaults.
+  translations?: Record<string, string>;
 }
 
 interface SetupCharactersMessage {
@@ -88,19 +124,14 @@ interface SetupCharactersMessage {
   characters: CharacterRow[];
 }
 
-interface LocaleChangedMessage {
-  action: 'localeChanged';
-  code: string;
-}
-
 const LOADING_STAGES = [
-  'ui.retrieving_playerdata',
-  'ui.retrieving_playerdata',
-  'ui.retrieving_playerdata',
-  'ui.validating_playerdata',
-  'ui.retrieving_characters',
-  'ui.retrieving_characters',
-  'ui.validating_characters',
+  'retrieving_playerdata',
+  'retrieving_playerdata',
+  'retrieving_playerdata',
+  'validating_playerdata',
+  'retrieving_characters',
+  'retrieving_characters',
+  'validating_characters',
 ] as const;
 
 const dollar = new Intl.NumberFormat('en-US');
@@ -153,9 +184,18 @@ export default function Page() {
   const [registerData, setRegisterData] = useState<RegisterFormData>(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
+  // Upstream's Lang phrases (ui.* slice) flattened by client/main.lua's
+  // openCharMenu. Used by tx() below to prefer upstream-provided
+  // translations over our i18next defaults for the keys upstream
+  // actually ships.
+  const [upstream, setUpstream] = useState<Record<string, string>>({});
 
-  // Bounds for the birthdate picker. Recomputed once per session — fine
-  // since the player is unlikely to keep this menu open across midnight.
+  // Upstream-aware translation helper. For keys upstream's locales/*.lua
+  // ships, prefer the value from the `translations` payload; otherwise
+  // fall back to the i18next bundle (with an English defaultValue).
+  const tx = (suffix: string, fallback: string): string =>
+    upstream[suffix] ?? t(`ui.${suffix}`, { defaultValue: fallback });
+
   const dateBounds = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -169,13 +209,7 @@ export default function Page() {
     {}
   );
 
-  // ---------- NUI inbound ----------
-
   useNuiEvent<UiOpenMessage>('ui', (data) => {
-    if (data.locale && BUNDLES[data.locale] && i18n.language !== data.locale) {
-      void i18n.changeLanguage(data.locale);
-    }
-
     setCustomNationality(!!data.customNationality);
     setAllowDelete(!!data.enableDeleteButton);
     setCharacterAmount(data.nChar);
@@ -184,6 +218,7 @@ export default function Page() {
     setFieldErrors({});
     setRegisterData(EMPTY_FORM);
     setDeleteOpen(false);
+    if (data.translations) setUpstream(data.translations);
 
     if (timersRef.current.stage !== undefined) {
       window.clearInterval(timersRef.current.stage);
@@ -224,17 +259,6 @@ export default function Page() {
     }
   });
 
-  // Live locale change (player ran `/locale <code>` mid-session, or
-  // any other SetPlayerLocale call landed). qb-core's client-side
-  // forwarder (client/locale.ts) re-broadcasts QBCore:Locale:Changed
-  // as a SendNUIMessage with action='localeChanged'. We re-localize
-  // i18next without a full remount.
-  useNuiEvent<LocaleChangedMessage>('localeChanged', (data) => {
-    if (data?.code && BUNDLES[data.code] && i18n.language !== data.code) {
-      void i18n.changeLanguage(data.code);
-    }
-  });
-
   useNuiEvent<SetupCharactersMessage>('setupCharacters', (data) => {
     const max = characterAmount > 0 ? characterAmount : 5;
     const slots: Array<CharacterRow | null> = new Array(max + 1).fill(null);
@@ -259,8 +283,6 @@ export default function Page() {
     }
   }, [characterAmount]);
 
-  // ---------- Slot interaction ----------
-
   const onSlotClick = (index: number) => {
     setSelectedIndex(index);
     const existing = characters[index];
@@ -275,8 +297,6 @@ export default function Page() {
     }
   };
 
-  // ---------- Actions ----------
-
   const onPlay = () => {
     if (selectedIndex < 1) return;
     const cData = characters[selectedIndex];
@@ -290,12 +310,6 @@ export default function Page() {
     const cData = characters[selectedIndex];
     if (!cData) return;
     void fetchNui('removeCharacter', { citizenid: cData.citizenid });
-    // Hide the panel immediately so the player doesn't stare at the
-    // stale roster (with the just-deleted row still visible) while the
-    // server processes the delete. The client's removeCharacter handler
-    // re-emits `chooseChar`, which fires the `ui` event handler above
-    // and brings the panel back through the loading sequence with the
-    // refreshed character list.
     setVisible(false);
     setDeleteOpen(false);
     setScreen('characters');
@@ -304,18 +318,12 @@ export default function Page() {
   const updateRegister = (patch: Partial<RegisterFormData>) => {
     setRegisterData((prev) => {
       const next = { ...prev, ...patch };
-      // Re-render the preview ped when gender flips so the player can see
-      // the model swap mid-form. Empty cData payload tells the client this
-      // is the "no character yet" branch; it picks the model from `gender`.
       if (patch.gender !== undefined && patch.gender !== prev.gender) {
         void fetchNui('cDataPed', { gender: patch.gender });
       }
       return next;
     });
     setFieldErrors((prev) => {
-      // Bail out unchanged so we don't schedule a redundant re-render on
-      // every keystroke. fieldErrors is empty until the first failed
-      // submit, so this short-circuit covers the common typing path.
       let touched = false;
       for (const key of Object.keys(patch)) {
         if (prev[key as keyof RegisterFormData] !== undefined) {
@@ -336,9 +344,6 @@ export default function Page() {
     key: keyof RegisterFormData,
     snapshot: RegisterFormData = registerData
   ): string | undefined => {
-    // Short, field-specific captions. `defaultValue` lets non-EN locales
-    // that haven't translated these new keys fall back to readable
-    // English instead of rendering the bare key.
     const required = t('ui.error_required', { defaultValue: 'Required' });
     const tooShort = t('ui.error_too_short', {
       defaultValue: 'At least 2 characters',
@@ -394,12 +399,22 @@ export default function Page() {
       setFieldErrors(errors);
       return;
     }
-    const payload: NewCharacterPayload = {
+    // Upstream client/main.lua's createNewCharacter callback does:
+    //   if cData.gender == Lang:t('ui.male') then cData.gender = 0
+    //   elseif cData.gender == Lang:t('ui.female') then cData.gender = 1
+    // i.e. it expects the localized phrase string and normalizes to
+    // 0/1 server-side. We send the localized phrase to match — that
+    // string is whatever upstream's `translations` payload provided
+    // for `male`/`female`, so it round-trips against Lang:t() exactly.
+    const genderLabel = registerData.gender === 'female'
+      ? tx('female', 'Female')
+      : tx('male', 'Male');
+    const payload = {
       firstname: registerData.firstname.trim(),
       lastname: registerData.lastname.trim(),
       nationality: registerData.nationality.trim(),
       birthdate: formatIsoDate(registerData.date),
-      gender: registerData.gender === 'female' ? 1 : 0,
+      gender: genderLabel,
       cid: selectedIndex,
     };
     void fetchNui('createNewCharacter', payload);
@@ -409,23 +424,14 @@ export default function Page() {
   const onCancelRegister = () => {
     setRegisterData(EMPTY_FORM);
     setFieldErrors({});
-    // Drop the empty-slot highlight when bailing out — leaving the
-    // selected rail on a slot that no longer corresponds to anything
-    // actionable made the action bar's "Select a file" hint feel
-    // contradictory.
     setSelectedIndex(-1);
     setScreen('characters');
   };
 
-  // Esc bails out of the register flow back to the slot grid. Scoped to
-  // the register screen so we don't fight Radix's Dialog/Popover Esc
-  // handlers (those stop propagation when open). Capture-phase listener
-  // so we react before any portal'd primitive's bubble handler.
   useEffect(() => {
     if (screen !== 'register') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      // Don't bail if a popover/dialog is open — Radix handles those.
       const popoverOpen = document.querySelector(
         '[data-radix-popper-content-wrapper]'
       );
@@ -436,8 +442,6 @@ export default function Page() {
     return () => window.removeEventListener('keydown', onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
-
-  // ---------- Derived ----------
 
   const slots = useMemo(() => {
     const out: Array<{ index: number; data: CharacterRow | null }> = [];
@@ -454,29 +458,30 @@ export default function Page() {
 
   const genderOptions = useMemo(
     () => [
-      { label: t('ui.male'), value: 'male' },
-      { label: t('ui.female'), value: 'female' },
+      { label: tx('male', 'Male'), value: 'male' },
+      { label: tx('female', 'Female'), value: 'female' },
     ],
-    [t]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [upstream, t]
   );
 
   if (!visible) return null;
 
+  const stageKey = LOADING_STAGES[loadingStage];
+  const stageDefaults: Record<string, string> = {
+    retrieving_playerdata: 'Retrieving player data',
+    validating_playerdata: 'Validating player data',
+    retrieving_characters: 'Retrieving characters',
+    validating_characters: 'Validating characters',
+  };
+  const loadingText = tx(stageKey, stageDefaults[stageKey] ?? stageKey);
+
   return (
     <div className="fixed inset-0 font-serif text-gray-100 pointer-events-none">
-      {/* Right column. The outer fixed wrapper stays pointer-events-none
-          so the empty area doesn't eat unrelated UI hits, but the column
-          itself takes pointer-events-auto — overflow-y-auto only scrolls
-          when the element receives wheel events, and pointer-events-none
-          would silently swallow them. The "gaps between papers" effect
-          is purely visual; click-through doesn't matter because
-          SetNuiFocus is on while the menu is up. */}
       <div className="absolute right-4 top-4 bottom-4 w-[clamp(320px,32vw,460px)] flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pointer-events-auto">
         <Letterhead />
 
-        {screen === 'loading' && (
-          <LoadingPanel text={t(LOADING_STAGES[loadingStage])} />
-        )}
+        {screen === 'loading' && <LoadingPanel text={loadingText} />}
         {screen === 'characters' && (
           <CharactersPanel
             slots={slots}
@@ -486,6 +491,7 @@ export default function Page() {
             onPlay={onPlay}
             onPrepareDelete={() => setDeleteOpen(true)}
             t={t}
+            tx={tx}
           />
         )}
         {screen === 'register' && (
@@ -503,6 +509,7 @@ export default function Page() {
             onCancel={onCancelRegister}
             onCreate={onCreate}
             t={t}
+            tx={tx}
           />
         )}
 
@@ -515,20 +522,23 @@ export default function Page() {
               <DialogTitle>
                 {characters[selectedIndex]
                   ? `${characters[selectedIndex]!.charinfo.firstname} ${characters[selectedIndex]!.charinfo.lastname}`
-                  : t('ui.deletechar_header')}
+                  : tx('deletechar_header', 'Delete Character')}
               </DialogTitle>
               <DialogDescription>
-                {t('ui.deletechar_description')}
+                {tx(
+                  'deletechar_description',
+                  'Are You Sure You Want To Delete Your Character?'
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
                 <X />
-                {t('ui.cancel')}
+                {tx('cancel', 'Cancel')}
               </Button>
               <Button variant="destructive" onClick={onConfirmDelete}>
                 <Trash2 />
-                {t('ui.confirm')}
+                {tx('confirm', 'Confirm')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -538,75 +548,7 @@ export default function Page() {
   );
 }
 
-// ============================================================
-// LocalePicker (small dropdown — sits in the Letterhead's right column)
-// ============================================================
-//
-// Native names so the dropdown reads as the language itself, not a
-// translation of it (a French speaker scanning for `Français` is
-// faster than scanning for `French` if the active locale is en).
-// Module-scoped const so the array reference is stable across renders;
-// SelectContent's children are also memoized into a single JSX array
-// so we don't re-create 15 SelectItem elements every parent re-render
-// (per memory: closed Radix Select still evaluates children).
-const LOCALE_OPTIONS: ReadonlyArray<{ code: string; native: string }> = [
-  { code: 'ar', native: 'العربية' },
-  { code: 'cs', native: 'Čeština' },
-  { code: 'de', native: 'Deutsch' },
-  { code: 'en', native: 'English' },
-  { code: 'es', native: 'Español' },
-  { code: 'fi', native: 'Suomi' },
-  { code: 'fr', native: 'Français' },
-  { code: 'it', native: 'Italiano' },
-  { code: 'ja', native: '日本語' },
-  { code: 'nl', native: 'Nederlands' },
-  { code: 'pt', native: 'Português' },
-  { code: 'pt-br', native: 'Português (BR)' },
-  { code: 'sv', native: 'Svenska' },
-  { code: 'tr', native: 'Türkçe' },
-  { code: 'vi', native: 'Tiếng Việt' },
-];
-
-const LOCALE_OPTION_NODES = LOCALE_OPTIONS.map((opt) => (
-  <SelectItem key={opt.code} value={opt.code}>
-    {opt.native}
-  </SelectItem>
-));
-
-function LocalePicker() {
-  // Source the active value from i18n.language (already kept in sync
-  // with the server via the localeChanged useNuiEvent at the top of
-  // CharacterMenu). On change, fire-and-forget to the client; the
-  // visual flip happens when the round-trip's QBCore:Locale:Changed
-  // echo lands and triggers i18n.changeLanguage there.
-  const { i18n } = useTranslation(NAMESPACE);
-  const handleChange = (code: string): void => {
-    void fetchNui('setLocale', { code });
-  };
-  return (
-    <Select value={i18n.language} onValueChange={handleChange}>
-      <SelectTrigger
-        className="h-7 px-2 gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase border-gray-700 text-gray-300 hover:text-gray-100 hover:border-gray-500 bg-transparent"
-        aria-label="Language"
-      >
-        <Languages className="w-3 h-3 shrink-0" aria-hidden />
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>{LOCALE_OPTION_NODES}</SelectContent>
-    </Select>
-  );
-}
-
-// ============================================================
-// Letterhead (its own paper, compact)
-// ============================================================
-
 function Letterhead() {
-  // Local useTranslation: Letterhead is decoration, not part of the
-  // form data flow, so it doesn't take `t` as a prop. defaultValue on
-  // every key keeps it readable when locales don't translate the
-  // dossier-specific strings (which most won't, since they're our
-  // additions beyond upstream's phrase set).
   const { t } = useTranslation(NAMESPACE);
   return (
     <Paper className="px-5 py-4 shrink-0">
@@ -628,19 +570,14 @@ function Letterhead() {
         </div>
       </div>
 
-      <div className="flex items-end justify-between gap-3 mt-2">
+      <div className="mt-2">
         <h1 className="font-display text-[1.6rem] font-light leading-tight text-gray-50 truncate">
           {t('ui.letterhead_subtitle', { defaultValue: 'Identity Registry' })}
         </h1>
-        <LocalePicker />
       </div>
     </Paper>
   );
 }
-
-// ============================================================
-// Loading
-// ============================================================
 
 function LoadingPanel({ text }: { text: string }) {
   const [dots, setDots] = useState(0);
@@ -665,10 +602,6 @@ function LoadingPanel({ text }: { text: string }) {
   );
 }
 
-// ============================================================
-// Character grid
-// ============================================================
-
 interface CharactersPanelProps {
   slots: Array<{ index: number; data: CharacterRow | null }>;
   selectedIndex: number;
@@ -677,6 +610,7 @@ interface CharactersPanelProps {
   onPlay: () => void;
   onPrepareDelete: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
+  tx: (suffix: string, fallback: string) => string;
 }
 
 function CharactersPanel({
@@ -687,6 +621,7 @@ function CharactersPanel({
   onPlay,
   onPrepareDelete,
   t,
+  tx,
 }: CharactersPanelProps) {
   const selected = slots.find((s) => s.index === selectedIndex);
   const showActions = selected?.data;
@@ -695,18 +630,6 @@ function CharactersPanel({
 
   return (
     <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
-      {/* Header — same hairline-seam treatment as RegisterPanel's
-          Section II header, so both screens read as the same kind of
-          dossier sheet. */}
-      {/* Header is the first child of the divide-y container, NOT a
-          separate sibling with its own border-b. Why: divide-y adds a
-          1px top border to every child after the first, so the line
-          between header and row 01 is owned by row 01. When row 01 is
-          selected, its `border-brand-500/70` recolors that line brand,
-          giving it the same "left rail + brand top hairline" frame
-          that selected rows 02–05 have. If the header had its own
-          border-b instead, row 01 selection would only recolor the
-          left rail and frame asymmetrically. */}
       <div className="flex flex-col divide-y divide-gray-800/60">
         <header className="pb-3">
           <div className="flex items-baseline justify-between gap-2">
@@ -722,7 +645,7 @@ function CharactersPanel({
             </span>
           </div>
           <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5">
-            {t('ui.characters_header')}
+            {tx('characters_header', 'My Characters')}
           </h2>
         </header>
         {slots.map(({ index, data }, idx) => (
@@ -733,28 +656,23 @@ function CharactersPanel({
             isSelected={index === selectedIndex}
             onClick={() => onSlotClick(index)}
             t={t}
+            tx={tx}
             mountDelay={idx * 50}
           />
         ))}
       </div>
 
-      {/* The "Select a file" hint mirrors a Button's box exactly:
-          same px-3 py-1.5, same text-[10px] tracking-[0.25em], same
-          1px bottom border (transparent here so it doesn't read as a
-          tappable affordance). With both states sharing the same
-          intrinsic size, the footer's natural height is identical
-          whether actions or the hint render — no UI jump on select. */}
       <footer className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-gray-800/60">
         {showActions ? (
           <>
             <Button onClick={onPlay}>
               <Play />
-              {t('ui.play_button')}
+              {tx('play_button', 'Play')}
             </Button>
             {allowDelete && (
               <Button variant="destructive" onClick={onPrepareDelete}>
                 <Trash2 />
-                {t('ui.delete_button')}
+                {tx('delete_button', 'Delete Character')}
               </Button>
             )}
           </>
@@ -774,6 +692,7 @@ interface SlotRowProps {
   isSelected: boolean;
   onClick: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
+  tx: (suffix: string, fallback: string) => string;
   mountDelay: number;
 }
 
@@ -783,6 +702,7 @@ function SlotRow({
   isSelected,
   onClick,
   t,
+  tx,
   mountDelay,
 }: SlotRowProps) {
   return (
@@ -797,16 +717,6 @@ function SlotRow({
         }
       }}
       style={{ animationDelay: `${mountDelay}ms` }}
-      // border-l-2 always present (transparent → brand on selected) so
-      // selecting a row never shifts horizontal layout.
-      //
-      // `border-{color}` (no side suffix) on the selected state colors
-      // ALL sides — that's intentional. The parent's `divide-y` adds a
-      // 1px border-top to every row except the first; on selected
-      // rows, that top border picks up the brand color and frames the
-      // selection (left rail + top hairline). For row 01 to match,
-      // the section header is moved INTO the same divide-y container
-      // so divide-y also draws a brand-recolorable line above row 01.
       className={[
         'group cursor-pointer outline-none',
         'grid grid-cols-[2.75rem_1fr_auto] items-center gap-2.5',
@@ -819,7 +729,6 @@ function SlotRow({
           : 'border-transparent hover:bg-gray-100/[0.025]',
       ].join(' ')}
     >
-      {/* file number (left) */}
       <div className="font-mono text-[8.5px] tracking-[0.25em] text-gray-500 uppercase leading-tight">
         <div className="text-gray-600">File</div>
         <div className="text-gray-200 text-[15px] font-display tracking-normal leading-tight">
@@ -827,12 +736,10 @@ function SlotRow({
         </div>
       </div>
 
-      {/* identity (center) */}
       <div className="min-w-0">
-        {data ? <SlotIdentity data={data} /> : <SlotEmpty t={t} />}
+        {data ? <SlotIdentity data={data} /> : <SlotEmpty tx={tx} />}
       </div>
 
-      {/* status badge (right) */}
       <div className="shrink-0">
         {isSelected && data && (
           <span className="font-mono text-[8.5px] tracking-[0.3em] text-brand-400 uppercase">
@@ -857,8 +764,6 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
       <p className="font-display text-[15px] font-light text-gray-50 leading-tight truncate">
         {fullName || '—'}
       </p>
-      {/* Stats wrap to a second row when the column is too narrow rather
-          than truncating to "..." or pushing the active badge off-screen. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1 font-mono text-[9.5px] text-gray-400">
         <span className="inline-flex items-center gap-1 truncate max-w-full">
           <Briefcase className="text-gray-500 shrink-0" />
@@ -877,17 +782,13 @@ function SlotIdentity({ data }: { data: CharacterRow }) {
   );
 }
 
-function SlotEmpty({ t }: { t: (k: string) => string }) {
+function SlotEmpty({ tx }: { tx: (suffix: string, fallback: string) => string }) {
   return (
     <div className="font-mono text-[9.5px] tracking-[0.25em] text-gray-500 uppercase group-hover:text-gray-300 transition-colors truncate">
-      {t('ui.create_button')}
+      {tx('create_button', 'Create Character')}
     </div>
   );
 }
-
-// ============================================================
-// Register form
-// ============================================================
 
 interface RegisterPanelProps {
   data: RegisterFormData;
@@ -903,6 +804,7 @@ interface RegisterPanelProps {
   onCancel: () => void;
   onCreate: () => void;
   t: (k: string, options?: Record<string, unknown>) => string;
+  tx: (suffix: string, fallback: string) => string;
 }
 
 function RegisterPanel({
@@ -919,19 +821,10 @@ function RegisterPanel({
   onCancel,
   onCreate,
   t,
+  tx,
 }: RegisterPanelProps) {
-  // Validation runs on submit only — errors live in `fieldErrors` and are
-  // cleared per-field by the parent's `updateRegister` as the user edits,
-  // so showing them directly is correct: nothing renders before the first
-  // failed submit, and individual errors disappear the moment the user
-  // touches that field.
   const visibleError = (key: keyof RegisterFormData) => fieldErrors[key];
 
-  // Coordinated Select open state. Radix Select's DismissableLayer is
-  // supposed to close one Select when another is clicked, but in our
-  // CEF/portal/backdrop-filter stack it doesn't always fire — both
-  // dropdowns can sit open at the same time. We hoist `open` here and
-  // make opening a new Select implicitly close the previous one.
   const [openSelect, setOpenSelect] = useState<
     'nationality' | 'gender' | null
   >(null);
@@ -939,26 +832,12 @@ function RegisterPanel({
     (key: 'nationality' | 'gender') => (open: boolean) =>
       setOpenSelect(open ? key : (cur) => (cur === key ? null : cur));
 
-  // Two-stage mount for the nationality dropdown. The list has ~200
-  // items — mounting them all in the same frame as the open transition
-  // means the user clicks the trigger and waits ~100ms staring at the
-  // closed trigger before the dropdown appears already-populated.
-  // Instead: open paints a spinner first (cheap), then a queued frame
-  // later we flip ready=true and React mounts the actual items. The
-  // dropdown opens instantly with a loading state, and the items pop
-  // in once the heavy work runs. CSS spin animation runs on the
-  // compositor so it stays smooth even while React is busy mounting.
   const [nationalityReady, setNationalityReady] = useState(false);
   useEffect(() => {
     if (openSelect !== 'nationality') {
       setNationalityReady(false);
       return;
     }
-    // First rAF puts the spinner on screen; second rAF defers the
-    // item mount to the frame after the spinner has actually painted.
-    // One rAF alone often isn't enough — React's commit and the
-    // browser's paint can land in the same frame, so the second rAF
-    // is a guarantee, not paranoia.
     let inner = 0;
     const outer = requestAnimationFrame(() => {
       inner = requestAnimationFrame(() => setNationalityReady(true));
@@ -969,12 +848,6 @@ function RegisterPanel({
     };
   }, [openSelect]);
 
-  // Memoize the SelectItem element arrays. Without this, every keystroke
-  // re-renders RegisterPanel, which re-evaluates the JSX inside each
-  // <SelectContent>{...} — that's ~200 React.createElement calls for the
-  // nationality list per keystroke (even though Content is unmounted
-  // because the dropdown is closed). Cached arrays make typing snappy
-  // and let React skip per-item reconciliation when the dropdown opens.
   const nationalityItems = useMemo(
     () =>
       nationalityOptions.map((opt) => (
@@ -997,9 +870,6 @@ function RegisterPanel({
   return (
     <Paper className="flex flex-col px-5 py-4 animate-[fadeIn_240ms_ease-out_both]">
       <form
-        // display: contents lets the form participate in the Paper's
-        // flex layout without nesting an extra block element. Native
-        // submit semantics give us free Enter-to-submit.
         className="contents"
         onSubmit={(e) => {
           e.preventDefault();
@@ -1007,10 +877,6 @@ function RegisterPanel({
         }}
         noValidate
       >
-        {/* Section header. The hairline below it is the visual seam
-            between header and body — replaces the old "header paper +
-            fields paper + action paper" stack with a single cohesive
-            document. */}
         <header className="flex items-start justify-between gap-3 pb-3 mb-4 border-b border-gray-800/60">
           <div className="min-w-0">
             <p className="font-mono text-[8.5px] tracking-[0.35em] text-gray-500 uppercase truncate">
@@ -1019,7 +885,7 @@ function RegisterPanel({
               })}
             </p>
             <h2 className="font-display text-xl font-light leading-tight text-gray-100 mt-1.5 truncate">
-              {t('ui.chardel_header')}
+              {tx('chardel_header', 'Character Registration')}
             </h2>
           </div>
           <span className="font-mono text-[8.5px] tracking-[0.3em] text-gray-400 uppercase shrink-0">
@@ -1034,7 +900,7 @@ function RegisterPanel({
         <div className="grid grid-cols-1 gap-3">
           <Field
             id="qbm-firstname"
-            label={t('ui.firstname')}
+            label={tx('firstname', 'First Name')}
             error={visibleError('firstname')}
           >
             <Input
@@ -1054,7 +920,7 @@ function RegisterPanel({
           </Field>
           <Field
             id="qbm-lastname"
-            label={t('ui.lastname')}
+            label={tx('lastname', 'Last Name')}
             error={visibleError('lastname')}
           >
             <Input
@@ -1074,7 +940,7 @@ function RegisterPanel({
           {customNationality ? (
             <Field
               id="qbm-nationality"
-              label={t('ui.nationality')}
+              label={tx('nationality', 'Nationality')}
               error={visibleError('nationality')}
             >
               <Input
@@ -1096,7 +962,7 @@ function RegisterPanel({
           ) : (
             <Field
               id="qbm-nationality"
-              label={t('ui.nationality')}
+              label={tx('nationality', 'Nationality')}
               error={visibleError('nationality')}
             >
               <Select
@@ -1114,17 +980,7 @@ function RegisterPanel({
                       : undefined
                   }
                 >
-                  {/* Pass `children` so Radix bypasses its
-                      SelectItemText portal mechanism for the trigger
-                      label. The portal only lives while the matching
-                      <SelectItem> is mounted; our deferred-mount
-                      spinner unmounts the items between picks, which
-                      makes the portal disappear and the trigger fall
-                      back to the placeholder. Rendering the value as
-                      children sets `valueNodeHasChildren=true` and
-                      Radix uses our text directly. Works because
-                      label === value for nationalities. */}
-                  <SelectValue placeholder={t('ui.nationality')}>
+                  <SelectValue placeholder={tx('nationality', 'Nationality')}>
                     {data.nationality || undefined}
                   </SelectValue>
                 </SelectTrigger>
@@ -1147,7 +1003,7 @@ function RegisterPanel({
           )}
           <Field
             id="qbm-gender"
-            label={t('ui.gender')}
+            label={tx('gender', 'Gender')}
             error={visibleError('gender')}
           >
             <Select
@@ -1163,14 +1019,14 @@ function RegisterPanel({
                   visibleError('gender') ? 'qbm-gender-error' : undefined
                 }
               >
-                <SelectValue placeholder={t('ui.gender')} />
+                <SelectValue placeholder={tx('gender', 'Gender')} />
               </SelectTrigger>
               <SelectContent>{genderItems}</SelectContent>
             </Select>
           </Field>
           <DatePicker
             id="qbm-birthdate"
-            label={t('ui.birthdate')}
+            label={tx('birthdate', 'Birthdate')}
             selected={data.date}
             onChange={(date) => onChange({ date: date ?? null })}
             error={visibleError('date')}
@@ -1178,7 +1034,7 @@ function RegisterPanel({
             maxDate={dateMax}
             defaultMonth={dateMax}
             yearNav
-            placeholder={t('ui.birthdate')}
+            placeholder={tx('birthdate', 'Birthdate')}
           />
         </div>
 
@@ -1186,33 +1042,21 @@ function RegisterPanel({
           <Button
             type="button"
             variant="secondary"
-            // preventDefault on mousedown stops the focused Input from
-            // blurring when this button is pressed. Without it, blur fires
-            // first → validation runs → an error caption renders below the
-            // input → layout shifts down → the click's mouseup lands on a
-            // different element, so onClick never fires, and the user has
-            // to click Cancel a second time.
             onMouseDown={(e) => e.preventDefault()}
             onClick={onCancel}
           >
             <X />
-            {t('ui.cancel')}
+            {tx('cancel', 'Cancel')}
           </Button>
           <Button type="submit">
             <Play />
-            {t('ui.create_button')}
+            {tx('create_button', 'Create Character')}
           </Button>
         </footer>
       </form>
     </Paper>
   );
 }
-
-// ============================================================
-// Field — small wrapper that pairs a Label and inline error caption
-// around any input primitive. Keeps the form fields visually aligned
-// without each call site repeating the wrapper markup.
-// ============================================================
 
 function Field({
   id,

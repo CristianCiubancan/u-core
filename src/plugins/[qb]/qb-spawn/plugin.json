@@ -1,14 +1,20 @@
 {
   "name": "qb-spawn",
-  "version": "2.0.0",
+  "version": "1.2.0",
   "fx_version": "cerulean",
   "games": ["gta5"],
   "lua54": true,
-  "author": "u-core (rewrite of Kakarot's qb-spawn)",
-  "description": "Spawn-point selector — u-core React rewrite preserving the QBCore event/callback contract.",
-  "client_scripts": ["client/*.js"],
-  "server_scripts": ["server/*.js"],
+  "author": "Kakarot (upstream); u-core (React UI)",
+  "description": "Allows players to select a spawn point from a list of available locations. Upstream Lua scripts; u-core React UI replacing the upstream Vue overlay.",
+  "shared_scripts": [
+    "@qb-core/shared/locale.lua",
+    "locales/en.lua",
+    "locales/*.lua",
+    "config.lua",
+    "@qb-apartments/config.lua"
+  ],
+  "client_scripts": ["client.lua"],
+  "server_scripts": ["@oxmysql/lib/MySQL.lua", "server.lua"],
   "ui_page": "html/index.html",
-  "files": ["html/index.html", "html/main.js"],
-  "dependencies": ["qb-core"]
+  "files": ["html/index.html", "html/main.js"]
 }
