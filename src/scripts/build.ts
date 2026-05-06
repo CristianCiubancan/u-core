@@ -9,6 +9,7 @@ import * as path from 'path';
 import { performance } from 'perf_hooks';
 import * as chokidar from 'chokidar';
 import { createDebouncer } from './util/debounce.js';
+import { acquireWatcherLock } from './util/watcher-lock.js';
 
 interface BuildOptions {
   /**
@@ -817,6 +818,26 @@ async function main(): Promise<void> {
 
     // Parse command line arguments
     const options = parseArgs();
+
+    // Single-instance enforcement for watch mode. Closing a terminal
+    // on Windows orphans the leaf node worker (pnpm/npx don't forward
+    // CTRL_CLOSE_EVENT), so multiple `pnpm dev` invocations stack up
+    // and race each other on dist swaps. Take over from any existing
+    // watcher rather than failing — the user's intent when they run
+    // `pnpm dev` again is "I want this terminal to be the watcher",
+    // not "tell me about the ghost from yesterday".
+    if (options.watch) {
+      const lockPath = path.resolve(process.cwd(), '.dev-watcher.lock');
+      const lock = acquireWatcherLock(lockPath);
+      if (lock.killedCount > 0) {
+        console.log(
+          chalk.yellow(
+            `[watcher-lock] Terminated ${lock.killedCount} other watcher ` +
+              `process(es) before starting`
+          )
+        );
+      }
+    }
 
     // Create plugin builder
     const builder = new PluginBuilder(options);

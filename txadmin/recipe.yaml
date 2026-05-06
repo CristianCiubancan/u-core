@@ -396,10 +396,12 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-banking
 
-  - action: download_github
-    dest: ./resources/[qb]/qb-clothing
-    ref: main
-    src: https://github.com/qbcore-framework/qb-clothing
+  # qb-clothing is shipped via the u-core plugin pipeline: upstream
+  # Lua scripts byte-for-byte; the upstream jQuery/HTML NUI is replaced
+  # with our React webview (same NUI message contract). The build
+  # emits to [GENERATED]/[qb]/qb-clothing on `pnpm build`. The
+  # upstream qbcore-framework/qb-clothing download is intentionally
+  # absent so FXServer doesn't double-register the resource.
 
   - action: download_github
     dest: ./resources/[qb]/qb-hotdogjob

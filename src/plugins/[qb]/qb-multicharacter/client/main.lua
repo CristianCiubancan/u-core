@@ -327,16 +327,73 @@ RegisterNUICallback('cDataPed', function(nData, cb)
 
         model = model ~= nil and tonumber(model) or false
 
-        if model ~= nil then
+        if model and model ~= 0 then
             initializePedModel(model, json.decode(data))
         else
-            initializePedModel()
+            -- u-core: no row in `playerskins` for this character (it
+            -- was created via the multichar form but never customized
+            -- via /clothing). Upstream falls through to a random
+            -- freemode here; instead, key off the character's stored
+            -- gender so the preview is at least male/female-consistent.
+            -- charinfo.gender is 0 (male) or 1 (female), set by the
+            -- createNewCharacter NUI callback above (see line 361).
+            local gender = cData.charinfo and cData.charinfo.gender
+            local fallbackModel
+            if gender == 0 then
+                fallbackModel = joaat('mp_m_freemode_01')
+            elseif gender == 1 then
+                fallbackModel = joaat('mp_f_freemode_01')
+            end
+            local decoded = data and json.decode(data) or nil
+            if fallbackModel then
+                initializePedModel(fallbackModel, decoded)
+            else
+                initializePedModel(nil, decoded)
+            end
         end
         cb('ok')
     else
         initializePedModel()
         cb('ok')
     end
+end)
+
+-- u-core: swap the empty-slot preview ped to the freemode model
+-- matching the gender the user just picked in the create form. Stable
+-- 'male'/'female' codes from the NUI side avoid the locale-string
+-- match upstream uses for createNewCharacter (see line 361).
+RegisterNUICallback('setCreatePed', function(data, cb)
+    local gender = data and data.gender
+    local modelName
+    if gender == 'male' then
+        modelName = 'mp_m_freemode_01'
+    elseif gender == 'female' then
+        modelName = 'mp_f_freemode_01'
+    else
+        cb('ok')
+        return
+    end
+    if charPed and DoesEntityExist(charPed) then
+        SetEntityAsMissionEntity(charPed, true, true)
+        DeleteEntity(charPed)
+    end
+    initializePedModel(joaat(modelName))
+    cb('ok')
+end)
+
+-- u-core: drop the create-form preview ped when the user cancels back
+-- to the grid. Without this, the random/gender-matched ped lingers on
+-- screen with no slot selected.
+RegisterNUICallback('clearPed', function(_, cb)
+    if charPed and DoesEntityExist(charPed) then
+        SetEntityAsMissionEntity(charPed, true, true)
+        DeleteEntity(charPed)
+    end
+    -- Don't nil charPed; upstream's pattern is to leave the handle as
+    -- a stale value and let the next initializePedModel reassign it.
+    -- Subsequent `if charPed and DoesEntityExist(charPed)` checks
+    -- correctly evaluate to false on a stale handle, so this is safe.
+    cb('ok')
 end)
 
 RegisterNUICallback('setupCharacters', function(_, cb)

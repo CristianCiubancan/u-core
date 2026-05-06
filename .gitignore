@@ -86,6 +86,9 @@ asset-server/original/*
 # ───────── Project-local agent settings ─────────
 **/.claude/settings.local.json
 
+# ───────── Dev watcher single-instance lockfile ─────────
+.dev-watcher.lock
+
 # ───────── dbmate ─────────
 # `db/schema.sql` is auto-written by `dbmate up` from the live DB it's
 # pointed at. Ignored until the per-resource SQL backlog (qb-banking,

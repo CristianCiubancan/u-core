@@ -6,7 +6,6 @@ import {
   Play,
   Plus,
   Trash2,
-  X,
 } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
@@ -304,6 +303,36 @@ const Page: React.FC = () => {
     if (openSelect !== 'nationality') setNationalitySearch('');
   }, [openSelect]);
 
+  // The scrollable form/grid container is always mounted (only its
+  // contents swap on `view`), so without an explicit reset its
+  // scrollTop carries over from the grid into the register form. Snap
+  // it to the top whenever we enter 'register' so the user always
+  // starts at the firstname field.
+  const mainRef = React.useRef<HTMLElement>(null);
+  React.useEffect(() => {
+    if (view === 'register') {
+      mainRef.current?.scrollTo({ top: 0 });
+    }
+  }, [view]);
+
+  // forceMount keeps the popover content in the tree across opens, so
+  // Radix's FocusScope only auto-focuses on initial mount — clicking
+  // the trigger on subsequent opens leaves focus on the button and
+  // typed characters go nowhere. Move focus into the search input
+  // ourselves whenever the popover transitions open. rAF defers past
+  // the `data-[state=closed]:hidden` flip (focusing display:none is a
+  // no-op). Re-runs on countries.length so the focus also lands if
+  // the list arrives after the user has already opened the popover.
+  const nationalityInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (openSelect !== 'nationality') return;
+    if (countries.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      nationalityInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [openSelect, countries.length]);
+
   const tx = React.useCallback(
     (key: string, fallback?: string): string =>
       translations[key] ?? fallback ?? key,
@@ -467,6 +496,22 @@ const Page: React.FC = () => {
 
   // ---- register form --------------------------------------------------
 
+  // Swap the empty-slot preview ped to match the picked gender. The
+  // Select stores localized labels (so the createNewCharacter callback
+  // can do the same string match upstream uses, line 361 of main.lua),
+  // so we map back to a stable code here. Only fire while the form is
+  // mounted — `registerData.gender` survives across cancel and we
+  // don't want to hijack the ped while the grid is showing.
+  React.useEffect(() => {
+    if (view !== 'register') return;
+    if (!registerData.gender) return;
+    let code: 'male' | 'female' | null = null;
+    if (registerData.gender === tx('male', 'Male')) code = 'male';
+    else if (registerData.gender === tx('female', 'Female')) code = 'female';
+    if (!code) return;
+    void fetchNui('setCreatePed', { gender: code });
+  }, [view, registerData.gender, tx]);
+
   const validate = (data: RegisterData): RegisterErrors => {
     const next: RegisterErrors = {};
     if (!data.firstname) next.firstname = tcap('err_required', 'Required');
@@ -551,6 +596,11 @@ const Page: React.FC = () => {
     // blur-driven layout shift on the active input (memory:
     // feedback_dismiss_blur_cascade).
     e.preventDefault();
+    // Drop the slot highlight + the preview ped so the grid returns to
+    // a clean "nothing selected" state. Without this the empty slot
+    // stays selected and the random/gender ped lingers on the scene.
+    setSelectedCid(-1);
+    void fetchNui('clearPed');
     setView('grid');
     setErrors({});
   };
@@ -630,30 +680,15 @@ const Page: React.FC = () => {
           'animate-[fadeIn_220ms_ease-out_both]'
         )}
       >
-        <header className="flex items-start justify-between gap-3 px-[clamp(1.25rem,2vw,2rem)] pt-[clamp(1.5rem,3vh,2.5rem)] pb-[clamp(1rem,2vh,1.5rem)] border-b border-border/40">
-          <div className="min-w-0">
-            <p className="font-mono uppercase text-brand-400/80 tracking-[0.4em] text-[clamp(0.6rem,0.7vw,0.75rem)]">
-              {tx('characters_header', 'My Characters')}
-            </p>
-            <h1 className="mt-2 font-display font-light leading-[1.1] text-balance text-[clamp(1.5rem,2.4vw,2.625rem)]">
-              {tx('select_character', 'Select a character')}
-            </h1>
-            <p className="mt-1.5 font-serif text-foreground/60 text-[clamp(0.78rem,0.95vw,0.95rem)] leading-snug">
-              {tx(
-                'select_character_subtitle',
-                'Choose a slot to begin or create a new identity.'
-              )}
-            </p>
-          </div>
-
-          {view === 'grid' && !showLoading && (
-            <div className="flex shrink-0 flex-col items-end gap-2 min-w-[8rem]">
+        {view === 'grid' && !showLoading && (
+          <header className="flex flex-col gap-3 px-[clamp(1.25rem,2vw,2rem)] py-[clamp(0.75rem,1.5vh,1.25rem)] border-b border-border/40">
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={handleDisconnect}
-                className="dossier-action group inline-flex items-center gap-2 text-foreground/60 hover:text-destructive border-b border-input/60 hover:border-destructive/70"
+                className="dossier-action group hover:text-destructive hover:border-destructive/70"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-3 w-3" />
                 {tx('disconnect', 'Disconnect')}
               </button>
               {availableLocales.length > 0 && (
@@ -663,8 +698,11 @@ const Page: React.FC = () => {
                   value={currentLocale}
                   onValueChange={handleLocaleChange}
                 >
+                  {/* ml-auto pushes the picker to the right edge.
+                      Visual weight matches the Disconnect dossier-action:
+                      same padding, typography, underline tone, hover. */}
                   <SelectTrigger
-                    className="h-auto py-1 text-[clamp(0.7rem,0.85vw,0.9rem)]"
+                    className="ml-auto h-auto w-auto min-w-0 px-3 py-1.5 pr-7 gap-1.5 font-mono text-[9.5px] tracking-[0.25em] uppercase text-foreground/60 border-input/60 hover:text-foreground hover:border-input"
                     aria-label="Locale"
                   >
                     <SelectValue placeholder={currentLocale} />
@@ -673,10 +711,26 @@ const Page: React.FC = () => {
                 </Select>
               )}
             </div>
-          )}
-        </header>
+            <div>
+              <p className="font-mono uppercase text-brand-400/80 tracking-[0.4em] text-[clamp(0.6rem,0.7vw,0.75rem)]">
+                {tx('characters_header', 'My Characters')}
+              </p>
+              {/* Brand-tinted hairline accent. Fades to transparent on
+                  the right so it reads as a dossier section rule, not a
+                  full-width structural line — the muted border-b on the
+                  header itself still does the structural separation. */}
+              <div
+                aria-hidden
+                className="mt-2 h-px bg-gradient-to-r from-brand-500/70 via-brand-500/30 to-transparent"
+              />
+            </div>
+          </header>
+        )}
 
-        <main className="flex-1 overflow-y-auto px-[clamp(1.25rem,2vw,2rem)] py-[clamp(1rem,2vh,1.5rem)]">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto px-[clamp(1.25rem,2vw,2rem)] py-[clamp(1rem,2vh,1.5rem)]"
+        >
           {showLoading && (
             <div className="flex h-full items-center justify-center">
               <div className="flex items-center gap-3 text-foreground/70">
@@ -779,25 +833,22 @@ const Page: React.FC = () => {
           )}
 
           {view === 'register' && (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-mono uppercase tracking-[0.4em] text-brand-400/80 text-[clamp(0.6rem,0.7vw,0.75rem)]">
-                    {tx('new_character', 'New character')}
-                  </p>
-                  <h2 className="mt-1 font-display font-light text-[clamp(1.125rem,1.6vw,1.75rem)]">
-                    {tx('chardel_header', 'Character Registration')}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={handleCancelRegister}
-                  aria-label={tx('cancel', 'Cancel')}
-                  className="text-foreground/50 transition-colors hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+            <form
+              id="register-form"
+              onSubmit={handleSubmit}
+              className="flex flex-col gap-5"
+            >
+              <div>
+                <p className="font-mono uppercase tracking-[0.4em] text-brand-400/80 text-[clamp(0.6rem,0.7vw,0.75rem)]">
+                  {tx('new_character', 'New character')}
+                </p>
+                {/* Mirrors the grid header's brand-tinted section rule
+                    — fades to transparent on the right for a dossier
+                    underline, not a hard divider. */}
+                <div
+                  aria-hidden
+                  className="mt-2 h-px bg-gradient-to-r from-brand-500/70 via-brand-500/30 to-transparent"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-4">
@@ -925,6 +976,7 @@ const Page: React.FC = () => {
                           ) : (
                             <Command className="bg-transparent border-0">
                               <CommandInput
+                                ref={nationalityInputRef}
                                 value={nationalitySearch}
                                 onValueChange={setNationalitySearch}
                                 placeholder={tx(
@@ -956,7 +1008,16 @@ const Page: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5 col-span-1">
-                  <Label htmlFor="gender">{tx('gender', 'Gender')}</Label>
+                  {/* htmlFor still focuses the trigger for a11y, but Radix
+                      Select opens on pointerdown — the label's synthesized
+                      click never reaches that handler — so we drive the
+                      controlled open state ourselves. */}
+                  <Label
+                    htmlFor="gender"
+                    onClick={() => setOpenSelect('gender')}
+                  >
+                    {tx('gender', 'Gender')}
+                  </Label>
                   <Select
                     open={openSelect === 'gender'}
                     onOpenChange={(o) => setOpenSelect(o ? 'gender' : null)}
@@ -1008,19 +1069,6 @@ const Page: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-border/50 pt-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={handleCancelRegister}
-                >
-                  {tx('cancel', 'Cancel')}
-                </Button>
-                <Button type="submit" size="lg">
-                  {tx('create_button', 'Create Character')}
-                </Button>
-              </div>
             </form>
           )}
         </main>
@@ -1046,6 +1094,22 @@ const Page: React.FC = () => {
             >
               <Play className="h-3.5 w-3.5" fill="currentColor" />
               {tx('play_button', 'Play')}
+            </Button>
+          </footer>
+        )}
+
+        {view === 'register' && (
+          <footer className="flex items-center justify-end gap-2 px-[clamp(1.25rem,2vw,2rem)] py-[clamp(0.75rem,1.5vh,1.25rem)] border-t border-border/40">
+            <Button
+              type="button"
+              variant="secondary"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCancelRegister}
+            >
+              {tx('cancel', 'Cancel')}
+            </Button>
+            <Button type="submit" form="register-form" variant="default">
+              {tx('create_button', 'Create Character')}
             </Button>
           </footer>
         )}
