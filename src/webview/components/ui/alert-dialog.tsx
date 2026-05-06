@@ -37,18 +37,27 @@ const AlertDialogContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
-    <AlertDialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
-        'w-full max-w-md',
-        'border border-border/60 bg-popover/92 backdrop-blur-md text-popover-foreground',
-        'p-5 shadow-[0_8px_32px_rgba(0,0,0,.45)]',
-        'data-[state=open]:animate-[fadeIn_180ms_ease-out_both]',
-        className
-      )}
-      {...props}
-    />
+    {/* Centering lives on the wrapper, not on Content. The shared
+     * `fadeIn` keyframe animates `transform`, which would clobber any
+     * `-translate-x-1/2 -translate-y-1/2` placed on the animated node
+     * (and with fill-mode `both` the override sticks after the
+     * animation ends — that's how the dialog ended up half-off-screen
+     * on narrow viewports). The `p-4` gutter guarantees the dialog
+     * never touches the viewport edge even when the content is at
+     * `max-w-md`. */}
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 pointer-events-none">
+      <AlertDialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          'pointer-events-auto w-full max-w-md',
+          'border border-border/60 bg-popover/92 backdrop-blur-md text-popover-foreground',
+          'p-5 shadow-[0_8px_32px_rgba(0,0,0,.45)]',
+          'data-[state=open]:animate-[fadeIn_180ms_ease-out_both]',
+          className
+        )}
+        {...props}
+      />
+    </div>
   </AlertDialogPortal>
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
