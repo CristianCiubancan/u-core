@@ -200,7 +200,16 @@ const SelectContent = React.forwardRef<
         // hairline border + backdrop-blur carry enough separation; the
         // dossier vocabulary specifically avoids drop shadows.
         'outline-none',
+        // Close animation matters here: large dropdowns (e.g. the 250-item
+        // nationality list) take ~300ms to unmount in CEF because every
+        // SelectItem runs Radix's per-item cleanup. Radix Presence holds
+        // the popper visible until the animation ends, so we use a fade-
+        // out to mask the unmount cost — user perceives 120ms close, the
+        // heavy unmount runs behind an invisible popper. Mirrors the
+        // pattern in accordion/sheet/alert-dialog. (forceMount + CSS hide
+        // would be cleaner but @radix-ui/react-select v2 dropped that prop.)
         'data-[state=open]:animate-[fadeIn_140ms_ease-out_both]',
+        'data-[state=closed]:animate-[fadeIn_120ms_ease-out_reverse_both]',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
         className

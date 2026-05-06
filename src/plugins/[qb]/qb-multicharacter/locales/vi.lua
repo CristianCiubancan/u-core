@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Chọn ô để bắt đầu hoặc tạo nhân vật mới.",
         empty_slot = "Ô trống",
         new_character = "Nhân vật mới",
-        disconnect = "Ngắt kết nối"
+        disconnect = "Ngắt kết nối",
+        loading_countries = "Đang tải các quốc gia",
+        search_nationality = "Tìm quốc tịch",
+        no_matches = "Không có kết quả"
     }
 }
 

@@ -467,41 +467,116 @@ class BuildManager {
       }
       await Promise.all(buildSteps);
 
+      // Hash the staged tmp dir BEFORE swapping. If it matches the
+      // prior build's hash AND the destination already exists, skip the
+      // swap entirely — neither disk content nor FXServer state needs
+      // to change. Without this short-circuit the rm+rename runs on
+      // every build, briefly disrupting FXServer's open file handles
+      // even when the resource is byte-identical.
+      const newHash = await this.hashDir(tmpDir);
+      const prevHash = this.distHashes.get(plugin.pluginName);
+      const destExists = fsSync.existsSync(destDir);
+      const distChanged = !destExists || prevHash !== newHash;
+
+      if (!distChanged) {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+        tmpDir = undefined;
+        this.logger.info(
+          `✓ Plugin ${
+            plugin.pluginName
+          } built successfully to ${this.pathToDisplay(destDir)} (dist unchanged)`
+        );
+        return { distChanged: false };
+      }
+
+      // Stop → swap → start. The stop guarantees FXServer has released
+      // its script env (and on Windows, its open file handles to the
+      // dist tree) before we rm the destDir. This closes both the
+      // EBUSY/EPERM rm hazard AND the partial-script-load cascade where
+      // the rebuilt resource began starting before the previous one was
+      // fully torn down (`Failed to load script player.lua` etc).
+      //
+      // The lifecycle is gated on `reload && reloadManager.isHealthy()`
+      // — a one-off `pnpm build` (no watch) skips it and falls back to
+      // the legacy hot-swap path. Same for builds that ran while
+      // FXServer is offline.
+      const useLifecycle =
+        reload &&
+        this.reloadManager !== null &&
+        this.reloadManager.isHealthy();
+      const reloadManager = this.reloadManager;
+
+      if (useLifecycle && reloadManager) {
+        const stopResult = await reloadManager.stopResource(plugin.pluginName);
+        // 'missing' is expected on first deploy — FXServer hasn't
+        // indexed the new resource yet. Proceed with the swap; the
+        // start that follows will also report 'missing' and the user
+        // can `refresh` once to register it.
+        //
+        // Any OTHER stop failure (HTTP timeout, state-poll timeout,
+        // StopResource threw) means we don't actually know whether
+        // FXServer has released the dist tree. Proceeding with the
+        // rm+rename here is the dist-swap-while-running race we
+        // designed the lifecycle to prevent — under save spam, this
+        // recovery path was the cascade trigger that ended in the
+        // txAdmin-watchdog-restart cold-boot. So we ABORT: clean up
+        // the tmp dir, leave the on-disk dist intact, do NOT update
+        // distHashes (so the next save re-attempts the lifecycle), and
+        // surface the error to the watcher.
+        if (!stopResult.success && stopResult.state !== 'missing') {
+          await fs.rm(tmpDir, { recursive: true, force: true });
+          tmpDir = undefined;
+          this.logger.error(
+            `✗ Stop failed for ${plugin.pluginName} — aborting deploy to keep the resource and its on-disk dist consistent. ` +
+              `FXServer says: ${stopResult.message}`
+          );
+          throw new Error(
+            `Stop failed for ${plugin.pluginName}: ${stopResult.message}`
+          );
+        }
+      }
+
       if (fsSync.existsSync(destDir)) {
         await fs.rm(destDir, { recursive: true, force: true });
       }
       await fs.rename(tmpDir, destDir);
       tmpDir = undefined;
 
-      // Hash the freshly-renamed dist and compare with the prior build's
-      // hash. Watchers downstream skip the FXServer reload POST when
-      // `distChanged` is false — see the field-doc on `distHashes`.
-      const newHash = await this.hashDir(destDir);
-      const prevHash = this.distHashes.get(plugin.pluginName);
-      const distChanged = prevHash !== newHash;
-      this.distHashes.set(plugin.pluginName, newHash);
-
       this.logger.info(
         `✓ Plugin ${
           plugin.pluginName
-        } built successfully to ${this.pathToDisplay(destDir)}` +
-          (distChanged ? '' : ' (dist unchanged)')
+        } built successfully to ${this.pathToDisplay(destDir)}`
       );
 
-      // After successful build, reload if requested — but only when the
-      // dist actually changed. Skipping no-op reloads is the whole point
-      // of the hash check; doing the reload anyway would defeat it.
-      if (reload && this.reloadManager && distChanged) {
-        try {
-          await this.reloadPlugin(pluginNameOrPath);
-        } catch (reloadError) {
+      if (useLifecycle && reloadManager) {
+        const startResult = await reloadManager.startResource(
+          plugin.pluginName
+        );
+        if (!startResult.success) {
+          // Don't update distHashes — leaving the previous (or
+          // empty) hash in place means the next rebuild's
+          // `distChanged` check will fire and re-attempt the
+          // lifecycle. Updating it now would mark a half-deployed
+          // resource as "successfully shipped" and the next no-op
+          // save would silently skip the retry.
           this.logger.warn(
-            `⚠ Plugin built successfully but reload failed: ${reloadError}`
+            `⚠ Start failed for ${plugin.pluginName}: ${startResult.message}`
+          );
+        } else {
+          this.distHashes.set(plugin.pluginName, newHash);
+          this.logger.info(
+            `✓ Plugin ${plugin.pluginName} reloaded (state: ${startResult.state ?? 'started'})`
           );
         }
+      } else {
+        // No lifecycle (one-off `pnpm build` or unhealthy reload
+        // manager). The dist on disk is now authoritative; record
+        // its hash so a subsequent watch session can short-circuit
+        // identical rebuilds.
+        this.distHashes.set(plugin.pluginName, newHash);
       }
 
-      return { distChanged };
+      return { distChanged: true };
     } catch (error) {
       this.logger.error(`Error building plugin ${pluginNameOrPath}`, error);
       if (tmpDir) {
@@ -2034,10 +2109,13 @@ class BuildManager {
     const manifest = plugin.manifest!;
     let content = '';
 
-    // Add header comment
+    // Header comment. Intentionally NO `Generated on: <timestamp>` —
+    // a wall-clock value would invalidate the dist hash on every
+    // build and turn `distChanged` into a permanent `true`, defeating
+    // the watcher's "skip reload when bytes unchanged" short-circuit.
+    // Build time is recoverable from the file mtime if anyone needs it.
     content += `-- Generated from plugin.json by BuildManager\n`;
-    content += `-- Plugin: ${plugin.pluginName}\n`;
-    content += `-- Generated on: ${new Date().toISOString()}\n\n`;
+    content += `-- Plugin: ${plugin.pluginName}\n\n`;
 
     // Add resource metadata
     content += `-- Resource Metadata\n`;

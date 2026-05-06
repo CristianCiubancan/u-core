@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Wähle einen Slot, um zu beginnen oder eine neue Identität zu erstellen.",
         empty_slot = "Leerer Platz",
         new_character = "Neuer Charakter",
-        disconnect = "Trennen"
+        disconnect = "Trennen",
+        loading_countries = "Länder werden geladen",
+        search_nationality = "Nationalität suchen",
+        no_matches = "Keine Treffer"
     }
 }
 

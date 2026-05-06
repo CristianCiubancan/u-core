@@ -89,7 +89,10 @@ local Translations = {
         select_character_subtitle = "スロットを選択して開始するか、新しい身分を作成してください。",
         empty_slot = "空きスロット",
         new_character = "新規キャラクター",
-        disconnect = "切断"
+        disconnect = "切断",
+        loading_countries = "国を読み込み中",
+        search_nationality = "国籍を検索",
+        no_matches = "一致なし"
     }
 }
 

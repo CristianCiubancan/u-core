@@ -96,7 +96,15 @@ local Translations = {
         select_character_subtitle = "Choose a slot to begin or create a new identity.",
         empty_slot = "Empty slot",
         new_character = "New character",
-        disconnect = "Disconnect"
+        disconnect = "Disconnect",
+
+        -- u-core: shown inside the nationality dropdown while the country
+        -- list is still in flight from the server.
+        loading_countries = "Loading countries",
+
+        -- u-core: nationality combobox search input + empty result.
+        search_nationality = "Search nationality",
+        no_matches = "No matches"
     }
 }
 

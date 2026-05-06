@@ -56,68 +56,246 @@ function getAllResources(): string[] {
   return resources;
 }
 
-// Function to restart a specific resource. Returns once `StartResource` has
-// either succeeded or thrown — never before. The 500ms settle window
-// between Stop and Start is wrapped in a Promise so the HTTP handler can
-// `await` the full lifecycle and surface the actual start outcome.
-async function restartResource(resourceName: string): Promise<boolean> {
-  console.log(
-    `[resource-manager] Attempting to restart resource: ${resourceName}`
-  );
+// Per-resource async mutex. Concurrent /stop, /start, /restart calls for
+// the same resource serialize through this map; cross-resource ops still
+// run in parallel. Without this lock, two near-simultaneous /restart
+// requests for the same resource interleave their StopResource/Start-
+// Resource calls inside FXServer's tick loop, producing the "Starting /
+// Starting" double-pump pattern that leaves a partially-loaded script
+// env (`Failed to load script player.lua` etc).
+const resourceLocks = new Map<string, Promise<unknown>>();
 
-  // Skip if resource name is empty or undefined
-  if (!resourceName) {
-    console.error(`[resource-manager] Invalid resource name: ${resourceName}`);
-    return false;
+function withResourceLock<T>(
+  name: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const prev = resourceLocks.get(name) ?? Promise.resolve();
+  // Run regardless of `prev`'s outcome — a failed previous lifecycle
+  // shouldn't block subsequent ops on the same resource.
+  const next = prev.then(fn, fn);
+  resourceLocks.set(name, next);
+  // Drop the entry once we settle, but only if no later op has already
+  // chained onto us (preserving the chain for a third caller queued
+  // behind the second).
+  void next.catch((): void => undefined).finally((): void => {
+    if (resourceLocks.get(name) === next) {
+      resourceLocks.delete(name);
+    }
+  });
+  return next as Promise<T>;
+}
+
+const STATE_POLL_INTERVAL_MS = 50;
+const STOP_TIMEOUT_MS = 5000;
+const START_TIMEOUT_MS = 10000;
+
+/**
+ * Poll `GetResourceState` until it equals one of `targets` or the
+ * timeout elapses. Returns the observed state on match, or null on
+ * timeout.
+ *
+ * FiveM resource state transitions: 'starting' → 'started' on a
+ * successful start, 'stopping' → 'stopped' on a stop. A *failed* start
+ * (script env never finishes loading) lands in 'stopped' too, so the
+ * caller passes both potential terminal states to surface the failure.
+ */
+async function waitForResourceState(
+  name: string,
+  targets: readonly string[],
+  timeoutMs: number
+): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  const targetSet = new Set(targets);
+  // Fast path: already in the target state.
+  const initial = GetResourceState(name);
+  if (targetSet.has(initial)) return initial;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, STATE_POLL_INTERVAL_MS));
+    const state = GetResourceState(name);
+    if (targetSet.has(state)) return state;
   }
+  return null;
+}
 
-  // Handle resource names with folder paths (also covers special-case 'core'
-  // — the previous code special-cased it but the logic was identical).
-  const cleanResourceName = resourceName.includes('/')
-    ? resourceName.split('/').pop()
+interface LifecycleResult {
+  success: boolean;
+  state?: string;
+  message: string;
+}
+
+/**
+ * Normalize an inbound resource name. We accept both bare names
+ * (`qb-core`) and slash-prefixed paths (`[default]/qb-core`) — only the
+ * basename is meaningful to FiveM's resource manager.
+ */
+function cleanResourceName(resourceName: string): string | null {
+  if (!resourceName) return null;
+  const cleaned = resourceName.includes('/')
+    ? resourceName.split('/').pop() ?? null
     : resourceName;
+  return cleaned ? cleaned : null;
+}
 
-  // Skip if resource name is empty after cleaning
-  if (!cleanResourceName) {
-    console.error(
-      `[resource-manager] Invalid resource name after cleaning: ${resourceName}`
-    );
-    return false;
+/**
+ * Stop a resource and wait for it to reach 'stopped'. Run inside the
+ * per-resource lock so concurrent ops can't interleave.
+ */
+async function performStop(name: string): Promise<LifecycleResult> {
+  const initial = GetResourceState(name);
+  if (initial === 'missing') {
+    return {
+      success: false,
+      state: 'missing',
+      message: `Resource '${name}' not found (state: missing)`,
+    };
+  }
+  if (initial === 'stopped') {
+    return {
+      success: true,
+      state: 'stopped',
+      message: `Resource '${name}' was already stopped`,
+    };
   }
 
-  // Check if resource exists by attempting to get its state
-  const state = GetResourceState(cleanResourceName);
-  if (state === 'missing') {
-    console.error(
-      `[resource-manager] Resource '${cleanResourceName}' not found (state: missing)`
-    );
-    return false;
-  }
-
+  console.log(`[resource-manager] Stopping resource: ${name}`);
   try {
-    console.log(`[resource-manager] Stopping resource: ${cleanResourceName}`);
-    StopResource(cleanResourceName);
+    StopResource(name);
   } catch (error) {
-    console.error(
-      `[resource-manager] Failed to stop resource ${cleanResourceName}:`,
-      error
-    );
-    return false;
+    return {
+      success: false,
+      state: GetResourceState(name),
+      message: `StopResource threw: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
   }
 
-  // Settle window between Stop and Start, wrapped in a Promise that the
-  // handler awaits before responding. Previously this was a fire-and-
-  // forget `setTimeout(..., 500)`, so the HTTP response went out before
-  // StartResource ran and the watcher always saw "OK" even on a failure.
-  // Now `restartResource` only resolves after the Start outcome is known.
-  const startSucceeded = await new Promise<boolean>((resolve) => setTimeout(() => { try { console.log(`[resource-manager] Starting resource: ${cleanResourceName}`); StartResource(cleanResourceName); resolve(true); } catch (startError) { console.error(`[resource-manager] Failed to start resource ${cleanResourceName}:`, startError); resolve(false); } }, 500));
-
-  if (startSucceeded) {
-    console.log(
-      `[resource-manager] Successfully restarted resource: ${cleanResourceName}`
-    );
+  const final = await waitForResourceState(name, ['stopped'], STOP_TIMEOUT_MS);
+  if (final === null) {
+    return {
+      success: false,
+      state: GetResourceState(name),
+      message: `Resource '${name}' did not reach 'stopped' within ${STOP_TIMEOUT_MS}ms`,
+    };
   }
-  return startSucceeded;
+  return {
+    success: true,
+    state: final,
+    message: `Resource '${name}' stopped`,
+  };
+}
+
+/**
+ * Start a resource and wait for it to reach 'started'. A failed start
+ * lands in 'stopped' (transient 'starting' state resolves either way),
+ * so we wait for either terminal outcome and surface a failure if the
+ * resource didn't end up 'started'.
+ */
+async function performStart(name: string): Promise<LifecycleResult> {
+  const initial = GetResourceState(name);
+  if (initial === 'missing') {
+    return {
+      success: false,
+      state: 'missing',
+      message: `Resource '${name}' not found (state: missing)`,
+    };
+  }
+  if (initial === 'started') {
+    return {
+      success: true,
+      state: 'started',
+      message: `Resource '${name}' was already started`,
+    };
+  }
+
+  console.log(`[resource-manager] Starting resource: ${name}`);
+  try {
+    StartResource(name);
+  } catch (error) {
+    return {
+      success: false,
+      state: GetResourceState(name),
+      message: `StartResource threw: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  const final = await waitForResourceState(
+    name,
+    ['started', 'stopped'],
+    START_TIMEOUT_MS
+  );
+  if (final === null) {
+    return {
+      success: false,
+      state: GetResourceState(name),
+      message: `Resource '${name}' did not reach a terminal state within ${START_TIMEOUT_MS}ms`,
+    };
+  }
+  if (final !== 'started') {
+    return {
+      success: false,
+      state: final,
+      message: `StartResource left '${name}' in state '${final}' (script env failed to populate)`,
+    };
+  }
+  return {
+    success: true,
+    state: final,
+    message: `Resource '${name}' started`,
+  };
+}
+
+async function stopResourceAndWait(rawName: string): Promise<LifecycleResult> {
+  const name = cleanResourceName(rawName);
+  if (!name) {
+    return {
+      success: false,
+      message: `Invalid resource name: ${rawName}`,
+    };
+  }
+  return withResourceLock(name, () => performStop(name));
+}
+
+async function startResourceAndWait(
+  rawName: string
+): Promise<LifecycleResult> {
+  const name = cleanResourceName(rawName);
+  if (!name) {
+    return {
+      success: false,
+      message: `Invalid resource name: ${rawName}`,
+    };
+  }
+  return withResourceLock(name, () => performStart(name));
+}
+
+async function restartResource(rawName: string): Promise<LifecycleResult> {
+  const name = cleanResourceName(rawName);
+  if (!name) {
+    return {
+      success: false,
+      message: `Invalid resource name: ${rawName}`,
+    };
+  }
+  console.log(`[resource-manager] Attempting to restart resource: ${name}`);
+  // Stop+start under a single lock acquisition so a second /restart for
+  // the same resource cannot slip between our stop and our start.
+  return withResourceLock(name, async () => {
+    const stopResult = await performStop(name);
+    if (!stopResult.success) {
+      return stopResult;
+    }
+    const startResult = await performStart(name);
+    if (startResult.success) {
+      console.log(
+        `[resource-manager] Successfully restarted resource: ${name}`
+      );
+    }
+    return startResult;
+  });
 }
 
 // Function to restart all resources
@@ -136,7 +314,13 @@ async function restartAllResources(): Promise<{
       continue;
     }
 
-    results[resource] = await restartResource(resource);
+    const result = await restartResource(resource);
+    results[resource] = result.success;
+    if (!result.success) {
+      console.error(
+        `[resource-manager] Restart failed for ${resource}: ${result.message}`
+      );
+    }
   }
 
   return {
@@ -206,17 +390,16 @@ const server = http.createServer((req, res) => {
           console.log(
             `[resource-manager] Processing restart request for resource: ${resourceName}`
           );
-          const success = await restartResource(resourceName);
+          const result = await restartResource(resourceName);
 
-          res.statusCode = success ? 200 : 500;
+          res.statusCode = result.success ? 200 : 500;
           res.setHeader('Content-Type', 'application/json');
           res.end(
             JSON.stringify({
-              success,
+              success: result.success,
               resource: resourceName,
-              message: success
-                ? `Resource '${resourceName}' restarted successfully`
-                : `Resource '${resourceName}' failed to start (or was missing)`,
+              message: result.message,
+              state: result.state,
             })
           );
         }
@@ -234,6 +417,67 @@ const server = http.createServer((req, res) => {
               success: result.success,
               message: 'Resources restart operation completed',
               results: result.results,
+            })
+          );
+        }
+      } else if (path === '/stop' && req.method === 'POST') {
+        // Stop a single resource and wait for it to reach 'stopped'.
+        // Used by BuildManager's stop→swap→start lifecycle so the dist
+        // swap happens against a torn-down script env (no Windows file
+        // locks, no half-loaded successor env).
+        if (!query.resource) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: '`resource` query parameter required',
+            })
+          );
+        } else {
+          const resourceName = query.resource as string;
+          console.log(
+            `[resource-manager] Processing stop request for resource: ${resourceName}`
+          );
+          const result = await stopResourceAndWait(resourceName);
+          res.statusCode = result.success ? 200 : 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: result.success,
+              resource: resourceName,
+              message: result.message,
+              state: result.state,
+            })
+          );
+        }
+      } else if (path === '/start' && req.method === 'POST') {
+        // Start a single resource and wait for it to reach 'started'.
+        // Counterpart to /stop; together they let the watcher gate the
+        // dist swap inside the resource's stopped window.
+        if (!query.resource) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: '`resource` query parameter required',
+            })
+          );
+        } else {
+          const resourceName = query.resource as string;
+          console.log(
+            `[resource-manager] Processing start request for resource: ${resourceName}`
+          );
+          const result = await startResourceAndWait(resourceName);
+          res.statusCode = result.success ? 200 : 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: result.success,
+              resource: resourceName,
+              message: result.message,
+              state: result.state,
             })
           );
         }
@@ -302,11 +546,11 @@ RegisterCommand(
       return;
     }
 
-    void restartResource(resourceName).then((success) => {
+    void restartResource(resourceName).then((result) => {
       console.log(
-        success
+        result.success
           ? `Resource '${resourceName}' restarted successfully`
-          : `Resource '${resourceName}' not found or failed to restart`
+          : `Resource '${resourceName}' restart failed: ${result.message}`
       );
     });
   },

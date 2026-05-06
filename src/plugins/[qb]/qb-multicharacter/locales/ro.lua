@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Alege un slot pentru a începe sau pentru a crea o nouă identitate.",
         empty_slot = "Slot gol",
         new_character = "Personaj nou",
-        disconnect = "Deconectare"
+        disconnect = "Deconectare",
+        loading_countries = "Se încarcă țările",
+        search_nationality = "Caută naționalitate",
+        no_matches = "Nicio potrivire"
     }
 }
 

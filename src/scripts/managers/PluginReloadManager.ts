@@ -8,13 +8,28 @@ import { Plugin } from '../types/Plugin.js';
 import { Logger, createLogger } from '../Logger.js';
 
 /**
- * How long to wait for the in-game reload endpoint before giving up. The
- * watcher serializes rebuilds behind reload calls — without this ceiling
- * one stalled FXServer connection wedges the entire dev loop until the
- * developer kills `pnpm dev`. 5000ms is a deliberate ceiling: a healthy
- * StopResource → 500ms settle → StartResource cycle finishes well below it.
+ * How long to wait on probe-style endpoints (`/resources`, etc.). Short
+ * by design: probes are health checks, not lifecycle ops. A stalled
+ * probe means FXServer is hung and the watcher should give up promptly.
  */
-const REQUEST_TIMEOUT_MS = 5000;
+const PROBE_TIMEOUT_MS = 5000;
+
+/**
+ * How long to wait on lifecycle endpoints (`/restart`, `/stop`,
+ * `/start`). Comfortably exceeds the FXServer-side ceilings:
+ * `STOP_TIMEOUT_MS=5s` + `START_TIMEOUT_MS=10s` = 15 s worst-case per
+ * call, plus FXServer dispatch overhead.
+ *
+ * Setting this BELOW the server-side ceiling was the source of the
+ * cascade-restart we hit under save spam: the watcher would time out at
+ * 5 s, the FXServer-side state poll was still legitimately running, and
+ * BuildManager would proceed to `rm destDir && rename tmpDir` while
+ * FXServer was mid-StopResource — exactly the dist-swap-while-running
+ * race the lifecycle was supposed to eliminate. Keep this >> the sum of
+ * the server-side timeouts so a "watcher timeout" only fires when
+ * FXServer is actually hung, not just slow.
+ */
+const LIFECYCLE_TIMEOUT_MS = 30000;
 
 /**
  * Options for configuring the PluginReloadManager
@@ -58,6 +73,14 @@ export interface ReloadResult {
   success: boolean;
   message: string;
   resource?: string;
+  /**
+   * The resource's `GetResourceState` value at the moment the lifecycle
+   * settled. Useful for distinguishing "start timed out" (state still
+   * 'starting') from "start landed in stopped" (script env failed to
+   * load). Only emitted by per-resource endpoints — undefined for the
+   * bulk `reloadAllResources` path.
+   */
+  state?: string;
   results?: Record<string, boolean>;
 }
 
@@ -71,6 +94,7 @@ interface RestartResponse {
   success: boolean;
   message?: string;
   resource?: string;
+  state?: string;
   results?: Record<string, boolean>;
 }
 
@@ -95,6 +119,7 @@ const restartResponseValidator: ValidateFunction<RestartResponse> =
       success: { type: 'boolean' },
       message: { type: 'string' },
       resource: { type: 'string' },
+      state: { type: 'string' },
       results: { type: 'object', additionalProperties: { type: 'boolean' } },
     },
   });
@@ -216,10 +241,86 @@ export class PluginReloadManager {
   }
 
   /**
-   * Reloads a specific resource on the server
+   * Reloads a specific resource on the server (stop+start in one call).
+   * Used by `reloadAllResources` and any caller that doesn't need to
+   * gate work between the stop and the start. For build-pipeline use
+   * (where dist must be swapped while the resource is stopped) call
+   * {@link stopResource} + {@link startResource} separately.
    * @param resourceName The name of the resource to reload
    */
   async reloadResource(resourceName: string): Promise<ReloadResult> {
+    return this.callLifecycleEndpoint(
+      '/restart',
+      resourceName,
+      `Reloading resource: ${resourceName}`,
+      `Successfully reloaded resource: ${resourceName}`,
+      `Failed to reload resource: ${resourceName}`
+    );
+  }
+
+  /**
+   * Stop a resource on the server. Returns once the resource has
+   * actually transitioned to 'stopped' (verified by the FXServer-side
+   * `GetResourceState` poll), so the caller can safely mutate the
+   * resource's dist tree before calling {@link startResource}.
+   *
+   * Idempotent: stopping an already-stopped resource is a success.
+   * Stopping a 'missing' resource is a failure (the dev script can
+   * skip the lifecycle for first-deploy plugins instead of asking
+   * FXServer to stop something it doesn't know about yet).
+   */
+  async stopResource(resourceName: string): Promise<ReloadResult> {
+    return this.callLifecycleEndpoint(
+      '/stop',
+      resourceName,
+      `Stopping resource: ${resourceName}`,
+      `Successfully stopped resource: ${resourceName}`,
+      `Failed to stop resource: ${resourceName}`
+    );
+  }
+
+  /**
+   * Start a resource on the server. Returns once the resource has
+   * actually reached 'started' (verified by `GetResourceState` poll on
+   * the FXServer side). A start that lands the resource back in
+   * 'stopped' (script env failed to populate) is reported as a failure
+   * with the terminal state in {@link ReloadResult.state}.
+   *
+   * Idempotent: starting an already-started resource is a success.
+   */
+  async startResource(resourceName: string): Promise<ReloadResult> {
+    return this.callLifecycleEndpoint(
+      '/start',
+      resourceName,
+      `Starting resource: ${resourceName}`,
+      `Successfully started resource: ${resourceName}`,
+      `Failed to start resource: ${resourceName}`
+    );
+  }
+
+  /**
+   * Reloads a plugin on the server by plugin name
+   * @param plugin The plugin object or plugin name to reload
+   */
+  async reloadPlugin(plugin: Plugin | string): Promise<ReloadResult> {
+    const pluginName = typeof plugin === 'string' ? plugin : plugin.pluginName;
+    return this.reloadResource(pluginName);
+  }
+
+  /**
+   * Shared call path for /restart, /stop, /start. Each of those
+   * endpoints returns the same envelope shape (`success`, `message`,
+   * `resource`, `state`), so the only thing varying between the three
+   * is the URL and the log strings.
+   * @private
+   */
+  private async callLifecycleEndpoint(
+    endpoint: '/restart' | '/stop' | '/start',
+    resourceName: string,
+    startLog: string,
+    successLog: string,
+    failureLog: string
+  ): Promise<ReloadResult> {
     if (!(await this.ensureInitialized())) {
       return {
         success: false,
@@ -229,36 +330,42 @@ export class PluginReloadManager {
     }
 
     try {
-      this.log('info', `Reloading resource: ${resourceName}`);
+      this.log('info', startLog);
 
       const raw = await this.makeRequest(
-        `/restart?resource=${encodeURIComponent(resourceName)}`,
+        `${endpoint}?resource=${encodeURIComponent(resourceName)}`,
         'POST'
       );
       if (!restartResponseValidator(raw)) {
         throw new Error(
-          `Unexpected /restart response shape: ${formatErrors(restartResponseValidator.errors)}`
+          `Unexpected ${endpoint} response shape: ${formatErrors(
+            restartResponseValidator.errors
+          )}`
         );
       }
       const response = raw;
 
       if (response.success) {
-        this.log('info', `Successfully reloaded resource: ${resourceName}`);
+        this.log('info', successLog);
       } else {
-        this.log('warn', `Failed to reload resource: ${resourceName}`);
+        this.log(
+          'warn',
+          `${failureLog}${response.message ? `: ${response.message}` : ''}`
+        );
       }
 
       return {
         success: response.success,
         message: response.message ?? '',
         resource: resourceName,
+        state: response.state,
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       this.log(
         'error',
-        `Error reloading resource ${resourceName}: ${errorMessage}`
+        `Error calling ${endpoint} for ${resourceName}: ${errorMessage}`
       );
       // A network or timeout error makes the next call worth re-probing
       this.initialized = false;
@@ -269,15 +376,6 @@ export class PluginReloadManager {
         resource: resourceName,
       };
     }
-  }
-
-  /**
-   * Reloads a plugin on the server by plugin name
-   * @param plugin The plugin object or plugin name to reload
-   */
-  async reloadPlugin(plugin: Plugin | string): Promise<ReloadResult> {
-    const pluginName = typeof plugin === 'string' ? plugin : plugin.pluginName;
-    return this.reloadResource(pluginName);
   }
 
   /**
@@ -327,11 +425,26 @@ export class PluginReloadManager {
   }
 
   /**
+   * Determine the timeout for an endpoint. Lifecycle endpoints get the
+   * generous {@link LIFECYCLE_TIMEOUT_MS}; all others (probes, etc.)
+   * get the shorter {@link PROBE_TIMEOUT_MS}.
+   */
+  private timeoutForEndpoint(endpoint: string): number {
+    // Match the path component, ignoring querystring (`/restart?resource=foo`).
+    const path = endpoint.split('?', 1)[0];
+    if (path === '/restart' || path === '/stop' || path === '/start') {
+      return LIFECYCLE_TIMEOUT_MS;
+    }
+    return PROBE_TIMEOUT_MS;
+  }
+
+  /**
    * Make an HTTP request to the resource management API. Returns the
    * parsed JSON body as `unknown`; the caller is responsible for
    * narrowing it with a runtime validator before reading fields. A
-   * `setTimeout` of `REQUEST_TIMEOUT_MS` is attached to every request
-   * so a hung FXServer cannot stall the watcher indefinitely.
+   * per-endpoint timeout is attached so a hung FXServer cannot stall
+   * the watcher indefinitely while still giving lifecycle ops enough
+   * room to complete (see {@link LIFECYCLE_TIMEOUT_MS}).
    * @param endpoint The API endpoint
    * @param method The HTTP method to use
    * @private
@@ -343,6 +456,7 @@ export class PluginReloadManager {
     return new Promise((resolve, reject) => {
       try {
         const url = new URL(endpoint, this.baseUrl);
+        const timeoutMs = this.timeoutForEndpoint(endpoint);
 
         const options = {
           method,
@@ -382,12 +496,11 @@ export class PluginReloadManager {
 
         // Per-request timeout. `req.setTimeout` only schedules a callback;
         // explicit `req.destroy(error)` is what surfaces the failure as a
-        // rejection via the 'error' listener below. Literal 5000ms keeps
-        // the ceiling visible at the call site.
-        req.setTimeout(5000, () => {
+        // rejection via the 'error' listener below.
+        req.setTimeout(timeoutMs, () => {
           req.destroy(
             new Error(
-              `Reload request to ${url.toString()} timed out after ${REQUEST_TIMEOUT_MS}ms`
+              `Reload request to ${url.toString()} timed out after ${timeoutMs}ms`
             )
           );
         });

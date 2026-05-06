@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "اختر خانة للبدء أو إنشاء هوية جديدة.",
         empty_slot = "خانة فارغة",
         new_character = "شخصية جديدة",
-        disconnect = "قطع الاتصال"
+        disconnect = "قطع الاتصال",
+        loading_countries = "جاري تحميل الدول",
+        search_nationality = "ابحث عن الجنسية",
+        no_matches = "لا توجد نتائج"
     }
 }
 

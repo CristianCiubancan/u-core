@@ -1,5 +1,13 @@
 import * as React from 'react';
-import { LogOut, Play, Plus, Trash2, X } from 'lucide-react';
+import {
+  ChevronDown,
+  Loader2,
+  LogOut,
+  Play,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
 import { fetchNui } from '@/utils/fetchNui';
@@ -10,6 +18,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -164,6 +185,9 @@ const BROWSER_MOCK_TRANSLATIONS: Record<string, string> = {
   job: 'Job',
   cash: 'Cash',
   bank: 'Bank',
+  loading_countries: 'Loading countries',
+  search_nationality: 'Search nationality',
+  no_matches: 'No matches',
 };
 
 const BROWSER_MOCK_CHARACTERS: Character[] = [
@@ -250,12 +274,35 @@ const Page: React.FC = () => {
   );
   const [errors, setErrors] = React.useState<RegisterErrors>({});
 
+  // Spinner shown on the empty-slot tile that the user just clicked,
+  // covering the gap between click and the heavy register-form mount
+  // (4 inputs + 2 Selects + DatePicker + measure-effects all commit in
+  // one synchronous reconciler pass). One rAF lets the spinner paint
+  // before the form mount blocks the thread.
+  const [pendingSlot, setPendingSlot] = React.useState<number | null>(null);
+
+  // Nationality is a forceMount Popover + cmdk Command (combobox) — not
+  // a Radix Select. The 250 items mount once with the form (covered by
+  // the empty-slot click spinner), then every open/close is a pure
+  // visibility toggle via `data-[state=closed]:hidden`. cmdk owns the
+  // search box, filter, and keyboard nav. We only own the controlled
+  // search string so we can reset it on close (otherwise the previous
+  // search would persist into the next open). The loading spinner only
+  // appears for the brief window where `countries.length === 0` —
+  // i.e. before the NUI 'ui' event delivers the country list.
+  const [nationalitySearch, setNationalitySearch] =
+    React.useState<string>('');
+
   // One-at-a-time Select coordinator. Radix's DismissableLayer was
   // unreliable when sibling Selects shared the form (per the
   // feedback_radix_select_onblur memory).
   const [openSelect, setOpenSelect] = React.useState<
     'gender' | 'nationality' | 'locale' | null
   >(null);
+
+  React.useEffect(() => {
+    if (openSelect !== 'nationality') setNationalitySearch('');
+  }, [openSelect]);
 
   const tx = React.useCallback(
     (key: string, fallback?: string): string =>
@@ -365,18 +412,27 @@ const Page: React.FC = () => {
   // ---- grid actions ---------------------------------------------------
 
   const handleSlotClick = (cid: number) => {
-    setSelectedCid(cid);
+    if (pendingSlot !== null) return;
     const existing = characters[cid];
     if (existing) {
+      // Filled slot — selection only, no form mount, no spinner needed.
+      setSelectedCid(cid);
       void fetchNui('cDataPed', { cData: existing });
-    } else {
+      return;
+    }
+    // Empty slot → upstream behavior is to jump straight into the
+    // register flow. Show the spinner on this tile, then on next rAF
+    // do the actual transition so the spinner paints before the form's
+    // synchronous mount blocks reconciliation.
+    setPendingSlot(cid);
+    requestAnimationFrame(() => {
+      setSelectedCid(cid);
       void fetchNui('cDataPed', {});
-      // Empty slot → upstream behavior is to jump straight into the
-      // register flow.
       setRegisterData(emptyRegister());
       setErrors({});
       setView('register');
-    }
+      setPendingSlot(null);
+    });
   };
 
   const handlePlay = () => {
@@ -499,17 +555,36 @@ const Page: React.FC = () => {
     setErrors({});
   };
 
-  // Memoize the country list — closed Selects still evaluate their JSX
-  // children every parent re-render, and the country list runs ~250
-  // items.
+  // Stable callback so the memoized item array below doesn't invalidate
+  // every Page re-render (setField is recreated each render). cmdk hands
+  // the chosen `value` back to onSelect; we close the popover and patch
+  // the field manually here instead of through setField.
+  const handleNationalitySelect = React.useCallback((value: string) => {
+    setRegisterData((prev) => ({ ...prev, nationality: value }));
+    setErrors((prev) => {
+      if (!prev.nationality) return prev;
+      const next = { ...prev };
+      delete next.nationality;
+      return next;
+    });
+    setOpenSelect(null);
+  }, []);
+
+  // Memoize the cmdk item array. With forceMount on the Popover the items
+  // are always part of the React tree; we don't want to recreate 250
+  // element objects every Page re-render (selection hover, focus, etc.).
   const countryItems = React.useMemo(
     () =>
       countries.map((country) => (
-        <SelectItem key={country} value={country}>
+        <CommandItem
+          key={country}
+          value={country}
+          onSelect={handleNationalitySelect}
+        >
           {country}
-        </SelectItem>
+        </CommandItem>
       )),
-    [countries]
+    [countries, handleNationalitySelect]
   );
 
   // Locale list is short (~15) but memoize on the same principle —
@@ -620,20 +695,30 @@ const Page: React.FC = () => {
                 const isSelected = selectedCid === cid;
 
                 if (!c) {
+                  const isPending = pendingSlot === cid;
                   return (
                     <button
                       key={cid}
                       type="button"
                       onClick={() => handleSlotClick(cid)}
+                      disabled={pendingSlot !== null}
                       className={cn(
                         'dossier-paper group relative flex w-full items-center justify-center gap-3',
                         'p-[clamp(0.625rem,1vw,1rem)]',
                         'transition-colors duration-200 hover:border-brand-500/50',
+                        'disabled:cursor-default',
                         isSelected && 'dossier-paper-selected'
                       )}
                     >
                       <span className="flex h-7 w-7 items-center justify-center rounded-full border border-input/60 text-foreground/40 transition-colors group-hover:border-brand-400/70 group-hover:text-brand-300">
-                        <Plus className="h-4 w-4" strokeWidth={1.25} />
+                        {isPending ? (
+                          <Loader2
+                            className="h-4 w-4 animate-spin text-brand-300"
+                            strokeWidth={1.5}
+                          />
+                        ) : (
+                          <Plus className="h-4 w-4" strokeWidth={1.25} />
+                        )}
                       </span>
                       <span className="font-mono uppercase tracking-[0.35em] text-foreground/50 text-[clamp(0.55rem,0.65vw,0.7rem)]">
                         {tx('empty_slot', 'Empty slot')}
@@ -767,24 +852,102 @@ const Page: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Select
+                      <Popover
                         open={openSelect === 'nationality'}
                         onOpenChange={(o) =>
                           setOpenSelect(o ? 'nationality' : null)
                         }
-                        value={registerData.nationality}
-                        onValueChange={(v) => setField('nationality', v)}
                       >
-                        <SelectTrigger
-                          id="nationality"
-                          aria-invalid={!!errors.nationality}
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            id="nationality"
+                            aria-invalid={!!errors.nationality}
+                            className={cn(
+                              'group flex w-full items-center justify-between',
+                              'bg-transparent border-0 border-b border-input/70 px-1 py-1.5 pr-1',
+                              'font-serif text-[14px] text-foreground',
+                              'hover:border-input transition-colors duration-150',
+                              'focus:outline-none focus:border-ring',
+                              'data-[state=open]:border-ring',
+                              'aria-[invalid=true]:border-destructive/60',
+                              'aria-[invalid=true]:data-[state=open]:border-destructive',
+                              'text-left'
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'truncate',
+                                !registerData.nationality &&
+                                  'text-muted-foreground/70'
+                              )}
+                            >
+                              {registerData.nationality ||
+                                tx('nationality', 'Nationality')}
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                'h-3.5 w-3.5 shrink-0 opacity-50 transition-transform duration-150',
+                                'group-data-[state=open]:rotate-180 group-data-[state=open]:opacity-80'
+                              )}
+                            />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          forceMount
+                          align="start"
+                          sideOffset={4}
+                          className={cn(
+                            // Override popover defaults: no padding (cmdk
+                            // owns layout), match trigger width, drop the
+                            // backdrop-blur (CEF-unreliable per the
+                            // backdrop-filter memory), and hide via
+                            // display:none on close so the forceMount'd
+                            // subtree doesn't paint. Keep the inherited
+                            // `bg-popover/85 border border-border/60` —
+                            // that's the rgba-only "dossier-paper" glass
+                            // tone we want.
+                            'w-[var(--radix-popover-trigger-width)] p-0',
+                            'backdrop-blur-none',
+                            'data-[state=closed]:hidden'
+                          )}
                         >
-                          <SelectValue
-                            placeholder={tx('nationality', 'Nationality')}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>{countryItems}</SelectContent>
-                      </Select>
+                          {countries.length === 0 ? (
+                            <div className="flex h-[180px] items-center justify-center gap-2 font-serif text-[13px] text-foreground/60">
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                              <span>
+                                {tx(
+                                  'loading_countries',
+                                  'Loading countries'
+                                )}
+                              </span>
+                            </div>
+                          ) : (
+                            <Command className="bg-transparent border-0">
+                              <CommandInput
+                                value={nationalitySearch}
+                                onValueChange={setNationalitySearch}
+                                placeholder={tx(
+                                  'search_nationality',
+                                  'Search nationality'
+                                )}
+                              />
+                              {/* max-h-48 trims the list to ~6.5 items
+                                  visible (192px) — combined with the 37px
+                                  input bar that puts total popover height
+                                  near 230px, slightly shorter than the
+                                  old Select (240px). cmdk handles scroll
+                                  for the rest of the 250-item list. */}
+                              <CommandList className="max-h-48">
+                                <CommandEmpty>
+                                  {tx('no_matches', 'No matches')}
+                                </CommandEmpty>
+                                <CommandGroup>{countryItems}</CommandGroup>
+                              </CommandList>
+                            </Command>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                       {errors.nationality && (
                         <ErrorCaption text={errors.nationality} />
                       )}

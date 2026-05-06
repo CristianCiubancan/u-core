@@ -89,7 +89,10 @@ local Translations = {
         select_character_subtitle = "Başlamak için bir slot seç veya yeni bir kimlik oluştur.",
         empty_slot = "Boş slot",
         new_character = "Yeni karakter",
-        disconnect = "Bağlantıyı kes"
+        disconnect = "Bağlantıyı kes",
+        loading_countries = "Ülkeler yükleniyor",
+        search_nationality = "Vatandaşlık ara",
+        no_matches = "Eşleşme yok"
     }
 }
 

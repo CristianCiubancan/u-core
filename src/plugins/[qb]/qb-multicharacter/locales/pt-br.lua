@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Escolha um espaço para começar ou criar uma nova identidade.",
         empty_slot = "Espaço vazio",
         new_character = "Novo personagem",
-        disconnect = "Desconectar"
+        disconnect = "Desconectar",
+        loading_countries = "Carregando países",
+        search_nationality = "Pesquisar nacionalidade",
+        no_matches = "Sem resultados"
     }
 }
 

@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Vyberte slot pro začátek nebo vytvořte novou identitu.",
         empty_slot = "Prázdný slot",
         new_character = "Nová postava",
-        disconnect = "Odpojit"
+        disconnect = "Odpojit",
+        loading_countries = "Načítání zemí",
+        search_nationality = "Hledat národnost",
+        no_matches = "Žádné shody"
     }
 }
 

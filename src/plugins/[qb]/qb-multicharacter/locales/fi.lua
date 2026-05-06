@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Valitse paikka aloittaaksesi tai luo uusi henkilöllisyys.",
         empty_slot = "Tyhjä paikka",
         new_character = "Uusi hahmo",
-        disconnect = "Katkaise yhteys"
+        disconnect = "Katkaise yhteys",
+        loading_countries = "Ladataan maita",
+        search_nationality = "Etsi kansallisuus",
+        no_matches = "Ei osumia"
     }
 }
 

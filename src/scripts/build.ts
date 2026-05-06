@@ -389,10 +389,22 @@ class PluginBuilder {
             return 0;
           });
 
+          // Each plugin's full lifecycle (build → stop → swap → start)
+          // runs inside `buildSinglePlugin` when `reload: true`. The old
+          // shape — build-all then reload-all — left the dist tree
+          // mutated under a running resource, which on Windows races
+          // FXServer's open file handles and on any platform allows the
+          // rebuilt resource to begin starting before the previous one
+          // is torn down (the partial-script-load cascade fixed by
+          // PR-XX). The lifecycle in BuildManager also short-circuits
+          // when the dist hash is unchanged, preserving the reload-skip
+          // behavior that prevented `_shared` cascade-stops on
+          // byte-identical recompiles.
           for (const plugin of plugins) {
             const intent = intentByPlugin.get(plugin.pluginName);
             await this.buildSinglePlugin(plugin, {
               skipVite: !(intent?.viteRebuild ?? true),
+              reload: true,
             });
           }
 
@@ -410,43 +422,6 @@ class PluginBuilder {
 
           if (failureCount > 0) {
             this.log('info', chalk.red.bold(`✗ Failed: ${failureCount}`));
-          }
-
-          // Reload plugins. Skip the reload POST when the build's dist
-          // bytes are unchanged — `_shared` recompiles to byte-identical
-          // output every time a consumer Page.tsx edit doesn't introduce
-          // a new Tailwind class, and historically that no-op reload was
-          // the dominant trigger for FXServer cascade-stops (and the
-          // occasional SIGSEGV) in dev sessions.
-          if (successCount > 0) {
-            for (const plugin of plugins) {
-              const result = this.pluginResults.get(plugin.pluginName);
-              if (result && result.success && result.distChanged === false) {
-                this.log(
-                  'verbose',
-                  chalk.gray(
-                    `↷ Skipped reload (dist unchanged): ${plugin.pluginName}`
-                  )
-                );
-                continue;
-              }
-              const reloadResult = await this.buildManager.reloadPlugin(
-                plugin.pluginName
-              );
-              if (reloadResult.success) {
-                this.log(
-                  'info',
-                  chalk.green(`✓ Reloaded plugin: ${plugin.pluginName}`)
-                );
-              } else {
-                this.log(
-                  'warn',
-                  chalk.yellow(
-                    `⚠ Failed to reload plugin: ${plugin.pluginName} - ${reloadResult.message}`
-                  )
-                );
-              }
-            }
           }
         }
       } catch (error) {
@@ -630,7 +605,7 @@ class PluginBuilder {
    */
   private async buildSinglePlugin(
     plugin: Plugin,
-    options: { skipVite?: boolean } = {}
+    options: { skipVite?: boolean; reload?: boolean } = {}
   ): Promise<void> {
     const pluginStartTime = performance.now();
 
@@ -638,11 +613,14 @@ class PluginBuilder {
       // Log current plugin build
       this.log('info', chalk.cyan(`🔨 Building plugin: ${plugin.pluginName}`));
 
-      // Build the plugin
+      // Build the plugin. `reload: true` (set by the watcher) hands the
+      // FXServer stop→swap→start lifecycle to BuildManager, which holds
+      // the resource in 'stopped' across the dist swap. One-off
+      // (`pnpm build`) calls leave it false and use the legacy hot-swap.
       const buildResult = await this.buildManager.buildPlugin(
         plugin.pluginName,
-        false,
-        options
+        options.reload ?? false,
+        { skipVite: options.skipVite }
       );
 
       // Record success

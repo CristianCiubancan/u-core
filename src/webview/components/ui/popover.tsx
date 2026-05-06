@@ -21,26 +21,38 @@ const PopoverAnchor = PopoverPrimitive.Anchor;
 const PopoverContent = React.forwardRef<
   React.ComponentRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'start', sideOffset = 6, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      className={cn(
-        'z-50 w-72 outline-none',
-        'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
-        // Drop shadow removed — it painted a halo wider than the popup
-        // that read as the dropdown "extending past" the trigger. The
-        // hairline border carries enough separation against the
-        // backdrop-blurred scene.
-        'p-3',
-        className
-      )}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
-));
+>(
+  (
+    { className, align = 'start', sideOffset = 6, forceMount, ...props },
+    ref
+  ) => (
+    // Forward forceMount to BOTH the Portal and the Content. Both have
+    // their own `forceMount?: true` prop in @radix-ui/react-popover v1
+    // and Radix only keeps the subtree mounted when both opt in. The
+    // long-list combobox in qb-multicharacter relies on this to mount
+    // its 250 cmdk items once per form open and avoid re-paying the
+    // open/close mount/unmount cost.
+    <PopoverPrimitive.Portal forceMount={forceMount}>
+      <PopoverPrimitive.Content
+        ref={ref}
+        align={align}
+        sideOffset={sideOffset}
+        forceMount={forceMount}
+        className={cn(
+          'z-50 w-72 outline-none',
+          'bg-popover/85 backdrop-blur-md border border-border/60 text-popover-foreground',
+          // Drop shadow removed — it painted a halo wider than the popup
+          // that read as the dropdown "extending past" the trigger. The
+          // hairline border carries enough separation against the
+          // backdrop-blurred scene.
+          'p-3',
+          className
+        )}
+        {...props}
+      />
+    </PopoverPrimitive.Portal>
+  )
+);
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };

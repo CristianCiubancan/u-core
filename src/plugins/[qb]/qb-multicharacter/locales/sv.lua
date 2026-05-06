@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Välj en plats för att börja eller skapa en ny identitet.",
         empty_slot = "Tom plats",
         new_character = "Ny karaktär",
-        disconnect = "Koppla från"
+        disconnect = "Koppla från",
+        loading_countries = "Laddar länder",
+        search_nationality = "Sök nationalitet",
+        no_matches = "Inga träffar"
     }
 }
 

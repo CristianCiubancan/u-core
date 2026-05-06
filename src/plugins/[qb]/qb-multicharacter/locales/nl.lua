@@ -88,7 +88,10 @@ local Translations = {
         select_character_subtitle = "Kies een slot om te beginnen of een nieuwe identiteit te maken.",
         empty_slot = "Lege plek",
         new_character = "Nieuw personage",
-        disconnect = "Verbinding verbreken"
+        disconnect = "Verbinding verbreken",
+        loading_countries = "Landen laden",
+        search_nationality = "Nationaliteit zoeken",
+        no_matches = "Geen resultaten"
     }
 }
 
