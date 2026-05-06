@@ -199,6 +199,19 @@ const Page: React.FC = () => {
   const [outfitName, setOutfitName] = React.useState<string>('');
   const [outfitNameError, setOutfitNameError] = React.useState<boolean>(false);
 
+  // Scroll the body back to the top whenever the active tab changes —
+  // shadcn ScrollArea forwards its ref to the Radix Root, not the
+  // viewport, so we query the viewport via Radix's documented
+  // data-attribute. Without this, scrolling halfway through Hair and
+  // then jumping to Clothing strands the user mid-list.
+  const scrollRootRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const viewport = scrollRootRef.current?.querySelector<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (viewport) viewport.scrollTop = 0;
+  }, [activeMenu]);
+
   const tx = React.useCallback(
     (key: string, fallback?: string): string =>
       translations[key] ?? fallback ?? key,
@@ -599,17 +612,17 @@ const Page: React.FC = () => {
         </div>
 
         {/* Body */}
-        <ScrollArea className="flex-1">
+        <ScrollArea ref={scrollRootRef} className="flex-1">
           <div className="px-[clamp(0.85rem,1.2vw,1.2rem)] py-[clamp(0.85rem,1.2vw,1.2rem)] flex flex-col gap-[clamp(0.6rem,0.9vw,0.9rem)]">
             {activeMenu === 'character' && (
               <>
-                <ModelRow
+                {/* <ModelRow
                   current={currentModel}
                   index={skin.model?.item ?? 1}
                   tx={tx}
                   canChange={canChange}
                   onArrow={handleModelArrow}
-                />
+                /> */}
                 {CHARACTER_CATEGORIES.map((cat) =>
                   renderRow(cat, skin, maxValues, hasTracker, canChange, tx, handleArrow, handleNumberInput, handleSlider)
                 )}
