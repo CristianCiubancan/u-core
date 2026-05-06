@@ -300,6 +300,18 @@ class BuildManager {
   }
 
   /**
+   * Returns the underlying reload manager so the watcher can run
+   * batch-level operations (e.g. snapshot + restore around a multi-
+   * plugin rebuild). Per-plugin lifecycle still flows through
+   * BuildManager — this is for the cross-cutting case where editing one
+   * plugin cascade-stops several others via FXServer's `dependency`
+   * mechanism and the watcher needs to undo that.
+   */
+  getReloadManager(): PluginReloadManager | null {
+    return this.reloadManager;
+  }
+
+  /**
    * Reloads a plugin after building
    * @param pluginNameOrPath The name or path of the plugin to reload
    * @returns The result of the reload operation

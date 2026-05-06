@@ -401,12 +401,95 @@ class PluginBuilder {
           // when the dist hash is unchanged, preserving the reload-skip
           // behavior that prevented `_shared` cascade-stops on
           // byte-identical recompiles.
+          //
+          // Snapshot resource states before the batch so we can detect
+          // cascade-stops afterwards. Editing a webview file rebuilds
+          // both the consumer and `_shared`; stopping `_shared` cascade-
+          // stops every resource declaring `dependency '_shared'` in
+          // its fxmanifest. FXServer never auto-restarts dependents on
+          // the depended-on resource's start, so without this snapshot
+          // the cascade-stopped resources sit in `stopped` until the
+          // next time the user happens to restart them. Symptom in the
+          // log was qb-apartments / qb-houses / qb-multicharacter /
+          // qb-spawn going dark after a single qb-clothing edit.
+          const reloadManager = this.buildManager.getReloadManager();
+          let preBatchStates: Map<string, string> | null = null;
+          if (reloadManager?.isHealthy()) {
+            try {
+              preBatchStates = await reloadManager.getResourceStates();
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              this.log(
+                'warn',
+                chalk.yellow(
+                  `Could not snapshot resource states; cascade restore disabled this batch: ${msg}`
+                )
+              );
+            }
+          }
+
           for (const plugin of plugins) {
             const intent = intentByPlugin.get(plugin.pluginName);
             await this.buildSinglePlugin(plugin, {
               skipVite: !(intent?.viteRebuild ?? true),
               reload: true,
             });
+          }
+
+          // Cascade restore. For every resource that was `started`
+          // before the batch and is now `stopped` (and wasn't a plugin
+          // we explicitly built — those were handled by the per-plugin
+          // lifecycle), call /start. Skip resources that were already
+          // stopped pre-batch: a manually-stopped resource shouldn't be
+          // resurrected just because we touched something else.
+          //
+          // Order doesn't matter: starting any one resource will auto-
+          // start its dependencies via FXServer's start-side cascade
+          // (the inverse of the stop-side cascade that triggered all
+          // this), and a /start against an already-started resource is
+          // a fast no-op on the server side.
+          if (reloadManager?.isHealthy() && preBatchStates) {
+            const builtNames = new Set(plugins.map((p) => p.pluginName));
+            const postBatchStates = await reloadManager
+              .getResourceStates()
+              .catch((err) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                this.log(
+                  'warn',
+                  chalk.yellow(
+                    `Could not re-read resource states; skipping cascade restore: ${msg}`
+                  )
+                );
+                return null;
+              });
+            if (postBatchStates) {
+              const toRestore: string[] = [];
+              for (const [name, prevState] of preBatchStates) {
+                if (builtNames.has(name)) continue;
+                if (prevState !== 'started') continue;
+                if (postBatchStates.get(name) === 'started') continue;
+                toRestore.push(name);
+              }
+              if (toRestore.length > 0) {
+                this.log(
+                  'info',
+                  chalk.yellow(
+                    `Restoring cascade-stopped resources: ${toRestore.join(', ')}`
+                  )
+                );
+                for (const name of toRestore) {
+                  const result = await reloadManager.startResource(name);
+                  if (!result.success) {
+                    this.log(
+                      'warn',
+                      chalk.yellow(
+                        `Failed to restore ${name}: ${result.message}`
+                      )
+                    );
+                  }
+                }
+              }
+            }
           }
 
           const totalTime = (

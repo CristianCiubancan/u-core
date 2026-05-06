@@ -296,15 +296,42 @@ function GetMaxValues()
     })
 end
 -- u-core: yaw the camera so the ped sits in the LEFT half of the
--- frame (right side is the React panel). PointCamAtCoord / SetCamRot
--- re-center on the ped, so callers must re-apply this after every
--- camera recenter (zoom preset, orbit, ped rotation).
+-- frame (right side is the React panel). Two helpers below:
+-- * applyLeftFrameYaw — read-add-write on rotation. Safe because
+--   SetCamRot is synchronous; enableCam uses this.
+-- * aimCamFromTo — explicit (camera_pos → target_pos) look-at + the
+--   yaw offset, in one SetCamRot. Used by setupCam / rotate. Caller
+--   passes the camera position they just SetCamCoord'd; do NOT
+--   GetCamCoord inside, it lags SetCamCoord by a frame and produces
+--   wrong-pitch aims on Z transitions.
 local LEFT_FRAME_YAW_OFFSET = -20.0
 
 local function applyLeftFrameYaw()
     if not DoesCamExist(cam) then return end
     local rot = GetCamRot(cam, 2)
     SetCamRot(cam, rot.x, rot.y, rot.z + LEFT_FRAME_YAW_OFFSET, 2)
+end
+
+-- Aim the camera at the world point (tx, ty, tz) from the explicit
+-- camera position (cx, cy, cz) AND apply the left-frame yaw, in a
+-- single SetCamRot. Caller MUST pass the camera position they just
+-- handed to SetCamCoord — do NOT call GetCamCoord here, it returns the
+-- pre-SetCamCoord position the same frame. Earlier version did call
+-- GetCamCoord and that produced wrong-pitch aims on every Z transition
+-- (e.g. Face POV → Full-body deselect read camPos.z = pedPos.z+0.65
+-- against tz = pedPos.z+0.2, pitch came out ~-12°, camera ended up at
+-- ankle height looking downward → "Full body" framed only the legs).
+-- Yaw formula matches FiveM's convention (verified empirically):
+-- forward = (-sin(yaw), cos(yaw)) ⇒ yaw = atan2(-Δx, Δy).
+local function aimCamFromTo(cx, cy, cz, tx, ty, tz)
+    if not DoesCamExist(cam) then return end
+    local dx = tx - cx
+    local dy = ty - cy
+    local dz = tz - cz
+    local horiz = math.sqrt(dx * dx + dy * dy)
+    local pitch = math.deg(math.atan2(dz, horiz))
+    local yaw = math.deg(math.atan2(-dx, dy))
+    SetCamRot(cam, pitch, 0.0, yaw + LEFT_FRAME_YAW_OFFSET, 2)
 end
 
 local function enableCam()
@@ -1628,27 +1655,23 @@ end)
 RegisterNUICallback('rotateRight', function(_, cb)
     local ped = PlayerPedId()
     local pedPos = GetEntityCoords(ped)
-    local camPos = GetCamCoord(cam)
-    local heading = headingToCam
-    heading = heading + 2.5
-    headingToCam = heading
-    local cx, cy = GetPositionByRelativeHeading(ped, heading, camOffset)
-    SetCamCoord(cam, cx, cy, camPos.z)
-    PointCamAtCoord(cam, pedPos.x, pedPos.y, camPos.z)
-    applyLeftFrameYaw()
+    -- Z stays put across rotations; GetCamCoord is read BEFORE any
+    -- SetCamCoord this frame, so it returns the actual current cam.
+    local cz = GetCamCoord(cam).z
+    headingToCam = headingToCam + 2.5
+    local cx, cy = GetPositionByRelativeHeading(ped, headingToCam, camOffset)
+    SetCamCoord(cam, cx, cy, cz)
+    aimCamFromTo(cx, cy, cz, pedPos.x, pedPos.y, cz)
     cb('ok')
 end)
 RegisterNUICallback('rotateLeft', function(_, cb)
     local ped = PlayerPedId()
     local pedPos = GetEntityCoords(ped)
-    local camPos = GetCamCoord(cam)
-    local heading = headingToCam
-    heading = heading - 2.5
-    headingToCam = heading
-    local cx, cy = GetPositionByRelativeHeading(ped, heading, camOffset)
-    SetCamCoord(cam, cx, cy, camPos.z)
-    PointCamAtCoord(cam, pedPos.x, pedPos.y, camPos.z)
-    applyLeftFrameYaw()
+    local cz = GetCamCoord(cam).z
+    headingToCam = headingToCam - 2.5
+    local cx, cy = GetPositionByRelativeHeading(ped, headingToCam, camOffset)
+    SetCamCoord(cam, cx, cy, cz)
+    aimCamFromTo(cx, cy, cz, pedPos.x, pedPos.y, cz)
     cb('ok')
 end)
 RegisterNUICallback('TrackerError', function(_, cb)
@@ -1680,29 +1703,30 @@ RegisterNUICallback('rotateCam', function(data, cb)
 end)
 RegisterNUICallback('setupCam', function(data, cb)
     local value = data.value
-    local pedPos = GetEntityCoords(PlayerPedId())
+    local ped = PlayerPedId()
+    local pedPos = GetEntityCoords(ped)
+    -- u-core: reset orbit angle so POV buttons are deterministic. Without
+    -- this, headingToCam carries any rotateLeft/rotateRight drift from
+    -- earlier clicks, so the same POV button produces a different view
+    -- depending on what was clicked before.
+    headingToCam = GetEntityHeading(ped) + 90
+    local cz
     if value == 1 then
         camOffset = 0.75
-        local cx, cy = GetPositionByRelativeHeading(PlayerPedId(), headingToCam, camOffset)
-        SetCamCoord(cam, cx, cy, pedPos.z + 0.65)
-        PointCamAtCoord(cam, pedPos.x, pedPos.y, pedPos.z + 0.65)
+        cz = pedPos.z + 0.65
     elseif value == 2 then
         camOffset = 1.0
-        local cx, cy = GetPositionByRelativeHeading(PlayerPedId(), headingToCam, camOffset)
-        SetCamCoord(cam, cx, cy, pedPos.z + 0.2)
-        PointCamAtCoord(cam, pedPos.x, pedPos.y, pedPos.z + 0.2)
+        cz = pedPos.z + 0.2
     elseif value == 3 then
         camOffset = 1.0
-        local cx, cy = GetPositionByRelativeHeading(PlayerPedId(), headingToCam, camOffset)
-        SetCamCoord(cam, cx, cy, pedPos.z + -0.5)
-        PointCamAtCoord(cam, pedPos.x, pedPos.y, pedPos.z + -0.5)
+        cz = pedPos.z + -0.5
     else
         camOffset = 2.0
-        local cx, cy = GetPositionByRelativeHeading(PlayerPedId(), headingToCam, camOffset)
-        SetCamCoord(cam, cx, cy, pedPos.z + 0.2)
-        PointCamAtCoord(cam, pedPos.x, pedPos.y, pedPos.z + 0.2)
+        cz = pedPos.z + 0.2
     end
-    applyLeftFrameYaw()
+    local cx, cy = GetPositionByRelativeHeading(ped, headingToCam, camOffset)
+    SetCamCoord(cam, cx, cy, cz)
+    aimCamFromTo(cx, cy, cz, pedPos.x, pedPos.y, cz)
     cb('ok')
 end)
 RegisterNUICallback('resetOutfit', function(_, cb)

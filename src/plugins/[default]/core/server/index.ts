@@ -374,6 +374,16 @@ const server = http.createServer((req, res) => {
         res.end('Resource Management API\n');
       } else if (path === '/resources') {
         const resources = getAllResources();
+        // Include per-resource state so the watcher can snapshot before a
+        // lifecycle batch and restart anything left `stopped` afterwards.
+        // FXServer cascade-stops dependents when a depended-on resource
+        // (e.g. `_shared`) goes down, but never auto-restarts dependents
+        // when it comes back. Without this signal the watcher would have
+        // no way to tell which resources got dragged down by the cascade.
+        const states: Record<string, string> = {};
+        for (const name of resources) {
+          states[name] = GetResourceState(name);
+        }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(
@@ -381,6 +391,7 @@ const server = http.createServer((req, res) => {
             success: true,
             resources,
             count: resources.length,
+            states,
           })
         );
       } else if (path === '/restart' && req.method === 'POST') {

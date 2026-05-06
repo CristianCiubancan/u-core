@@ -10,12 +10,10 @@ import {
   Footprints,
   ScanFace,
 } from 'lucide-react';
-
 import { useNuiEvent } from '@/hooks/useNuiEvent';
 import { fetchNui } from '@/utils/fetchNui';
 import { isEnvBrowser } from '@/utils/misc';
 import { cn } from '@/lib/utils';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -1052,10 +1050,13 @@ const CamButton: React.FC<CamButtonProps> = ({ active, onClick, title, children 
     onClick={onClick}
     className={cn(
       'flex h-9 w-9 items-center justify-center border transition-colors',
-      'bg-gray-950/85',
+      // Active vs inactive must read unambiguously against the live game
+      // scene. A translucent fill (bg-brand-500/20) was indistinguishable
+      // from the dark inactive backdrop in CEF — switched to a solid brand
+      // fill + ring so the selected POV is obvious without inspection.
       active
-        ? 'border-brand-400/80 text-brand-300'
-        : 'border-border/50 text-foreground/70 hover:border-brand-400/60 hover:text-brand-300'
+        ? 'border-brand-400 bg-brand-500 text-primary-foreground ring-1 ring-brand-300/60'
+        : 'border-border/30 bg-gray-950/85 text-foreground/40 hover:border-brand-400/60 hover:text-brand-300'
     )}
   >
     {children}

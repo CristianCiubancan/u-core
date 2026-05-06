@@ -88,6 +88,7 @@ interface ResourcesResponse {
   success: boolean;
   resources?: string[];
   count?: number;
+  states?: Record<string, string>;
 }
 
 interface RestartResponse {
@@ -108,6 +109,10 @@ const resourcesResponseValidator: ValidateFunction<ResourcesResponse> =
       success: { type: 'boolean' },
       resources: { type: 'array', items: { type: 'string' } },
       count: { type: 'integer', minimum: 0 },
+      states: {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+      },
     },
   });
 
@@ -238,6 +243,31 @@ export class PluginReloadManager {
       this.log('error', `Failed to get resources: ${errorMessage}`);
       throw new Error(`Failed to get resources: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Snapshot every resource's `GetResourceState` value. Used by the
+   * watcher to detect cascade-stops: when `_shared` (or any heavily
+   * depended-on resource) is restarted, FXServer auto-stops every
+   * dependent and never auto-restarts them. Snapshotting before the
+   * lifecycle and diffing after lets the watcher restart anything that
+   * was running before but was left in `stopped`.
+   *
+   * Returns null when the server response lacks the `states` field (an
+   * older resource-manager build) — callers should treat that as
+   * "cascade restoration unavailable" and proceed without it.
+   */
+  async getResourceStates(): Promise<Map<string, string> | null> {
+    await this.ensureInitialized();
+
+    const response = await this.makeRequest('/resources');
+    if (!resourcesResponseValidator(response)) {
+      throw new Error(
+        `Unexpected /resources response shape: ${formatErrors(resourcesResponseValidator.errors)}`
+      );
+    }
+    if (!response.states) return null;
+    return new Map(Object.entries(response.states));
   }
 
   /**
