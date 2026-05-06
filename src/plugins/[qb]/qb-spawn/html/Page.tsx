@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { ArrowRight, Building2, Home, MapPin, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Home, MapPin, RotateCcw } from 'lucide-react';
 
 import { useNuiEvent } from '@/hooks/useNuiEvent';
 import { fetchNui } from '@/utils/fetchNui';
+import { isEnvBrowser } from '@/utils/misc';
 import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,16 @@ type SetupAppartementsPayload = {
   action: 'setupAppartements';
   locations: Record<string, SpawnEntry>;
   isNew: true;
+};
+
+type LocaleChangedPayload = {
+  action: 'localeChanged';
+  translations?: Record<string, string>;
+};
+
+type SetVisiblePayload = {
+  action: 'setVisible';
+  visible: boolean;
 };
 
 type SelectionType = 'current' | 'normal' | 'house' | 'appartment';
@@ -85,6 +96,42 @@ const Page: React.FC = () => {
     setSelected(null);
   });
 
+  // Mid-session locale swap: the Lua side has already replaced its Lang
+  // phrases and rebuilt the translations dict — just slot the new dict in.
+  useNuiEvent<LocaleChangedPayload>('localeChanged', (data) => {
+    if (data.translations) setTranslations(data.translations);
+  });
+
+  // Pause-menu / quit-warning suspend: Lua toggles `visible` so the React
+  // UI isn't painting on top of GTA's pause overlay. PRESERVES selected/
+  // normal/houses/appartments — distinct from `showUi` which is a
+  // session boundary.
+  useNuiEvent<SetVisiblePayload>('setVisible', (data) => {
+    if (typeof data.visible === 'boolean') setVisible(!!data.visible);
+  });
+
+  // Window-focus handshake: catches the FiveM client's OS-level quit
+  // prompt (X button, ALT+F4) which is neither a pause menu nor a
+  // warning screen, so the Lua-side polling thread can't see it. The
+  // CEF surface DOES blur when focus moves to the FiveM frontend prompt,
+  // so we mirror the suspend path: hide locally + ask Lua to release
+  // NUI focus so the prompt is clickable. On focus return, do the inverse.
+  React.useEffect(() => {
+    if (isEnvBrowser()) return;
+    const onBlur = () => {
+      void fetchNui('uiBlurred');
+    };
+    const onFocus = () => {
+      void fetchNui('uiFocused');
+    };
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
   // ---- click handlers ----------------------------------------------------
 
   const handleClick = React.useCallback((type: SelectionType, name: string) => {
@@ -110,6 +157,11 @@ const Page: React.FC = () => {
     // so the panel doesn't linger during the fade-out.
     setVisible(false);
   }, [selected]);
+
+  const handleBack = React.useCallback(() => {
+    void fetchNui('goBackToMulti');
+    setVisible(false);
+  }, []);
 
   // ---- render ------------------------------------------------------------
 
@@ -185,7 +237,15 @@ const Page: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-[clamp(0.85rem,1.3vw,1.2rem)] flex justify-end">
+        <div className="mt-[clamp(0.85rem,1.3vw,1.2rem)] flex items-center justify-between">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {tx('back', 'Back')}
+          </Button>
           <Button
             type="button"
             variant="default"

@@ -2,6 +2,7 @@ local Translations = {
     ui = {
         last_location = "最後の位置",
         confirm = "始める",
+        back = "戻る",
         where_would_you_like_to_start = "開始する場所を選択",
     }
 }

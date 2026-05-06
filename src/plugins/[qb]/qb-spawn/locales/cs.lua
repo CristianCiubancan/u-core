@@ -2,6 +2,7 @@ local Translations = {
     ui = {
         last_location = "Poslední pozice",
         confirm = "Potvrdit",
+        back = "Zpět",
         where_would_you_like_to_start = "Kde chcete začít?",
     }
 }

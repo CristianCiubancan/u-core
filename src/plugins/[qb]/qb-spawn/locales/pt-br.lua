@@ -2,6 +2,7 @@ local Translations = {
     ui = {
         last_location = "Última Localização",
         confirm = "Confirmar",
+        back = "Voltar",
         where_would_you_like_to_start = "Onde você gostaria de começar?",
     }
 }

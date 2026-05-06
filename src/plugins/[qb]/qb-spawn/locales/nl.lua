@@ -2,6 +2,7 @@ local Translations = {
     ui = {
         last_location = "Laatste locatie",
         confirm = "Bevestig",
+        back = "Terug",
         where_would_you_like_to_start = "Waar wilde wakker worden?",
     }
 }
