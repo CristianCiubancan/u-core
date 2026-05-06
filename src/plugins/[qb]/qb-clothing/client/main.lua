@@ -28,6 +28,37 @@ local currentLocale = nil
 -- us; reset on every openMenu so a fresh session starts clean.
 local nuiHidden = false
 
+-- u-core: walk the ped forward a few meters at openMenu so apartment
+-- door / shop interaction zones don't keep their DrawText prompts up
+-- behind our UI. Stashed coords are restored on close.
+local preMenuCoords = nil
+local preMenuHeading = nil
+
+local function shiftPedAwayForMenu()
+    local distance = Config and Config.MenuForwardShift or 0
+    if distance == 0 then return end
+    local ped = PlayerPedId()
+    preMenuCoords = GetEntityCoords(ped)
+    preMenuHeading = GetEntityHeading(ped)
+    local offset = GetOffsetFromEntityInWorldCoords(ped, 0.0, distance, 0.0)
+    -- Snap to floor at the new XY: GetOffsetFromEntity preserves the
+    -- original Z, so stepping off a threshold leaves the ped floating.
+    local groundFound, groundZ = GetGroundZFor_3dCoord(offset.x, offset.y, offset.z + 1.0, false)
+    local newZ = groundFound and groundZ or offset.z
+    SetEntityCoords(ped, offset.x, offset.y, newZ, false, false, false, false)
+end
+
+local function restorePedAfterMenu()
+    if not preMenuCoords then return end
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, preMenuCoords.x, preMenuCoords.y, preMenuCoords.z, false, false, false, false)
+    if preMenuHeading then
+        SetEntityHeading(ped, preMenuHeading)
+    end
+    preMenuCoords = nil
+    preMenuHeading = nil
+end
+
 local skinData = {
     ["face"] =                 {item = 0,    texture = 0,  defaultItem = 0,      defaultTexture = 0},
     ["face2"] =                {item = 0,    texture = 0,  defaultItem = 0,      defaultTexture = 0},
@@ -264,14 +295,11 @@ function GetMaxValues()
         maxValues = maxModelValues
     })
 end
--- u-core: yaw the camera so the ped sits in the LEFT half of the frame,
--- leaving the right side free for the React panel. Same shift idea as
--- qb-multicharacter's CamCoords.w rotation, but qb-clothing's camera is
--- dynamic (PointCamAtCoord re-centers on every zoom preset / ped
--- rotation callback), so the offset has to be re-applied after each
--- recenter. Helper reads current rotation and adds the yaw delta;
--- callers invoke it after SetCamRot or PointCamAtCoord.
-local LEFT_FRAME_YAW_OFFSET = -15.0
+-- u-core: yaw the camera so the ped sits in the LEFT half of the
+-- frame (right side is the React panel). PointCamAtCoord / SetCamRot
+-- re-center on the ped, so callers must re-apply this after every
+-- camera recenter (zoom preset, orbit, ped rotation).
+local LEFT_FRAME_YAW_OFFSET = -20.0
 
 local function applyLeftFrameYaw()
     if not DoesCamExist(cam) then return end
@@ -299,7 +327,6 @@ local function enableCam()
 
     headingToCam = GetEntityHeading(PlayerPedId()) + 90
     camOffset = 2.0
-    -- u-core: shift ped to LEFT half of the frame.
     applyLeftFrameYaw()
 end
 local function resetClothing(data)
@@ -471,13 +498,11 @@ local function buildTranslations()
     return translations
 end
 
--- u-core: re-translate menu labels after the locale swap. Each call
--- site passes a `labelKey` (e.g. "menu.features") alongside the
--- upstream `label`. Upstream baked the translated label at the call
--- site BEFORE the locale callback resolves, so the tab strip would
--- otherwise show in the initial (en) locale even after applyLocaleHere
--- swapped phrases. Mutates in place because the menus table flows
--- straight into SendNUIMessage.
+-- u-core: re-translate menu labels after applyLocaleHere swaps phrases.
+-- Each call site passes a `labelKey` alongside the upstream `label`;
+-- without this, tabs would ship in the pre-swap (en) locale because
+-- upstream evaluates `Lang:t(...)` at call time, before the locale
+-- callback returns. Mutates in place.
 local function relabelMenus(menus)
     if type(menus) ~= 'table' then return end
     for _, m in ipairs(menus) do
@@ -487,10 +512,9 @@ local function relabelMenus(menus)
     end
 end
 
--- u-core: extracted from the original inline open. Calling it on its own
--- keeps openMenu callable from the locale-resolved closure below without
--- duplicating the body. relabelMenus runs here (post-applyLocaleHere)
--- so tabs ship in the resolved locale.
+-- u-core: split out so openMenu can defer it to inside the locale
+-- callback (relabelMenus + buildTranslations both depend on the
+-- post-swap Lang).
 local function sendOpen(allowedMenus, trackerMeta)
     relabelMenus(allowedMenus)
     SendNUIMessage({
@@ -523,6 +547,10 @@ local function openMenu(allowedMenus)
     end)
     SetNuiFocus(true, true)
     SetCursorLocation(0.9, 0.25)
+    -- u-core: walk the ped forward BEFORE freezing so the door /
+    -- zone DrawText doesn't bleed through. enableCam reads the new
+    -- position and stays in front of it.
+    shiftPedAwayForMenu()
     FreezeEntityPosition(PlayerPedId(), true)
     enableCam()
 end
@@ -1111,8 +1139,6 @@ local function getOutfits(gradeLevel, data)
     if QBCore.Functions.GetPlayerData().charinfo.gender == 1 then gender = "female" end
     QBCore.Functions.TriggerCallback('qb-clothing:server:getOutfits', function(result)
         openMenu({
-            -- u-core: labelKey carries the i18n key so relabelMenus can re-translate
-            -- post locale swap; label kept as upstream pre-translated fallback.
             {menu = "roomOutfits", labelKey = "outfits.roomOutfits", label = Lang:t("outfits.roomOutfits"), selected = true, outfits = data[gender][gradeLevel]},
             {menu = "myOutfits", labelKey = "outfits.myOutfits", label = Lang:t("outfits.myOutfits"), selected = false, outfits = result},
             {menu = "character", labelKey = "outfits.character", label = Lang:t("outfits.character"), selected = false},
@@ -1134,9 +1160,12 @@ end)
 
 RegisterNetEvent('qb-clothing:client:openMenu', function()
     customCamLocation = nil
+    -- u-core: each menu carries `labelKey` so relabelMenus can
+    -- re-translate the tab strip after the per-player locale swap
+    -- (see relabelMenus / sendOpen above). The upstream `label =
+    -- Lang:t(...)` stays as a fallback for the brief window before
+    -- the locale callback returns.
     openMenu({
-        -- u-core: labelKey ride-along; relabelMenus re-translates after the
-        -- per-player locale resolves so the tab strip ships in their language.
         {menu = "character", labelKey = "menu.features", label = Lang:t("menu.features"), selected = true},
         {menu = "hair", labelKey = "menu.hair", label = Lang:t("menu.hair"), selected = false},
         {menu = "clothing", labelKey = "menu.character", label = Lang:t("menu.character"), selected = false},
@@ -1153,7 +1182,6 @@ RegisterNetEvent('qb-clothes:client:CreateFirstCharacter', function()
     QBCore.Functions.GetPlayerData(function(pData)
         local skin = "mp_m_freemode_01"
         openMenu({
-            -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
             {menu = "character", labelKey = "menu.features", label = Lang:t("menu.features"), selected = true},
             {menu = "hair", labelKey = "menu.hair", label = Lang:t("menu.hair"), selected = false},
             {menu = "clothing", labelKey = "menu.character", label = Lang:t("menu.character"), selected = false},
@@ -1587,7 +1615,6 @@ end)
 RegisterNetEvent('qb-clothing:client:openOutfitMenu', function()
     QBCore.Functions.TriggerCallback('qb-clothing:server:getOutfits', function(result)
         openMenu({
-            -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
             {menu = "myOutfits", labelKey = "outfits.myOutfits", label = Lang:t("outfits.myOutfits"), selected = true, outfits = result},
         })
     end)
@@ -1608,7 +1635,6 @@ RegisterNUICallback('rotateRight', function(_, cb)
     local cx, cy = GetPositionByRelativeHeading(ped, heading, camOffset)
     SetCamCoord(cam, cx, cy, camPos.z)
     PointCamAtCoord(cam, pedPos.x, pedPos.y, camPos.z)
-    -- u-core: re-shift ped to LEFT half of frame (PointCamAtCoord centered it).
     applyLeftFrameYaw()
     cb('ok')
 end)
@@ -1622,7 +1648,6 @@ RegisterNUICallback('rotateLeft', function(_, cb)
     local cx, cy = GetPositionByRelativeHeading(ped, heading, camOffset)
     SetCamCoord(cam, cx, cy, camPos.z)
     PointCamAtCoord(cam, pedPos.x, pedPos.y, camPos.z)
-    -- u-core: re-shift ped to LEFT half of frame (PointCamAtCoord centered it).
     applyLeftFrameYaw()
     cb('ok')
 end)
@@ -1636,21 +1661,21 @@ RegisterNUICallback('saveOutfit', function(data, cb)
     TriggerServerEvent('qb-clothes:saveOutfit', data.outfitName, model, skinData)
     cb('ok')
 end)
+-- u-core: upstream's rotateCam rotated the ped AND re-positioned the
+-- camera in front of the ped's new face, so the visual was "camera
+-- orbits, ped stays still" — and worse, both buttons looked the same
+-- because the camera always re-aimed at whichever way the ped now
+-- faced. Stripped to just SetEntityHeading: the camera stays put, the
+-- ped visibly spins in place. Left = -10° (CCW from above), right =
+-- +10° (CW from above) — opposite directions, matching the icons.
 RegisterNUICallback('rotateCam', function(data, cb)
     local rotType = data.type
     local ped = PlayerPedId()
-    local coords = GetOffsetFromEntityInWorldCoords(ped, 0, 2.0, 0)
     if rotType == "left" then
         SetEntityHeading(ped, GetEntityHeading(ped) - 10)
-        SetCamCoord(cam, coords.x, coords.y, coords.z + 0.5)
-        SetCamRot(cam, 0.0, 0.0, GetEntityHeading(ped) + 180)
     else
         SetEntityHeading(ped, GetEntityHeading(ped) + 10)
-        SetCamCoord(cam, coords.x, coords.y, coords.z + 0.5)
-        SetCamRot(cam, 0.0, 0.0, GetEntityHeading(ped) + 180)
     end
-    -- u-core: re-shift ped to LEFT half of frame (SetCamRot above centered it).
-    applyLeftFrameYaw()
     cb('ok')
 end)
 RegisterNUICallback('setupCam', function(data, cb)
@@ -1677,7 +1702,6 @@ RegisterNUICallback('setupCam', function(data, cb)
         SetCamCoord(cam, cx, cy, pedPos.z + 0.2)
         PointCamAtCoord(cam, pedPos.x, pedPos.y, pedPos.z + 0.2)
     end
-    -- u-core: re-shift ped to LEFT half of frame (PointCamAtCoord above centered it).
     applyLeftFrameYaw()
     cb('ok')
 end)
@@ -1693,6 +1717,9 @@ RegisterNUICallback('close', function(_, cb)
     nuiHidden = false
     disableCam()
     FreezeEntityPosition(PlayerPedId(), false)
+    -- u-core: put the ped back at the pre-shift coords. Unfreeze
+    -- first so SetEntityCoords isn't fighting a frozen position.
+    restorePedAfterMenu()
     TriggerEvent('qb-clothing:client:onMenuClose')
     cb('ok')
 end)
@@ -1750,6 +1777,9 @@ AddEventHandler('onResourceStop', function(resourceName)
             RenderScriptCams(false, false, 0, 1, 0)
             DestroyCam(cam, false)
         end
+        -- u-core: restore pre-shift coords so the player isn't left
+        -- standing wherever the menu's forward shift dropped them.
+        restorePedAfterMenu()
     end
 end)
 RegisterNUICallback('getCatergoryItems', function(data, cb)
@@ -1836,7 +1866,6 @@ function loadStores()
                         action = function()
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "hair", labelKey = "menu.hair", label = Lang:t("menu.hair"), selected = true},
                             })
                         end,
@@ -1848,7 +1877,6 @@ function loadStores()
                         action = function()
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "clothing", labelKey = "menu.character", label = Lang:t("menu.character"), selected = true},
                                 {menu = "accessoires", labelKey = "menu.accessoires", label = Lang:t("menu.accessoires"), selected = false}
                             })
@@ -1861,7 +1889,6 @@ function loadStores()
                         action = function()
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "character", labelKey = "menu.features", label = Lang:t("menu.features"), selected = true},
                             })
                         end,
@@ -2022,7 +2049,6 @@ function loadStores()
                         if IsControlJustReleased(0, 38) then
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "character", labelKey = "menu.features", label = Lang:t("menu.features"), selected = true},
                             })
                         end
@@ -2030,7 +2056,6 @@ function loadStores()
                         if IsControlJustReleased(0, 38) then
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "clothing", labelKey = "menu.character", label = Lang:t("menu.character"), selected = true},
                                 {menu = "accessoires", labelKey = "menu.accessoires", label = Lang:t("menu.accessoires"), selected = false}
                             })
@@ -2039,7 +2064,6 @@ function loadStores()
                         if IsControlJustReleased(0, 38) then
                             customCamLocation = nil
                             openMenu({
-                                -- u-core: labelKey ride-along; relabelMenus re-translates after locale swap.
                                 {menu = "hair", labelKey = "menu.hair", label = Lang:t("menu.hair"), selected = true},
                             })
                         end

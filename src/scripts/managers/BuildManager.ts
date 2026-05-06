@@ -500,6 +500,16 @@ class BuildManager {
       // — a one-off `pnpm build` (no watch) skips it and falls back to
       // the legacy hot-swap path. Same for builds that ran while
       // FXServer is offline.
+      //
+      // Re-probe before reading `isHealthy()`: the watcher's one-shot
+      // `initializeReloadManager` runs at startup, and if FXServer's
+      // resource-manager listener wasn't up yet the probe fails and
+      // `initialized` stays false for the rest of the session. Without
+      // this retry the gate below silently no-ops every rebuild's
+      // /stop+/start even after FXServer comes online.
+      if (reload && this.reloadManager && !this.reloadManager.isHealthy()) {
+        await this.reloadManager.initialize();
+      }
       const useLifecycle =
         reload &&
         this.reloadManager !== null &&

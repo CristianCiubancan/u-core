@@ -1,5 +1,11 @@
 Config = Config or {}
 
+-- u-core: meters to walk the ped forward (ped-local +Y) on menu open
+-- so apartment-door / shop DrawText doesn't bleed through. Restored
+-- on close. Set to 0 to disable.
+Config.MenuForwardShift = 4.0
+
+
 Config.WomanPlayerModels = {
     'mp_f_freemode_01',
     'a_f_m_beach_01',

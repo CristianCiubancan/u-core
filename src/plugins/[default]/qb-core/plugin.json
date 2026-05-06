@@ -27,6 +27,7 @@
     "client/events.lua",
     "client/drawtext.lua",
     "client/locale_pl.lua",
+    "client/debug.lua",
     "client/_uitest.lua"
   ],
   "server_scripts": [
