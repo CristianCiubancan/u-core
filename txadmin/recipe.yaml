@@ -396,12 +396,15 @@ tasks:
     ref: main
     src: https://github.com/qbcore-framework/qb-banking
 
-  # qb-clothing is shipped via the u-core plugin pipeline: upstream
-  # Lua scripts byte-for-byte; the upstream jQuery/HTML NUI is replaced
-  # with our React webview (same NUI message contract). The build
-  # emits to [GENERATED]/[qb]/qb-clothing on `pnpm build`. The
+  # qb-clothing has been replaced by rcore_clothing (paid resource,
+  # deobfuscated source committed under src/plugins/[qb]/rcore_clothing/
+  # and src/plugins/[qb]/rcore_clothing_for_photos/). The build emits to
+  # [GENERATED]/[qb]/rcore_clothing(_for_photos) on `pnpm build`.
+  # rcore_clothing's fxmanifest declares `provide 'qb-clothing'`, so any
+  # resource doing `dependency 'qb-clothing'` keeps resolving. The
   # upstream qbcore-framework/qb-clothing download is intentionally
-  # absent so FXServer doesn't double-register the resource.
+  # absent so FXServer doesn't double-register the resource. rcore is
+  # not pulled from a public repo — it ships in this repo's source tree.
 
   - action: download_github
     dest: ./resources/[qb]/qb-hotdogjob
